@@ -1,0 +1,302 @@
+{
+    "who is kobe bryant dad": {
+        "Kobe Bryant": "Kobe Bryant -> people.person.parents"
+    },
+    "who is jojo simmons mother": {
+        "Joseph Simmons": "Joseph Simmons -> people.person.parents"
+    },
+    "who played as barney": {
+        "Barney & Friends": "Barney & Friends -> tv.tv_program.regular_cast -> tv.regular_tv_appearance.actor"
+    },
+    "who plays lorne on angel": {
+        "Lorne": "Lorne -> tv.tv_character.appeared_in_tv_program -> tv.regular_tv_appearance.actor"
+    },
+    "what countries around the world speak french": {
+        "French": "French -> language.human_language.countries_spoken_in"
+    },
+    "what countries are included in the continent of asia": {
+        "Asia": "Asia -> base.locations.continents.countries_within"
+    },
+    "what money system does australia use": {
+        "Australia": "Australia -> location.country.currency_used"
+    },
+    "what money do they use in china": {
+        "China": "China -> location.country.currency_used"
+    },
+    "which team does ronaldinho play for": {
+        "Ronaldinho": "Ronaldinho -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+    },
+    "what club team is diego forlan on": {
+        "Diego Forl\u00e1n": "Diego Forl\u00e1n -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+    },
+    "where is kia car from": {
+        "Kia Motors": "Kia Motors -> organization.organization.place_founded"
+    },
+    "where kurdish people from": {
+        "Kurds": "Kurds -> people.ethnicity.geographic_distribution"
+    },
+    "what is a famous person from massachusetts": {
+        "Massachusetts": "Massachusetts -> location.location.people_born_here"
+    },
+    "who is adam sandler": {
+        "Adam Sandler": "Adam Sandler -> people.person.profession"
+    },
+    "what timezone is michigan usa": {
+        "Michigan": "Michigan -> location.location.time_zones"
+    },
+    "what time zone is it in california": {
+        "California": "California -> location.location.time_zones"
+    },
+    "who married jessica simpson": {
+        "Jessica Simpson": "Jessica Simpson -> people.person.spouse_s -> people.marriage.spouse"
+    },
+    "who tom cruise been married to": {
+        "Tom Cruise": "Tom Cruise -> people.person.spouse_s -> people.marriage.spouse"
+    },
+    "what countries does china border": {
+        "China": "China -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "what are five countries that border france": {
+        "France": "France -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "where was adolf hitler died": {
+        "Adolf Hitler": "Adolf Hitler -> people.deceased_person.place_of_death"
+    },
+    "what place did thomas jefferson died": {
+        "Thomas Jefferson": "Thomas Jefferson -> people.deceased_person.place_of_death"
+    },
+    "what book did w.e.b. dubois wrote": {
+        "W. E. B. Du Bois": "W. E. B. Du Bois -> book.author.book_editions_published"
+    },
+    "what children 's books did suzanne collins wrote": {
+        "Suzanne Collins": "Suzanne Collins -> book.author.works_written"
+    },
+    "which airport to fly in rome": {
+        "Rome": "Rome -> travel.travel_destination.how_to_get_here -> travel.transportation.transport_terminus"
+    },
+    "what airport is close to daytona beach florida": {
+        "Daytona Beach": "Daytona Beach -> location.location.nearby_airports"
+    },
+    "who are senators from utah": {
+        "Utah": "Utah -> government.political_district.representatives -> government.government_position_held.office_holder"
+    },
+    "who is my state senator and representative minnesota": {
+        "Minnesota": "Minnesota -> government.political_district.representatives -> government.government_position_held.office_holder"
+    },
+    "what to see near austin": {
+        "Austin": "Austin -> travel.travel_destination.tourist_attractions"
+    },
+    "what to do in ottawa ontario today": {
+        "Ottawa": "Ottawa -> travel.travel_destination.tourist_attractions"
+    },
+    "what college did steve jobs attend": {
+        "Steve Jobs": "Steve Jobs -> people.person.education -> education.education.institution"
+    },
+    "where george washington carver go to school": {
+        "George Washington Carver": "George Washington Carver -> people.person.education -> education.education.institution"
+    },
+    "what form of government do we have in the usa": {
+        "United States of America": "United States of America -> location.country.form_of_government"
+    },
+    "what kind of government system does canada have": {
+        "Canada": "Canada -> location.country.form_of_government"
+    },
+    "what movies johnny depp is in": {
+        "Johnny Depp": "Johnny Depp -> film.actor.film -> film.performance.film"
+    },
+    "what movies are directed by steven spielberg": {
+        "Steven Spielberg": "Steven Spielberg -> film.director.film"
+    },
+    "what year was michael jordan rookie year": {
+        "Michael Jordan": "Michael Jordan -> sports.drafted_athlete.drafted -> sports.sports_league_draft_pick.draft"
+    },
+    "what teams did shaq play 4": {
+        "Shaquille O'Neal": "Shaquille O'Neal -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+    },
+    "what jobs did albert einstein have": {
+        "Albert Einstein": "Albert Einstein -> people.person.profession"
+    },
+    "what did martin luther do": {
+        "Martin Luther": "Martin Luther -> people.person.profession"
+    },
+    "what war was george washington president during": {
+        "George Washington": "George Washington -> military.military_commander.military_commands -> military.military_command.military_conflict"
+    },
+    "when richard nixon was president": {
+        "Richard Nixon": "Richard Nixon -> government.politician.government_positions_held -> government.government_position_held.from"
+    },
+    "what instrument does ringo starr play": {
+        "Ringo Starr": "Ringo Starr -> music.group_member.instruments_played"
+    },
+    "what 's the national sport of puerto rico": {
+        "Puerto Rico": "Puerto Rico -> sports.sports_team_location.teams"
+    },
+    "which party was lincoln": {
+        "Abraham Lincoln": "Abraham Lincoln -> government.politician.party -> government.political_party_tenure.party"
+    },
+    "what party did paul keating belong to": {
+        "Paul Keating": "Paul Keating -> government.politician.party -> government.political_party_tenure.party"
+    },
+    "what county is bradenton fl located in": {
+        "Bradenton": "Bradenton -> location.hud_county_place.county"
+    },
+    "what county is clearwater fl in": {
+        "Clearwater": "Clearwater -> location.hud_county_place.county"
+    },
+    "what instruments does katy perry play": {
+        "Katy Perry": "Katy Perry -> music.artist.track_contributions -> music.track_contribution.role"
+    },
+    "what music did antonio vivaldi compose": {
+        "Antonio Vivaldi": "Antonio Vivaldi -> music.artist.genre"
+    },
+    "what inspired van gogh work": {
+        "Vincent van Gogh": "Vincent van Gogh -> influence.influence_node.influenced_by"
+    },
+    "what art movements was henri matisse involved in": {
+        "Henri Matisse": "Henri Matisse -> visual_art.visual_artist.associated_periods_or_movements"
+    },
+    "what years did the knicks win the championship": {
+        "New York Knicks": "New York Knicks -> sports.sports_team.championships"
+    },
+    "when is the last time chicago bulls won a championship": {
+        "Chicago Bulls": "Chicago Bulls -> sports.sports_team.championships"
+    },
+    "what language do iraqi people speak": {
+        "Iraq": "Iraq -> location.country.languages_spoken"
+    },
+    "what languages are there in switzerland": {
+        "Switzerland": "Switzerland -> location.country.languages_spoken"
+    },
+    "where north dakota located": {
+        "North Dakota": "North Dakota -> base.aareas.schema.administrative_area.administrative_parent"
+    },
+    "where is azerbaijan": {
+        "Azerbaijan": "Azerbaijan -> base.locations.countries.continent"
+    },
+    "what language do u speak in egypt": {
+        "Egypt": "Egypt -> location.country.official_language"
+    },
+    "what language do you speak in iran": {
+        "Iran": "Iran -> location.country.languages_spoken"
+    },
+    "when did ny giants win the superbowl": {
+        "New York Giants": "New York Giants -> sports.sports_team.championships"
+    },
+    "what year did giants win world series": {
+        "San Francisco Giants": "San Francisco Giants -> sports.sports_team.championships"
+    },
+    "what is the official state flower of arizona": {
+        "Arizona": "Arizona -> government.governmental_jurisdiction.official_symbols -> location.location_symbol_relationship.symbol"
+    },
+    "what 6 states border south dakota": {
+        "South Dakota": "South Dakota -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "what are the basic beliefs of islam religion": {
+        "Islam": "Islam -> religion.religion.beliefs"
+    },
+    "what are the major religions in uk": {
+        "United Kingdom": "United Kingdom -> location.statistical_region.religions -> location.religion_percentage.religion"
+    },
+    "what is d capital city of south africa": {
+        "South Africa": "South Africa -> location.country.capital"
+    },
+    "what is the capital city of germany now": {
+        "Germany": "Germany -> location.country.capital"
+    },
+    "who runs china 2011": {
+        "China": "China -> government.governmental_jurisdiction.governing_officials -> government.government_position_held.office_holder"
+    },
+    "who is the governor of indiana 2012": {
+        "Governor of Indiana": "Governor of Indiana -> government.government_office_or_title.office_holders -> government.government_position_held.office_holder"
+    },
+    "what did douglas engelbart invent": {
+        "Douglas Engelbart": "Douglas Engelbart -> law.inventor.inventions"
+    },
+    "what are all the things thomas edison invented": {
+        "Thomas Edison": "Thomas Edison -> law.inventor.inventions"
+    },
+    "when were the texas rangers started": {
+        "Texas Rangers": "Texas Rangers -> sports.sports_team.founded"
+    },
+    "what else did eli whitney invent": {
+        "Eli Whitney": "Eli Whitney -> law.inventor.inventions"
+    },
+    "what currency do i need in egypt": {
+        "Egypt": "Egypt -> location.country.currency_used"
+    },
+    "what type of currency is used in the united kingdom": {
+        "United Kingdom": "United Kingdom -> location.country.currency_used"
+    },
+    "where does bradley cooper live now": {
+        "Bradley Cooper": "Bradley Cooper -> people.person.places_lived -> people.place_lived.location"
+    },
+    "where does niles crane live": {
+        "Niles Crane": "Niles Crane -> fictional_universe.fictional_character.places_lived"
+    },
+    "where president nixon was born": {
+        "Richard Nixon": "Richard Nixon -> people.person.place_of_birth"
+    },
+    "where was alice paul born": {
+        "Alice Stokes Paul": "Alice Stokes Paul -> people.person.place_of_birth"
+    },
+    "what is zip code for chicago illinois": {
+        "Chicago": "Chicago -> location.citytown.postal_codes"
+    },
+    "what is the zip code for moorpark ca": {
+        "Moorpark": "Moorpark -> location.citytown.postal_codes"
+    },
+    "where is sarajevo located": {
+        "Sarajevo": "Sarajevo -> location.location.containedby"
+    },
+    "where is american express located": {
+        "American Express": "American Express -> organization.organization.headquarters -> location.mailing_address.citytown"
+    },
+    "what language do australian people speak": {
+        "Australia": "Australia -> location.country.languages_spoken"
+    },
+    "what language does people speak in australia": {
+        "Australia": "Australia -> location.country.languages_spoken"
+    },
+    "what team does lamar odom play for 2011": {
+        "Lamar Odom": "Lamar Odom -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+    },
+    "what team does lamar odom play for 2013": {
+        "Lamar Odom": "Lamar Odom -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+    },
+    "where is oceania on a map": {
+        "Oceania": "Oceania -> location.location.containedby"
+    },
+    "on which continent is the usa located": {
+        "United States of America": "United States of America -> base.locations.countries.continent"
+    },
+    "who is the head coach of the indianapolis colts": {
+        "Indianapolis Colts": "Indianapolis Colts -> american_football.football_team.current_head_coach"
+    },
+    "who is the chicago bulls head coach": {
+        "Chicago Bulls": "Chicago Bulls -> basketball.basketball_team.head_coach"
+    },
+    "what illness did huell howser died of": {
+        "Huell Howser": "Huell Howser -> people.deceased_person.cause_of_death"
+    },
+    "what did alvin smith died from": {
+        "Alvin Smith": "Alvin Smith -> people.deceased_person.cause_of_death"
+    },
+    "what does bill gates own": {
+        "Bill Gates": "Bill Gates -> architecture.architectural_structure_owner.structures_owned -> architecture.ownership.structure"
+    },
+    "who owns audi 2011": {
+        "Audi": "Audi -> organization.organization.parent -> organization.organization_relationship.parent"
+    },
+    "what is the san francisco giants mascot": {
+        "San Francisco Giants": "San Francisco Giants -> sports.sports_team.team_mascot"
+    },
+    "what is the name of the broncos mascot": {
+        "Denver Broncos": "Denver Broncos -> sports.sports_team.team_mascot"
+    },
+    "what country speak english as native language": {
+        "English Language": "English Language -> language.human_language.countries_spoken_in"
+    },
+    "what language do you speak in finland": {
+        "Finland": "Finland -> location.country.languages_spoken"
+    }
+}

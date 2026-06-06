@@ -1,0 +1,316 @@
+{
+    "What is the most recently founded sports team that Aguero played for?": {
+        "Sergio Ag\u00fcero": "Sergio Ag\u00fcero -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+    },
+    "Where does the sports team that plays at Turner Field play?": {
+        "Turner Field": "Turner Field -> sports.sports_team.arena_stadium -> sports.sports_team.arena_stadium"
+    },
+    "What Super bowl was the last one to be won by the team that won the 2009 AFC Championship title?": {
+        "2009 AFC Championship Game": "2009 AFC Championship Game -> sports.sports_team.championships -> sports.sports_team.championships",
+        "Super bowl": "Super bowl -> common.topic.notable_types"
+    },
+    "Which was the first Super Bowl won by the Steelers?": {
+        "Pittsburgh Steelers": "Pittsburgh Steelers -> sports.sports_team.championships"
+    },
+    "What college was attended by the most known alumnus of State elementary school Menteng 1?": {
+        "State Elementary School Menteng 01": "State Elementary School Menteng 01 -> education.education.institution -> people.person.education -> people.person.education -> education.education.institution"
+    },
+    "The person who attended education institution Postgate School, Great Ayton grew up where?": {
+        "Postgate School, Great Ayton": "Postgate School, Great Ayton -> education.education.institution -> people.person.education -> people.person.place_of_birth"
+    },
+    "What movies recieved a Theatrical distribution and had Nick Cannon play in it?": {
+        "Theatrical": "Theatrical -> film.film_regional_release_date.film_release_distribution_medium -> film.film.release_date_s",
+        "Nick Cannon": "Nick Cannon -> film.actor.film -> film.performance.film"
+    },
+    "What movies have the same actor in common with the film Hold on to Me?": {
+        "Hold on to Me": "Hold on to Me -> film.performance.film -> film.actor.film -> film.actor.film -> film.performance.film"
+    },
+    "Which nation is one of five countries to border Wthiopia and has an ISo appha 3 of SDN?": {
+        "Wthiopia": "Wthiopia -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "Which countries share borders with the country where Corfu is located?": {
+        "Corfu": "Corfu -> location.country.administrative_divisions -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "Who has been the owners of the sports team that has Fred Hasner as the coach?": {
+        "Fred Hanser": "Fred Hanser -> sports.professional_sports_team.owner_s -> baseball.baseball_team.current_coaches -> baseball.current_coaching_tenure.baseball_coach"
+    },
+    "What amazing player did the sports team that plays at M&T Bank Stadium draft in 2011?": {
+        "M&T Bank Stadium": "M&T Bank Stadium -> sports.sports_team.arena_stadium -> sports.professional_sports_team.draft_picks -> sports.sports_league_draft_pick.player"
+    },
+    "Who are the parents of the recording artist for \"A Dreamer's Holiday?\"?": {
+        "A Dreamer's Holiday": "A Dreamer's Holiday -> music.featured_artist.recordings -> people.person.parents"
+    },
+    "The artist who had the Woman to Woman concert to is married to whom?": {
+        "Woman to Woman Tour": "Woman to Woman Tour -> music.artist.concert_tours -> people.person.spouse_s -> people.marriage.spouse"
+    },
+    "Name the shows produced by an actor from the movie The Only Way Out .?": {
+        "The Only Way Out": "The Only Way Out -> film.performance.film -> film.actor.film -> tv.tv_producer.programs_produced -> tv.tv_producer_term.program"
+    },
+    "Name the actor who produced Fun With Dick and Jane and also played Captain Kirk.?": {
+        "Fun with Dick and Jane": "Fun with Dick and Jane -> film.producer.film",
+        "James T. Kirk": "James T. Kirk -> tv.tv_character.appeared_in_tv_program -> tv.regular_tv_appearance.actor"
+    },
+    "What is the mascot of the team that plays in Turner Field?": {
+        "Turner Field": "Turner Field -> sports.sports_team.arena_stadium -> sports.sports_team.team_mascot"
+    },
+    "Who is the head coach of the team with mascot named T-Rac?": {
+        "T-Rac": "T-Rac -> sports.sports_team.team_mascot -> american_football.football_team.current_head_coach"
+    },
+    "What poltiical party is ideallogically based of off conservatism and inlcded john bell as a member?": {
+        "Conservatism": "Conservatism -> government.political_party.ideology",
+        "John Bell": "John Bell -> government.politician.party -> government.political_party_tenure.party"
+    },
+    "What is the name of the political party that was led by Hitler?": {
+        "Adolf Hitler": "Adolf Hitler -> government.politician.party -> government.political_party_tenure.party"
+    },
+    "Whihc other MLB season did the winners of the 1912 world series win?": {
+        "1912 World Series": "1912 World Series -> sports.sports_team.championships -> sports.sports_team.championships"
+    },
+    "What year was the world series that featured the Yankees as the winners and the Cubs as the runners up?": {
+        "Chicago Cubs": "Chicago Cubs -> sports.sports_championship_event.runner_up",
+        "New York Yankees": "New York Yankees -> sports.sports_team.championships"
+    },
+    "What other languages are spoken in the country where the Bribri language is spoken?": {
+        "Bribri Language": "Bribri Language -> location.country.languages_spoken -> location.country.languages_spoken"
+    },
+    "What other languages are spoken in the country that has Domari as its spoken language?": {
+        "Domari Language": "Domari Language -> location.country.languages_spoken -> location.country.languages_spoken"
+    },
+    "When was the last Championship Magic Johnson's team won?": {
+        "Magic Johnson": "Magic Johnson -> sports.professional_sports_team.owner_s -> sports.sports_team.championships"
+    },
+    "What was the last championship won by the team coached by Tom Thiboeau?": {
+        "Tom Thibodeau": "Tom Thibodeau -> basketball.basketball_team.head_coach -> sports.sports_team.championships"
+    },
+    "What college did Obama attend that has less than 1,727 postgraduates?": {
+        "Barack Obama": "Barack Obama -> people.person.education -> education.education.institution"
+    },
+    "What college with the largest number of postgraduates did Obama attend?": {
+        "Barack Obama": "Barack Obama -> people.person.education -> education.education.institution"
+    },
+    "What fun place that was opened on 11-11-1926 that is located in Kansas City?": {
+        "Kansas City": "Kansas City -> travel.travel_destination.tourist_attractions"
+    },
+    "what is the amusement park in san diego california that opened after 1925-07-04?": {
+        "San Diego": "San Diego -> travel.travel_destination.tourist_attractions"
+    },
+    "The location that appointed National People's Congress to govermental position has what form of government in existence?": {
+        "National People's Congress": "National People's Congress -> government.government_position_held.appointed_by -> government.governmental_jurisdiction.governing_officials -> location.country.form_of_government"
+    },
+    "Which system of government does the location, that has a governmental office holder, Wu Xiaoling have?": {
+        "Wu Xiaoling": "Wu Xiaoling -> government.government_position_held.office_holder -> government.governmental_jurisdiction.governing_officials -> location.country.form_of_government"
+    },
+    "What countries bordering South Africa have a standing army of greater than 6000 peoplel?": {
+        "South Africa": "South Africa -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "Which country that has a total of 129100 people in its army also borders the US?": {
+        "United States of America": "United States of America -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "What does the actor that plays in the movie \"A Very School Gyrl's Holla-Day\" play in?": {
+        "A Very School Gyrls Holla-Day": "A Very School Gyrls Holla-Day -> film.performance.film -> film.actor.film -> tv.tv_actor.starring_roles -> tv.regular_tv_appearance.series"
+    },
+    "What currency does the country that contains the Col\u00c3\u00b3n Province use?": {
+        "Col\u00f3n Province": "Col\u00f3n Province -> location.country.administrative_divisions -> location.country.currency_used"
+    },
+    "The country that contains Corfu uses what currency?": {
+        "Corfu": "Corfu -> location.country.administrative_divisions -> location.country.currency_used"
+    },
+    "What painter inspired Van Gogh's work?": {
+        "Vincent van Gogh": "Vincent van Gogh -> influence.influence_node.influenced_by"
+    },
+    "Who were some peers of Van Gogh who inspired his work?": {
+        "Vincent van Gogh": "Vincent van Gogh -> influence.influence_node.influenced_by"
+    },
+    "What country exports to Egypt and uses Euros?": {
+        "Egypt": "Egypt -> location.imports_and_exports.exported_to -> location.statistical_region.places_exported_to",
+        "Euro": "Euro -> finance.currency.countries_used"
+    },
+    "Which countries are exported to from the country that imports from Zimbabwe?": {
+        "Zimbabwe": "Zimbabwe -> location.imports_and_exports.imported_from -> location.statistical_region.places_imported_from -> location.statistical_region.places_exported_to -> location.imports_and_exports.exported_to"
+    },
+    "What does the area where the newspaper Informer is circulated called?": {
+        "Informer": "Informer -> periodicals.newspaper_circulation_area.newspapers -> location.country.official_language"
+    },
+    "What language is spoken in the area where the Legal Daily newspaper is distributed?": {
+        "Legal Daily": "Legal Daily -> periodicals.newspaper_circulation_area.newspapers -> location.country.official_language"
+    },
+    "What predominant religion with religious text named Sword Verse is in Russia?": {
+        "Sword Verse": "Sword Verse -> religion.religion.texts",
+        "Russia": "Russia -> location.statistical_region.religions -> location.religion_percentage.religion"
+    },
+    "What are some of the beliefs of the religious group whose place of worship is located at Guru Ram Das Ashram Gurdwara San Francisco?": {
+        "Guru Ram Das Ashram Gurdwara San Francisco": "Guru Ram Das Ashram Gurdwara San Francisco -> religion.religion.places_of_worship -> religion.religion.beliefs"
+    },
+    "Who are the two current senators of the location where there is a governmental office holder named John Early?": {
+        "John Early": "John Early -> government.government_position_held.office_holder -> government.governmental_jurisdiction.governing_officials -> government.political_district.representatives -> government.government_position_held.office_holder"
+    },
+    "Who is the 107th United States Congressional Senator?": {
+        "United States Senate": "United States Senate -> government.governmental_body.members -> government.government_position_held.office_holder",
+        "107th United States Congress": "107th United States Congress -> government.government_position_held.legislative_sessions -> government.politician.government_positions_held"
+    },
+    "Who held his govermental position from 1843-03-04 and was VP for Lincoln?": {
+        "Abraham Lincoln": "Abraham Lincoln -> government.us_president.vice_president"
+    },
+    "Who was Vice President that had the title Comptroller General of the United States?": {
+        "Comptroller General of the United States": "Comptroller General of the United States -> government.government_position_held.office_position_or_title -> government.political_appointer.appointees -> government.us_president.vice_president"
+    },
+    "Name the location that is the birth city of a famous Tight End Football Player and Kennedy's inaugural address.?": {
+        "John F. Kennedy 1961 presidential inauguration": "John F. Kennedy 1961 presidential inauguration -> time.event.locations"
+    },
+    "What is the birth place of the famous person who went to East Whittier Elementary School?": {
+        "East Whittier Elementary School": "East Whittier Elementary School -> education.education.institution -> people.person.education -> people.person.place_of_birth"
+    },
+    "The country that has the national anthem The Internationale has what type of government?": {
+        "The Internationale": "The Internationale -> government.national_anthem_of_a_country.anthem -> location.country.national_anthem -> location.country.form_of_government"
+    },
+    "What is the type of government in the nation whose national anthem is Arise, O Compratriots?": {
+        "Arise, O Compatriots": "Arise, O Compatriots -> government.national_anthem_of_a_country.anthem -> location.country.national_anthem -> location.country.form_of_government"
+    },
+    "Where is the company headquarters for the company that bought out Onavo located?": {
+        "Onavo": "Onavo -> business.acquisition.company_acquired -> organization.organization.companies_acquired -> organization.organization.headquarters -> location.mailing_address.citytown"
+    },
+    "Gerber Products Company owns what child organizations?": {
+        "Gerber Products Company": "Gerber Products Company -> organization.organization_relationship.child -> organization.organization.child -> business.business_operation.industry"
+    },
+    "What states neighbor the state with an official symbol of Protographium marcellus?": {
+        "Protographium marcellus": "Protographium marcellus -> location.location_symbol_relationship.symbol -> government.governmental_jurisdiction.official_symbols -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "Of the states, that are included in the Midwest US, which have a governmental jurisdiction location symbol, that was latest adapted?": {
+        "Midwestern United States": "Midwestern United States -> location.location.contains"
+    },
+    "What currency is used in the country where Bribri is a spoken language?": {
+        "Bribri Language": "Bribri Language -> location.country.languages_spoken -> location.country.currency_used"
+    },
+    "What currency is used in the country that speaks the Bribri language?": {
+        "Bribri Language": "Bribri Language -> location.country.languages_spoken -> location.country.currency_used"
+    },
+    "What states in the Midwest US are located in the UTC-05:00 time zone?": {
+        "UTC\u221205:00": "UTC\u221205:00 -> location.location.time_zones",
+        "Midwestern United States": "Midwestern United States -> location.location.contains"
+    },
+    "Where is time zone UTC-05:00 and Walton Indiana?": {
+        "Walton": "Walton -> location.location.containedby",
+        "UTC\u221205:00": "UTC\u221205:00 -> location.location.time_zones"
+    },
+    "What language is spoken in the country that has Althing?": {
+        "Althing": "Althing -> government.government_position_held.governmental_body -> government.governmental_jurisdiction.governing_officials -> location.country.languages_spoken"
+    },
+    "What languages are spoken where the Fillipino language is spoken?": {
+        "Filipino language": "Filipino language -> location.country.official_language -> location.country.official_language"
+    },
+    "hat central American country is home to the Andean region and also  calls Quito its capital city?": {
+        "Quito": "Quito -> location.country.capital",
+        "Andes": "Andes -> location.location.partially_containedby"
+    },
+    "Where in the world is the country with the capital of Tegucigalpa?": {
+        "Tegucigalpa": "Tegucigalpa -> location.country.capital -> location.location.containedby"
+    },
+    "Give three names for the type of government used in the Philippines.?": {
+        "Government of the Philippines": "Government of the Philippines -> government.governmental_jurisdiction.government -> location.country.form_of_government"
+    },
+    "What is the governmental system in the region where the legislative session of the First Valls government is held?": {
+        "First Valls Government": "First Valls Government -> government.government_position_held.legislative_sessions -> government.governmental_jurisdiction.governing_officials -> location.country.form_of_government"
+    },
+    "The location where the movie,\"The Naked and the Dead\" , occurs?": {
+        "The Naked and the Dead": "The Naked and the Dead -> film.film_location.featured_in_films -> base.locations.countries.continent"
+    },
+    "What airport is near the downtown location of the movie Puncture?": {
+        "Puncture": "Puncture -> film.film_location.featured_in_films -> location.location.nearby_airports"
+    },
+    "What did Thomas Edison and Joesph Swan invent?": {
+        "Joseph Swan": "Joseph Swan -> law.invention.inventor",
+        "Thomas Edison": "Thomas Edison -> law.inventor.inventions"
+    },
+    "Please state all the inventions by Thomas Edison and also Emile Berliner.?": {
+        "Emile Berliner": "Emile Berliner -> law.invention.inventor",
+        "Thomas Edison": "Thomas Edison -> law.inventor.inventions"
+    },
+    "Name the husband of Cleopatra who died by his own hand.?": {
+        "Cleopatra": "Cleopatra -> people.person.spouse_s -> people.marriage.spouse"
+    },
+    "The person who attended Edward Devotion School was supposedly shot and killed by whom?": {
+        "Edward Devotion School": "Edward Devotion School -> education.education.institution -> people.person.education -> user.alexander.misc.murdered_person.murdered_by"
+    },
+    "\"Just Like Starting Over\"'s composer plays what kind of music?": {
+        "(Just Like) Starting Over": "(Just Like) Starting Over -> music.composer.compositions -> music.artist.genre"
+    },
+    "Name the composer of Now It Can Be Told and what was their profession?": {
+        "Now It Can Be Told": "Now It Can Be Told -> music.composer.compositions -> people.person.profession"
+    },
+    "Who is the politician that currently holds the government position of Prime minister, and was in the Israeli Palestinian conflict?": {
+        "Israeli\u2013Palestinian conflict": "Israeli\u2013Palestinian conflict -> time.event.people_involved",
+        "Prime minister": "Prime minister -> government.government_position_held.basic_title -> government.political_appointer.appointees"
+    },
+    "Who was the President in 2011 of the governmental jurisdiction where the government includes the position Minister Secretary-General of the Presidency?": {
+        "President": "President -> government.government_position_held.basic_title -> government.government_position_held.office_holder",
+        "Minister Secretary-General of the Presidency": "Minister Secretary-General of the Presidency -> government.government_position_held.office_position_or_title -> government.governmental_jurisdiction.governing_officials -> government.governmental_jurisdiction.governing_officials -> government.government_position_held.office_holder"
+    },
+    "What tv shows were shot in New York and have program episode run times of more than 26?": {
+        "New York City": "New York City -> tv.tv_location.tv_shows_filmed_here"
+    },
+    "What tv show taped in New York City has an episode run time of 26?": {
+        "New York City": "New York City -> tv.tv_location.tv_shows_filmed_here"
+    },
+    "What English speaking country has an emissions per capita rating of 10.119593 metric tons?": {
+        "English Language": "English Language -> language.human_language.main_country"
+    },
+    "What Nordic country had a co2 emissions per capita once of 2009 metric ton?": {
+        "Nordic countries": "Nordic countries -> location.location.contains"
+    },
+    "What was the name of the person who said \"Live out of your imagination, not your history?\"?": {
+        "Live out of your imagination, not your history.": "Live out of your imagination, not your history. -> people.person.quotations -> people.person.profession"
+    },
+    "The artist from the HIStory World Tour concert tour played what character on the Wiz?": {
+        "The Wiz": "The Wiz -> film.performance.film -> film.performance.character",
+        "HIStory World Tour": "HIStory World Tour -> music.artist.concert_tours -> film.actor.film -> film.performance.character"
+    },
+    "What countries are located in South America and have an ISO numeric code greater than 076?": {
+        "South America": "South America -> location.location.contains"
+    },
+    "What countries near russia have a country calling code higher than 372?": {
+        "Russia": "Russia -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+    },
+    "Find the country that makes Pilsner Lager Beer, what is the dominant language there?": {
+        "Brewerkz Pilsner Lager": "Brewerkz Pilsner Lager -> food.beer_country_region.beers_from_here -> location.country.languages_spoken"
+    },
+    "Find the country that makes Al Ahram Beverages Co that makes Stella beer, what language is spoken there?": {
+        "Al Ahram Beverages Co. Stella": "Al Ahram Beverages Co. Stella -> food.beer_country_region.beers_from_here -> location.country.official_language"
+    },
+    "Which Julian Fellowes books are fiction?": {
+        "Fiction": "Fiction -> book.book.genre",
+        "Julian Fellowes": "Julian Fellowes -> book.author.works_written"
+    },
+    "Where was the death place of the author who published Editions for Journals?": {
+        "Journals": "Journals -> book.author.book_editions_published -> people.deceased_person.place_of_death"
+    },
+    "On what continent does the river that flows through Bel\u00c3\u00a9m run?": {
+        "Bel\u00e9m": "Bel\u00e9m -> geography.river.cities -> location.location.containedby"
+    },
+    "What body of water does the Zambezi and it's river basing flow into?": {
+        "The Zambezi and its river basin": "The Zambezi and its river basin -> common.topic.image -> geography.river.mouth"
+    },
+    "What Country did the artist lead, who was nominated for an award for Year of Decisions?": {
+        "Year of Decisions": "Year of Decisions -> award.award_nomination.nominated_for -> award.award_nominee.award_nominations -> government.politician.government_positions_held -> government.government_position_held.jurisdiction_of_office"
+    },
+    "Which awards, has the artist that was award nominated for ,The Cardturner, won?": {
+        "The Cardturner": "The Cardturner -> award.award_nomination.nominated_for -> award.award_nominee.award_nominations -> award.award_winner.awards_won -> award.award_honor.award"
+    },
+    "What film has a netflix_id lower than 701359781 and features Matt Dallas as an actor?": {
+        "Matt Dallas": "Matt Dallas -> film.actor.film -> film.performance.film"
+    },
+    "What film is listed under tvrage_id\" 23158 and was directed by JJ Abrams?": {
+        "J.J. Abrams": "J.J. Abrams -> film.director.film"
+    },
+    "What language is spoken where the breed Canchim originated in speak?": {
+        "Canchim": "Canchim -> biology.breed_origin.breeds_originating_here -> location.country.languages_spoken"
+    },
+    "What is the currency used in the country where Drever breed was originated in?": {
+        "Drever": "Drever -> biology.breed_origin.breeds_originating_here -> location.country.currency_used"
+    },
+    "What home of Sherrod Brown has the largest location GNIS feature ID?": {
+        "Sherrod Brown": "Sherrod Brown -> people.person.places_lived -> people.place_lived.location"
+    },
+    "What GNIS feature ID location of 612400 is Northeast of the United States?": {
+        "Northeastern United States": "Northeastern United States -> location.location.contains"
+    }
+}

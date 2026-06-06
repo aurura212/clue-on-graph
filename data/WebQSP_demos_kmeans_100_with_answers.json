@@ -1,0 +1,2256 @@
+{
+    "who is kobe bryant dad": {
+        "Answers": [
+            "Joe Bryant"
+        ],
+        "Paths": {
+            "Kobe Bryant": "Kobe Bryant -> people.person.parents"
+        }
+    },
+    "who is jojo simmons mother": {
+        "Answers": [
+            "Evelyn Simmons"
+        ],
+        "Paths": {
+            "Joseph Simmons": "Joseph Simmons -> people.person.parents"
+        }
+    },
+    "who played as barney": {
+        "Answers": [
+            "Bob West",
+            "Dean Wendt",
+            "Carey Stinson",
+            "David Joyner"
+        ],
+        "Paths": {
+            "Barney & Friends": "Barney & Friends -> tv.tv_program.regular_cast -> tv.regular_tv_appearance.actor"
+        }
+    },
+    "who plays lorne on angel": {
+        "Answers": [
+            "Andy Hallett"
+        ],
+        "Paths": {
+            "Lorne": "Lorne -> tv.tv_character.appeared_in_tv_program -> tv.regular_tv_appearance.actor"
+        }
+    },
+    "what countries around the world speak french": {
+        "Answers": [
+            "Belgium",
+            "Barbados",
+            "Benin",
+            "Burkina Faso",
+            "Burundi",
+            "Comoros",
+            "Cameroon",
+            "Central African Republic",
+            "Chad",
+            "Cyprus",
+            "Congo",
+            "Cambodia",
+            "Djibouti",
+            "Dominica",
+            "Equatorial Guinea",
+            "Jersey",
+            "Gabon",
+            "Guinea",
+            "Habsburg Netherlands",
+            "Holy Roman Empire",
+            "Haiti",
+            "Luxembourg",
+            "Laos",
+            "Lebanon",
+            "Madagascar",
+            "Mali",
+            "Martinique",
+            "Mauritius",
+            "Monaco",
+            "Morocco",
+            "Niger",
+            "Qatar",
+            "Rwanda",
+            "Switzerland",
+            "Senegal",
+            "Seychelles",
+            "Tunisia",
+            "Vatican City",
+            "Vanuatu",
+            "France",
+            "Ivory Coast",
+            "South Vietnam",
+            "Algeria"
+        ],
+        "Paths": {
+            "French": "French -> language.human_language.countries_spoken_in"
+        }
+    },
+    "what countries are included in the continent of asia": {
+        "Answers": [
+            "Bahrain",
+            "Bangladesh",
+            "Brunei",
+            "Nepal",
+            "Turkmenistan",
+            "Vietnam",
+            "Cambodia",
+            "Saudi Arabia",
+            "Yemen",
+            "Timor-Leste",
+            "Jordan",
+            "Japan",
+            "Hong Kong",
+            "India",
+            "Indonesia",
+            "Iran",
+            "Israel",
+            "Kazakhstan",
+            "Kuwait",
+            "Laos",
+            "Lebanon",
+            "Macau",
+            "Maldives",
+            "Mongolia",
+            "Myanmar",
+            "North Korea",
+            "Oman",
+            "Pakistan",
+            "Philippines",
+            "Qatar",
+            "Taiwan",
+            "Sri Lanka",
+            "South Korea",
+            "Singapore",
+            "Syria",
+            "Bhutan",
+            "Tajikistan",
+            "Thailand",
+            "Uzbekistan",
+            "Malaysia",
+            "Iraq",
+            "China",
+            "United Arab Emirates",
+            "Afghanistan",
+            "Kyrgyzstan"
+        ],
+        "Paths": {
+            "Asia": "Asia -> base.locations.continents.countries_within"
+        }
+    },
+    "what money system does australia use": {
+        "Answers": [
+            "Australian dollar"
+        ],
+        "Paths": {
+            "Australia": "Australia -> location.country.currency_used"
+        }
+    },
+    "what money do they use in china": {
+        "Answers": [
+            "Renminbi"
+        ],
+        "Paths": {
+            "China": "China -> location.country.currency_used"
+        }
+    },
+    "which team does ronaldinho play for": {
+        "Answers": [
+            "Brazil national football team",
+            "Quer\u00e9taro F.C."
+        ],
+        "Paths": {
+            "Ronaldinho": "Ronaldinho -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+        }
+    },
+    "what club team is diego forlan on": {
+        "Answers": [
+            "Uruguay national football team",
+            "Cerezo Osaka"
+        ],
+        "Paths": {
+            "Diego Forl\u00e1n": "Diego Forl\u00e1n -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+        }
+    },
+    "where is kia car from": {
+        "Answers": [
+            "South Korea"
+        ],
+        "Paths": {
+            "Kia Motors": "Kia Motors -> organization.organization.place_founded"
+        }
+    },
+    "where kurdish people from": {
+        "Answers": [
+            "Asia"
+        ],
+        "Paths": {
+            "Kurds": "Kurds -> people.ethnicity.geographic_distribution"
+        }
+    },
+    "what is a famous person from massachusetts": {
+        "Answers": [
+            "",
+            "",
+            "Leon Livingstone",
+            "Nick Kaplan",
+            "Cory Stambler",
+            "Greg Daniel Smith",
+            "Chiedu Egbuniwe",
+            "Keegan Schelling",
+            "Robert S. Kinsman",
+            "Herbert Edgar Wright",
+            "David Narkewicz",
+            "Linda Hartke",
+            "William C. Sharpe",
+            "Marguerite Insolia",
+            "Karl Jacoby",
+            "Jimmy Noel",
+            "Justin D'Abbraccio",
+            "Joseph Breck",
+            "Grace Morse",
+            "Rob Font",
+            "John Hanrahan",
+            "Sebastian Keefe ",
+            "Malcolm 'Shorty' Jarvis",
+            "Walter Hitchcock",
+            "Peter Daggett",
+            "Leigh Alexander",
+            "Rick Caplan",
+            "Ollie Satenstein",
+            "Rick Sacra",
+            "Ethelwyn Manning",
+            "David Muradian",
+            "Henry Toczylowski",
+            "Pat Bisceglia",
+            "Fred A. Leuchter",
+            "Norman Farnsworth",
+            "Charles Steadman",
+            "Red Noel",
+            "Samuel Adams",
+            "Jude",
+            "Ebenezer Learned",
+            "Deb Talan",
+            "Casey Dienel",
+            "Frank Perkins",
+            "Joe Keefe",
+            "Eric Schenkman",
+            "Hrishikesh Hirway",
+            "Sarah Lee Guthrie",
+            "Brandi Emma",
+            "Juma Santos",
+            "Charles McCarry",
+            "F. Holland Day",
+            "Herbert Philbrick",
+            "Jonathan Payne",
+            "Seth Hastings",
+            "William Soden Hastings",
+            "Henry Durant",
+            "Joel H. Rosenthal",
+            "Florence Holway",
+            "Albert J. Adams",
+            "Larry Frisoli",
+            "Eleanor Raymond",
+            "Daniel Lyons",
+            "George N. Peterson, Jr.",
+            "Christopher Forgues",
+            "Sarah Osborne",
+            "Laura Wilson",
+            "Schuyler Wheeler",
+            "Joe Pernice",
+            "Hannah Howell",
+            "Mayo A. Shattuck III",
+            "Michael Goulian",
+            "Vernon Howard",
+            "Bernard Marshall Gordon",
+            "Roger Vose",
+            "William \\\"Bill\\\" McKinney",
+            "Walter P. Phillips",
+            "Andr\u00e9 Bernier",
+            "Isaiah Stillman",
+            "Lincoln D. Faurer",
+            "Edwin Cranston",
+            "Jim Marzilli",
+            "Harrison Pope",
+            "Quock Walker",
+            "Lyman Reed Blake",
+            "Caroline A. Hall",
+            "Samuel Hoar",
+            "Christine JM Connors",
+            "Patricia Grasso",
+            "William Conkey",
+            "Harold Rugg",
+            "Daniel Pierce Thompson",
+            "Peter R. Dolan",
+            "Amo Bessone",
+            "John Curdo",
+            "William Reed Huntington",
+            "Steve Holman",
+            "Diana Golden",
+            "Andy Fish",
+            "Henry White Warren",
+            "Marc Tucker",
+            "Nictzin Dyalhis",
+            "Phil Apollo",
+            "Eric Rosenfeld",
+            "Daniel Maldonado",
+            "Jessica Andersen",
+            "Joan Larkin",
+            "Bob Miller",
+            "Erin Fehlau",
+            "Ruth Edna Kelley",
+            "Ed Souza",
+            "Lauren Terrazzano",
+            "Paul Ryan",
+            "Benjamin T. Eames",
+            "George W. Weymouth",
+            "Samuel Davis",
+            "Samuel Lathrop",
+            "Thomas Hammond",
+            "Nathaniel Garrow",
+            "Johnny Kelley",
+            "Ed Walsh",
+            "George LeBreton",
+            "Peter Berndtson",
+            "Franklin E. Plummer",
+            "Whitey Bulger",
+            "Chipper Lowell",
+            "John Quincy Adams II",
+            "Charles Johnson Maynard",
+            "Henry Babson",
+            "William Herbert Rollins",
+            "Austin M. Knight",
+            "Arthur Everett Austin, Jr.",
+            "Huc-Mazelet Luquiens",
+            "Johnny Broaca",
+            "Jed Horne",
+            "Henry Sargent",
+            "Art Kenney",
+            "John Barnard",
+            "Brian Pimental",
+            "John Gaffney",
+            "Nathaniel Eaton",
+            "Evan Dobelle",
+            "Elbridge Trask",
+            "Wallace Nutting",
+            "VenetianPrincess",
+            "Richard McGlynn",
+            "John M. Deane",
+            "Benjamin Wadsworth",
+            "Mary Parker",
+            "Joseph Gayetty",
+            "Jim Galvin",
+            "David Stoupakis",
+            "William Goodell",
+            "Harry Lew",
+            "Josiah Taft",
+            "Daniel C. Esty",
+            "Bass Otis",
+            "Maria Louise Pool",
+            "L. Thomas Hopkins",
+            "Ron Lamothe",
+            "Albert E. Wilson",
+            "James M. Burt",
+            "H. Irving Hancock",
+            "Patrick O'Shea",
+            "Herman G. Steiner",
+            "Andrew P. Iosue",
+            "George Miserlis",
+            "Eddie Kohler",
+            "Tom Lynch",
+            "Josiah Parsons Cooke",
+            "Joseph S. Manning",
+            "William Marland",
+            "Ty Burhoe",
+            "Benjamin Briggs",
+            "Herb Chambers",
+            "Dana Cameron",
+            "Dave Barsky",
+            "Al Checchi",
+            "Sean Garballey",
+            "William Brewster",
+            "Ruth Graves Wakefield",
+            "Erastus Salisbury Field",
+            "Dexter Mussey",
+            "Henry Ingersoll Bowditch",
+            "Leonard G. Shepard",
+            "Johnny Rae",
+            "Leslie Marshall",
+            "James Sigourney",
+            "Hago Harrington",
+            "Norman Prince",
+            "Sean Hurley",
+            "Eugene Conley",
+            "Sarah Manguso",
+            "Si Rosenthal",
+            "Frederick A. Lyon",
+            "Frances Shea-Buckley",
+            "Ed Droste",
+            "John Howard Ferguson",
+            "John Shea",
+            "Louis C. Mosher",
+            "Susan Hurley",
+            "Chris Lehane",
+            "Howie Storie",
+            "Pete Carmichael, Jr.",
+            "Russel Farnham",
+            "Luther Rice",
+            "William H. Mumler",
+            "Rick Asadoorian",
+            "Jack Daly",
+            "Francis X. Spina",
+            "John Albert Cousens",
+            "Jason M. Burns",
+            "Raymond J. Saulnier",
+            "Daniel Waters",
+            "Russ Marin",
+            "William Kennison",
+            "Brandon Westgate",
+            "Emily Yoffe",
+            "Fred Waitzkin",
+            "Samuel Clesson Allen",
+            "Stephen Moten",
+            "Aoibheann Sweeney",
+            "Arun Luthra",
+            "John McNamara",
+            "Johnny Thomson",
+            "Michael Gallagher",
+            "Anton Strout",
+            "Nathan Cobb",
+            "John Beach",
+            "James Schouler",
+            "Enoch Pratt",
+            "Liam Ezekiel",
+            "Harris Barron",
+            "Michael Legge",
+            "Julie Checkoway",
+            "Edward Dexter Sohier",
+            "Kyle Cooper",
+            "List of accolades received by Derrick Pierce",
+            "Mark Marderosian",
+            "John Greaney",
+            "Brunonia Barry",
+            "Roger Hooker Leavitt",
+            "Sara Pennypacker",
+            "Thomas Brattle",
+            "Samuel C. Damon",
+            "Jeb Spaulding",
+            "Ebenezer W. Peirce",
+            "Joshua Lamb",
+            "Madeline Amy Sweeney",
+            "Jeff Coffin",
+            "James D. Hornfischer",
+            "Walter Scott III",
+            "Howard Earl",
+            "Melissa Pasut",
+            "Samuel Wood",
+            "Thomas Woods",
+            "William Weeks",
+            "Joe Rindone",
+            "H. H. Hunnewell",
+            "Edmund Quincy",
+            "David Shepard",
+            "Braddish Billings",
+            "Leonard Chapin Mead",
+            "Ashley Phillips",
+            "Allyson Vieira",
+            "Shane Murphy",
+            "Julian Moynahan",
+            "Bernard Barber",
+            "Franklin D. Richards",
+            "Webster Edgerly",
+            "Thomas Whittemore",
+            "William Meninger",
+            "Matthew H. Kramer",
+            "Edwin Bryant",
+            "Jesse E. Edwards",
+            "William Watson Goodwin",
+            "Cylin Busby",
+            "Amy Ziering",
+            "Joe Anglin",
+            "Daniel Anthony Cronin",
+            "Richard Gurnon",
+            "Charles L. McCawley",
+            "Isaac Davis",
+            "Cidny Bullens",
+            "Martin Gaffney",
+            "Daniel Pratt",
+            "John Mills",
+            "Martha May Eliot",
+            "Ebenezer Walden",
+            "Alexander Pope, Jr.",
+            "Madeleine Doran",
+            "Charles Swasey",
+            "Nathaniel Peabody",
+            "Robert Giardina",
+            "Henry A. Peirce",
+            "Judith Winsor Smith",
+            "John Augustus",
+            "Alexander Russell Webb",
+            "Russell Conwell",
+            "George W. Sears",
+            "David J. Campanale",
+            "Scofield Thayer",
+            "Roger Sherman Hoar",
+            "Eliphalet Chapin",
+            "Jeremy Ingalls",
+            "Isador M. Sheffer",
+            "Augustus Hemenway",
+            "Walton Danforth Stowell",
+            "Moses Ashley Curtis",
+            "Felix Hathaway",
+            "John Black",
+            "Liz Kniss",
+            "Marcus Morton",
+            "Martha Ware",
+            "John Joseph Nilan",
+            "John Lovewell",
+            "John P. O'Brien",
+            "Larry Glick",
+            "Craig Stevens",
+            "Louis Sebastian Walsh",
+            "Roger Marino",
+            "Louise Dickinson Rich",
+            "Gary Renard",
+            "Patrick Regan",
+            "Edward Channing",
+            "John Palfrey",
+            "Isaac Sears",
+            "Nate Thayer",
+            "Larry Blamire",
+            "Daniel Anthony Hart",
+            "James Louis Connolly",
+            "Bill Stephens",
+            "William Sethares",
+            "Judith Regan",
+            "Rich Fulcher",
+            "Sarah Palfrey Cooke",
+            "Jane English",
+            "Mary E. Black",
+            "Yodelin' Slim Clark",
+            "Steven Mullahoo",
+            "John Howe",
+            "John Perkins Cushing",
+            "Ted Sears",
+            "Frank C. Whitmore",
+            "Amariah Brigham",
+            "James Pierpont",
+            "Brian J. Donnelly",
+            "Daniel Treadwell",
+            "James Hayden Tufts",
+            "Anthony A. Smalley",
+            "James Shannon",
+            "Henry Beston",
+            "Mike Gorman",
+            "Stacey Tappan",
+            "Norman D'Amours",
+            "John Sassamon",
+            "Matthew Sherman",
+            "Clayton Valli",
+            "Larry Benjamin",
+            "Ephraim Emerton",
+            "Mary Phylinda Dole",
+            "Charles Stuart",
+            "Joshua K. Ingalls",
+            "Nathan Coombs",
+            "Edgar Ray Butterworth",
+            "Elisha Cooke, Jr.",
+            "Michael Bluestein",
+            "Daniel Webster Whittle",
+            "Glenn Ordway",
+            "David Lee Child",
+            "Aristides Demetrios",
+            "Alastair Willis",
+            "Steven Baddour",
+            "Charles Neal Barney",
+            "Melvin Swig",
+            "Christopher Golden",
+            "Ray Barry",
+            "Mary Tyler Peabody Mann",
+            "Francis Pierlot",
+            "Edward G. Loring",
+            "Gail Huff",
+            "Henry F. Starbuck",
+            "Amy Correia",
+            "Alfred McCoy",
+            "Thomas Wrightington",
+            "James Jackson",
+            "Howard I. Chapelle",
+            "James Reed",
+            "Darius Marder",
+            "Nehemiah Adams",
+            "Amory Dwight Mayo",
+            "Sada Cowan",
+            "Liz Canner",
+            "Thomas Badger",
+            "George Lunt",
+            "Francis T. Ryan",
+            "Neil Shepard",
+            "Loren Galler-Rabinowitz",
+            "Thorndike Proctor",
+            "Clifton Daggett Gray",
+            "Edmund Dinis",
+            "Kevin Hunt",
+            "Love Brewster",
+            "Charles Stearns",
+            "Andrew O'Connor",
+            "Ted Nash",
+            "Benjamin Ide Wheeler",
+            "Timothy Bigelow",
+            "Irving A. Breger",
+            "Simeon Strong",
+            "Thomas E. Sniegoski",
+            "Rufus Phineas Stebbins",
+            "George H. Tinkham",
+            "Milton A. Marsh III",
+            "James A. Burke",
+            "Charles L. Gifford",
+            "Thomas Curtis Clarke",
+            "Harriet Ware",
+            "Rosalind Picard",
+            "George Girdler Smith",
+            "George Denman",
+            "Sharon Globerson",
+            "James Barnum",
+            "Bill Cardoso",
+            "George Lee Haskins",
+            "Francis Jackson",
+            "Louisa Barnes Pratt",
+            "Ernest Luxembourg Wright",
+            "Conrad Thibault",
+            "Martha Stanley",
+            "Thomas Gardner",
+            "Mellen Chamberlain",
+            "Thomas Thayer",
+            "Shaw Livermore",
+            "Sumner Arthur Long",
+            "Mark Jay Mirsky",
+            "Hastings Keith",
+            "George Jacobs",
+            "William B. Stacy",
+            "William Hart",
+            "George Grebenstein",
+            "J. Williams Beal",
+            "Jeremiah Gridley",
+            "John Delisle",
+            "Jonathan Fisher",
+            "Percy S. Prince",
+            "Christopher Denise",
+            "John Handran",
+            "Michael Deneef",
+            "Clement Drew",
+            "Dana Rosenblatt",
+            "Joel Pelletier",
+            "Frederick H. Prince",
+            "Theron Metcalf",
+            "Lucas Brunelle",
+            "Roger Swain",
+            "Stephen Brewer",
+            "J.R. Ward",
+            "Christine Lehner",
+            "Joseph Lord",
+            "Katherine Fairfax Wright",
+            "John Patrick Higgins",
+            "Jim Mullaney",
+            "Timothy Gilbert",
+            "Emerson Greenaway",
+            "Dylan Kidd",
+            "Patrick Francis Bresnahan",
+            "Patrick Kelly",
+            "Daniel J. Bloomberg",
+            "Benjamin Nugent",
+            "Nicolas Falacci",
+            "James E. FitzGerald",
+            "Calvin Goddard",
+            "George A. Draper",
+            "Robert Dickson Crane",
+            "Steven Tolman",
+            "Jordan Todman",
+            "Henry Albert Roby",
+            "Ken Stone",
+            "David Whitney",
+            "Mark P. Fitzgerald",
+            "Robert Broadwell",
+            "Thomas P. Kennedy",
+            "William Waite",
+            "Gary Galone",
+            "Marcus Child",
+            "Terrence E. McNally",
+            "Nathaniel Peaslee Sargent",
+            "Alexander Baker",
+            "Walter Orr Roberts",
+            "Joan Houlihan",
+            "Dick Sollenberger",
+            "Frank Leon Smith",
+            "Edmund Pike Graves",
+            "David Vieira",
+            "Morgan Upton",
+            "Al Freeman",
+            "Marie Denn",
+            "Joe George",
+            "David Jeremiah",
+            "Susan Jennifer Sullivan",
+            "Nancy Oakes",
+            "Jimmy Goodwin",
+            "Alexis Thurn-Taxis",
+            "Elizabeth Maclellan",
+            "Michael Piscitelli",
+            "Sarah Zoe Canner",
+            "Gillian Grisman",
+            "Denise George",
+            "Frank Marlowe",
+            "Florence Louise Pettitt",
+            "Peter Bruni",
+            "Robert Champagne",
+            "Arthur Polonsky",
+            "Amy Kravitz",
+            "F. Jay Barrows",
+            "John F. Morse",
+            "Robert Morris",
+            "Shaunna O'Connell",
+            "Christopher Markey",
+            "William Tremblay",
+            "Alfred Winsor Brown",
+            "Julia O'Connor",
+            "Michael Canavan",
+            "James S. Bolan",
+            "Robert H. Quinn",
+            "David Goodman",
+            "Alfred Vellucci",
+            "Lou Lucier",
+            "Matt Hawrilenko",
+            "Ella Cherry",
+            "Edward H. Larkin",
+            "Ralph G. Wright",
+            "Kate MacKenna",
+            "Edmund M. Wheelwright",
+            "George Maran",
+            "Marguerita Padula",
+            "George Dutton",
+            "George Gibson",
+            "Robert Swain Peabody",
+            "Heather Connell",
+            "Rezwan Ferdaus",
+            "Mark Sikes",
+            "Norman F. May",
+            "Todd Grinnell",
+            "Gerald Chertavian",
+            "Asahel Perry",
+            "Harmon Nelson",
+            "Walter Homans",
+            "Laura Lampsen",
+            "Henry DeMond",
+            "Ruth Wells",
+            "William Manning",
+            "Ruth Helms",
+            "Mary Frances Halloran",
+            "Byron Stevens",
+            "Betsy Stoddard",
+            "Jack Mintz",
+            "Sam Buffington",
+            "Arnold Hiatt",
+            "Sunda Hopkins",
+            "Lester Crawford",
+            "Louise Bates",
+            "Hamilton Morris",
+            "George W. Fuller",
+            "Amos Pollard",
+            "Don Silverman",
+            "Elisabeth Coit",
+            "Frank S. Gile",
+            "Bob Walsh",
+            "Mary Coffin",
+            "Robert Brendon Keating",
+            "John Wentworth Loring",
+            "Thomas Rice",
+            "Lucia Fairchild Fuller",
+            "Cristina C\u00f3rdova",
+            "Harry Davis",
+            "Carrie Sherman Spear",
+            "Dana Spear",
+            "Joseph O. Lee",
+            "Bill Migliore",
+            "Robert Cummings",
+            "Conrad Ranft",
+            "Margaret Bryan Davis",
+            "Ryan Jude Novelline",
+            "Melville Webber",
+            "Murray Seldeen",
+            "Charles Hochberg",
+            "Ray Fernstrom",
+            "Clarence Walworth Alvord",
+            "Janet Miller Sully",
+            "Jack Mantos",
+            "Phil Fougere",
+            "Frank Croteau",
+            "E. F. Bleiler",
+            "Norm Anderson",
+            "Norma Drury Boleslavsky",
+            "John Meehan Jr",
+            "Richard Trombly",
+            "Bella Vendetta",
+            "Louise Rousseau",
+            "Kerry Berry Brogan",
+            "Jimmy Hollywood",
+            "David Berg",
+            "Heidi Rhodes",
+            "George Souza",
+            "Anthony Lea",
+            "George DeAngelo",
+            "Harold Christie",
+            "William A. Stanley",
+            "Fred Maguire",
+            "Audrey Berry",
+            "\u00c1ngel Alves",
+            "Paul Scott",
+            "Nora Lovejoy",
+            "Walter Aspden",
+            "Gardner Bradford",
+            "Len Irving",
+            "Bill Green",
+            "Art Cruickshank",
+            "Gordon Hyatt",
+            "Steve Moses",
+            "Kenneth Kirk",
+            "Mark A. Milley",
+            "Abigail Hill Booth",
+            "Steve Sanderson",
+            "Jason Chen",
+            "John Timothy Botka",
+            "Nick Collins",
+            "Steven Gordon",
+            "Karen Daley",
+            "William Doyle",
+            "Mary Doyle",
+            "Caroline Remond Putnam",
+            "Paul Clark",
+            "Allan Drake",
+            "Carl Princi",
+            "Amy Schloerb",
+            "Ken Weiner",
+            "Gail Bruno",
+            "William Meader",
+            "Cyprian R. Dube",
+            "Stanis Johnson",
+            "Chuck Wilson",
+            "Brendon Watson",
+            "Judith Woodbury",
+            "Ashley Tramonte",
+            "Tony Cirillo",
+            "Michael Cirillo",
+            "Stephanie Clayman",
+            "Dan Stowell",
+            "Paul Nichols",
+            "Evelyn Dutton",
+            "Sean Gildea",
+            "Patricia Scanlon",
+            "John Roche",
+            "Jerry Robbins",
+            "Henry Ryan",
+            "Jennifer Markey",
+            "Barry Karas",
+            "Art Howard",
+            "Chantel Silvain",
+            "Maureen Kerrigan",
+            "Mylan Janoplis",
+            "Elizabeth Dunn",
+            "Elizabeth Dunne",
+            "Frank Meservey",
+            "Jean Champagne",
+            "Hannah Landberg",
+            "Thomas Cotter",
+            "Geoffrey Binney",
+            "Jack Fleischer",
+            "Liz Larsen-Silva",
+            "Rob Marin",
+            "Victoria Saunders",
+            "Mary Landa",
+            "John Burke",
+            "Samuel W. Martien",
+            "Colleen Pelletier",
+            "Uzo Aduba",
+            "Althea Giordano",
+            "Al Szathmary",
+            "Jason Audette",
+            "Marrian Walters",
+            "Jim Cohen",
+            "Allen D. Sewall",
+            "Ted Ouellet",
+            "Jean Canha",
+            "Peggy Scott",
+            "Richard Coolidge",
+            "Kevin Kapstad",
+            "Michael Lata",
+            "Lori DeBortoli",
+            "Philip Sears",
+            "Philip C. Bankwitz",
+            "J. Brian Smith"
+        ],
+        "Paths": {
+            "Massachusetts": "Massachusetts -> location.location.people_born_here"
+        }
+    },
+    "who is adam sandler": {
+        "Answers": [
+            "Comedian",
+            "Film Producer",
+            "Actor",
+            "Television producer",
+            "Musician",
+            "Screenwriter",
+            "Songwriter",
+            "Voice Actor"
+        ],
+        "Paths": {
+            "Adam Sandler": "Adam Sandler -> people.person.profession"
+        }
+    },
+    "what timezone is michigan usa": {
+        "Answers": [
+            "UTC\u221205:00",
+            "Central Time Zone",
+            "Eastern Time Zone"
+        ],
+        "Paths": {
+            "Michigan": "Michigan -> location.location.time_zones"
+        }
+    },
+    "what time zone is it in california": {
+        "Answers": [
+            "Pacific Time Zone"
+        ],
+        "Paths": {
+            "California": "California -> location.location.time_zones"
+        }
+    },
+    "who married jessica simpson": {
+        "Answers": [
+            "Eric Johnson"
+        ],
+        "Paths": {
+            "Jessica Simpson": "Jessica Simpson -> people.person.spouse_s -> people.marriage.spouse"
+        }
+    },
+    "who tom cruise been married to": {
+        "Answers": [
+            "Mimi Rogers",
+            "Nicole Kidman",
+            "Katie Holmes"
+        ],
+        "Paths": {
+            "Tom Cruise": "Tom Cruise -> people.person.spouse_s -> people.marriage.spouse"
+        }
+    },
+    "what countries does china border": {
+        "Answers": [
+            "Nepal",
+            "Vietnam",
+            "Japan",
+            "India",
+            "Kazakhstan",
+            "Laos",
+            "Mongolia",
+            "Myanmar",
+            "North Korea",
+            "Pakistan",
+            "Russia",
+            "Taiwan",
+            "Bhutan",
+            "Tajikistan",
+            "Afghanistan",
+            "Kyrgyzstan"
+        ],
+        "Paths": {
+            "China": "China -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+        }
+    },
+    "what are five countries that border france": {
+        "Answers": [
+            "Belgium",
+            "Germany",
+            "Italy",
+            "Luxembourg",
+            "Monaco",
+            "Spain",
+            "Switzerland",
+            "United Kingdom",
+            "Andorra"
+        ],
+        "Paths": {
+            "France": "France -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+        }
+    },
+    "where was adolf hitler died": {
+        "Answers": [
+            "Berlin"
+        ],
+        "Paths": {
+            "Adolf Hitler": "Adolf Hitler -> people.deceased_person.place_of_death"
+        }
+    },
+    "what place did thomas jefferson died": {
+        "Answers": [
+            "Charlottesville"
+        ],
+        "Paths": {
+            "Thomas Jefferson": "Thomas Jefferson -> people.deceased_person.place_of_death"
+        }
+    },
+    "what book did w.e.b. dubois wrote": {
+        "Answers": [
+            "Darkwater",
+            "John Brown",
+            "The suppression of the African slave trade to the United States of America, 1638-1870",
+            "Writings",
+            "Dark princess",
+            "The Negro",
+            "The world of W.E.B. Du Bois",
+            "The illustrated Souls of Black folk",
+            "W.E.B. Du Bois on Asia",
+            "The quest of the silver fleece",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The Souls of Black Folk",
+            "The souls of Black folk",
+            "Souls of Black Folk",
+            "The Souls of Black Folk",
+            "Souls of Black Folk",
+            "The souls of Black folk.",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of black folk",
+            "The souls of Black folk",
+            "The Souls of Black Folk (Dodo Press)",
+            "The Souls of Black Folk (Penguin Classics)",
+            "The Souls of Black Folk (Oxford World's Classics)",
+            "The souls of Black folk",
+            "Souls of Black Folk",
+            "The Souls of Black Folk (Barnes & Noble Classics Series) (Barnes & Noble Classics)",
+            "Souls of Black Folk (Signet Classics (Paperback))",
+            "The Souls of Black Folk (Bedford Series in History and Culture)",
+            "The souls of Black folk",
+            "The Souls of Black Folk (Barnes & Noble Classics Series) (Barnes & Noble Classics)",
+            "The Negro",
+            "The Negro",
+            "The Negro.",
+            "The Negro",
+            "Negro",
+            "The negro",
+            "The Negro",
+            "The Negro (Classics in Black Studies)",
+            "The Negro (Large Print Edition)",
+            "The Negro (Illustrated Edition) (Dodo Press)",
+            "John Brown.",
+            "John Brown.",
+            "John Brown (Modern Library Classics (Sagebrush))",
+            "John Brown (New World Paperbacks)",
+            "John Brown",
+            "John Brown (Modern Library Classics)",
+            "Dark princess",
+            "Dark princess",
+            "John Brown",
+            "Dark Princess",
+            "Writings (The Library of America)",
+            "Darkwater",
+            "Darkwater",
+            "Darkwater",
+            "Darkwater",
+            "Darkwater",
+            "Darkwater",
+            "The suppression of the African slave-trade to the United States of America, 1638-1870.",
+            "Darkwater (Large Print Edition)",
+            "Darkwater",
+            "The suppression of the African slave-trade to the United States of America, 1638-1870.",
+            "The Suppression of the African Slave-Trade to the United States of America 1638-1870 (Dodo Press)",
+            "The suppression of the African slave trade to the United States of America, 1638-1870",
+            "The quest of the silver fleece",
+            "The quest of the silver fleece",
+            "The quest of the silver fleece",
+            "The quest of the silver fleece",
+            "The quest of the silver fleece",
+            "Quest of the Silver Fleece",
+            "The quest of the silver fleece",
+            "The quest of the silver fleece",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk.",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "Souls of Black Folk",
+            "Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The Souls of Black Folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of Black folk",
+            "The souls of black folk",
+            "Souls of Black Folk",
+            "The Souls of Black Folk (Penguin Classics)",
+            "The Souls of Black Folk (Dodo Press)",
+            "The Souls of Black Folk (Oxford World's Classics)",
+            "The Souls of Black Folk (Bedford Series in History and Culture)",
+            "Souls of Black Folk (Signet Classics (Paperback))",
+            "The Souls of Black Folk (Barnes & Noble Classics Series) (Barnes & Noble Classics)",
+            "The Souls of Black Folk (Barnes & Noble Classics Series) (Barnes & Noble Classics)"
+        ],
+        "Paths": {
+            "W. E. B. Du Bois": "W. E. B. Du Bois -> book.author.book_editions_published"
+        }
+    },
+    "what children 's books did suzanne collins wrote": {
+        "Answers": [
+            "The Underland Chronicles Book Three",
+            "Gregor and the Code of Claw",
+            "FIRE PROOF",
+            "Gregor and the Prophecy of Bane"
+        ],
+        "Paths": {
+            "Suzanne Collins": "Suzanne Collins -> book.author.works_written"
+        }
+    },
+    "which airport to fly in rome": {
+        "Answers": [
+            "Leonardo da Vinci\u2013Fiumicino Airport",
+            "Ciampino\u2013G. B. Pastine International Airport"
+        ],
+        "Paths": {
+            "Rome": "Rome -> travel.travel_destination.how_to_get_here -> travel.transportation.transport_terminus"
+        }
+    },
+    "what airport is close to daytona beach florida": {
+        "Answers": [
+            "Spruce Creek Airport",
+            "Massey Ranch Airpark",
+            "Daytona Beach International Airport"
+        ],
+        "Paths": {
+            "Daytona Beach": "Daytona Beach -> location.location.nearby_airports"
+        }
+    },
+    "who are senators from utah": {
+        "Answers": [
+            "Orrin Hatch",
+            "Bob Bennett",
+            "Frank Moss",
+            "Mike Lee"
+        ],
+        "Paths": {
+            "Utah": "Utah -> government.political_district.representatives -> government.government_position_held.office_holder"
+        }
+    },
+    "who is my state senator and representative minnesota": {
+        "Answers": [
+            "Paul Wellstone",
+            "Wendell Anderson",
+            "Dean Barkley",
+            "Eugene McCarthy",
+            "Norm Coleman",
+            "Rudy Boschwitz",
+            "William Windom",
+            "Daniel Sheldon Norton",
+            "Alonzo J. Edgerton",
+            "Dwight M. Sabin",
+            "Henry Mower Rice",
+            "Samuel J. R. McMillan",
+            "Ozora P. Stearns",
+            "Morton S. Wilkinson",
+            "Mark Dayton",
+            "Rod Grams",
+            "David Durenberger",
+            "Muriel Humphrey Brown",
+            "Edward John Thye",
+            "Knute Nelson",
+            "Elmer Austin Benson",
+            "Alexander Ramsey",
+            "Cushman Kellogg Davis",
+            "Frank B. Kellogg",
+            "Al Franken",
+            "Charles A. Towne",
+            "William D. Washburn",
+            "James Shields",
+            "Thomas D. Schall",
+            "Joseph H. Ball",
+            "Arthur E. Nelson",
+            "Ernest Lundeen",
+            "Guy V. Howard",
+            "Magnus Johnson",
+            "Henrik Shipstead",
+            "Moses E. Clapp",
+            "Amy Klobuchar",
+            "Walter Mondale",
+            "Hubert Humphrey"
+        ],
+        "Paths": {
+            "Minnesota": "Minnesota -> government.political_district.representatives -> government.government_position_held.office_holder"
+        }
+    },
+    "what to see near austin": {
+        "Answers": [
+            "Lady Bird Lake",
+            "Zilker Park",
+            "Lake Austin",
+            "Texas State Capitol",
+            "William Sidney Porter House",
+            "Ann W. Richards Congress Avenue Bridge",
+            "Texas Memorial Museum",
+            "Harry Ransom Center",
+            "Barton Springs Pool",
+            "Cathedral of Junk",
+            "Lyndon Baines Johnson Library and Museum",
+            "Blanton Museum of Art",
+            "Bullock Texas State History Museum",
+            "Texas Department of Public Safety Historical Museum and Research Center",
+            "Lady Bird Johnson Wildflower Center",
+            "Austin Aquarium"
+        ],
+        "Paths": {
+            "Austin": "Austin -> travel.travel_destination.tourist_attractions"
+        }
+    },
+    "what to do in ottawa ontario today": {
+        "Answers": [
+            "Canadian War Museum",
+            "Rideau Hall",
+            "Canadian Museum of Nature",
+            "National Gallery of Canada",
+            "Nepean Museum",
+            "Centrepointe Theatre",
+            "Canadian Museum of Contemporary Photography",
+            "Canada Agriculture Museum",
+            "Canada Aviation and Space Museum",
+            "Canadian Ski Museum",
+            "CFS Carp",
+            "Canada Science and Technology Museum",
+            "Currency Museum",
+            "Bytown Museum",
+            "Billings Estate Museum",
+            "Logos Land"
+        ],
+        "Paths": {
+            "Ottawa": "Ottawa -> travel.travel_destination.tourist_attractions"
+        }
+    },
+    "what college did steve jobs attend": {
+        "Answers": [
+            "Reed College"
+        ],
+        "Paths": {
+            "Steve Jobs": "Steve Jobs -> people.person.education -> education.education.institution"
+        }
+    },
+    "where george washington carver go to school": {
+        "Answers": [
+            "Simpson College",
+            "Iowa State University",
+            "Minneapolis High School"
+        ],
+        "Paths": {
+            "George Washington Carver": "George Washington Carver -> people.person.education -> education.education.institution"
+        }
+    },
+    "what form of government do we have in the usa": {
+        "Answers": [
+            "Presidential system",
+            "Constitutional republic",
+            "Federal republic"
+        ],
+        "Paths": {
+            "United States of America": "United States of America -> location.country.form_of_government"
+        }
+    },
+    "what kind of government system does canada have": {
+        "Answers": [
+            "Parliamentary system",
+            "Constitutional monarchy",
+            "Federal monarchy"
+        ],
+        "Paths": {
+            "Canada": "Canada -> location.country.form_of_government"
+        }
+    },
+    "what movies johnny depp is in": {
+        "Answers": [
+            "Black Mass",
+            "Yoga Hosers",
+            "Edward Scissorhands",
+            "Pirates of the Caribbean: The Curse of the Black Pearl",
+            "The Ninth Gate",
+            "Benny & Joon",
+            "Secret Window",
+            "Ed Wood",
+            "London Fields",
+            "The Source",
+            "The Imaginarium of Doctor Parnassus",
+            "Once Upon a Time in Mexico",
+            "The Rum Diary",
+            "What's Eating Gilbert Grape",
+            "Don Juan DeMarco",
+            "Pirates of the Caribbean: Dead Man's Chest",
+            "The Tourist",
+            "Finding Neverland",
+            "Sonic the Hedgehog",
+            "Cannes Man",
+            "Alice in Wonderland",
+            "Slow Burn",
+            "Charlie and the Chocolate Factory",
+            "Corpse Bride",
+            "Cry-Baby",
+            "The Man Who Cried",
+            "When You're Strange",
+            "Pirates of the Caribbean: At World's End",
+            "The Brave",
+            "Chocolat",
+            "Nick of Time",
+            "Donnie Brasco",
+            "Arizona Dream",
+            "The Libertine",
+            "The Astronaut's Wife",
+            "Rango",
+            "Freddy's Dead: The Final Nightmare",
+            "A Nightmare on Elm Street",
+            "Shantaram",
+            "Dark Shadows",
+            "The Devil, the Sinner, and His Journey",
+            "Private Resort",
+            "Pirates of the Caribbean: On Stranger Tides",
+            "Wild Roses, Tender Roses",
+            "21 Jump Street",
+            "From Hell",
+            "Divine Rapture",
+            "Jack and Jill",
+            "Before Night Falls",
+            "Sweeney Todd: The Demon Barber of Fleet Street",
+            "The Lone Ranger",
+            "Fear and Loathing in Las Vegas",
+            "Sleepy Hollow",
+            "Public Enemies",
+            "Deep Sea 3D",
+            "Pirates of the Caribbean: Dead Men Tell No Tales",
+            "Happily Ever After",
+            "L.A. Without a Map",
+            "Blow",
+            "Platoon",
+            "Dead Man",
+            "Transcendence",
+            "Into the Woods",
+            "Tusk",
+            "Alice in Wonderland: Through the Looking Glass",
+            "Mortdecai"
+        ],
+        "Paths": {
+            "Johnny Depp": "Johnny Depp -> film.actor.film -> film.performance.film"
+        }
+    },
+    "what movies are directed by steven spielberg": {
+        "Answers": [
+            "Bridge of Spies",
+            "Minority Report",
+            "A.I. Artificial Intelligence",
+            "Close Encounters of the Third Kind",
+            "The BFG",
+            "Catch Me If You Can",
+            "Duel",
+            "Empire of the Sun",
+            "Amistad",
+            "Hook",
+            "War of the Worlds",
+            "The Adventures of Tintin: The Secret of the Unicorn",
+            "The Attack of the Mummies",
+            "Slipstream",
+            "Amazing Stories: Book One",
+            "The Lost World: Jurassic Park",
+            "The Terminal",
+            "Always",
+            "Indiana Jones and the Kingdom of the Crystal Skull",
+            "Twilight Zone: The Movie",
+            "1941",
+            "The Sugarland Express",
+            "Something Evil",
+            "Saving Private Ryan",
+            "Munich",
+            "The Color Purple",
+            "War Horse",
+            "Indiana Jones and the Raiders of the Lost Ark",
+            "Amblin",
+            "Savage",
+            "Lincoln",
+            "Indiana Jones and the Last Crusade",
+            "Schindler's List",
+            "Robopocalypse",
+            "Jurassic Park",
+            "E.T. the Extra-Terrestrial",
+            "Jaws",
+            "Indiana Jones and the Temple of Doom",
+            "Firelight"
+        ],
+        "Paths": {
+            "Steven Spielberg": "Steven Spielberg -> film.director.film"
+        }
+    },
+    "what year was michael jordan rookie year": {
+        "Answers": [
+            "1984 NBA draft"
+        ],
+        "Paths": {
+            "Michael Jordan": "Michael Jordan -> sports.drafted_athlete.drafted -> sports.sports_league_draft_pick.draft"
+        }
+    },
+    "what teams did shaq play 4": {
+        "Answers": [
+            "LSU Tigers men's basketball",
+            "Boston Celtics",
+            "Miami Heat",
+            "Orlando Magic",
+            "Cleveland Cavaliers",
+            "Los Angeles Lakers",
+            "Phoenix Suns"
+        ],
+        "Paths": {
+            "Shaquille O'Neal": "Shaquille O'Neal -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+        }
+    },
+    "what jobs did albert einstein have": {
+        "Answers": [
+            "Teacher",
+            "Philosopher",
+            "Theoretical Physicist",
+            "Mathematician",
+            "Physicist",
+            "Scientist",
+            "Writer",
+            "Author"
+        ],
+        "Paths": {
+            "Albert Einstein": "Albert Einstein -> people.person.profession"
+        }
+    },
+    "what did martin luther do": {
+        "Answers": [
+            "Professor",
+            "Monk",
+            "Theologian",
+            "Physician",
+            "Priest",
+            "Writer"
+        ],
+        "Paths": {
+            "Martin Luther": "Martin Luther -> people.person.profession"
+        }
+    },
+    "what war was george washington president during": {
+        "Answers": [
+            "Battle of Brandywine",
+            "Siege of Yorktown",
+            "Treaty of Alliance",
+            "Battle of Long Island",
+            "Battle of Princeton",
+            "Braddock Expedition",
+            "Battle of Trenton",
+            "Siege of Boston",
+            "Battle of Monmouth",
+            "Battle of Germantown",
+            "Battle of White Plains",
+            "New York and New Jersey campaign",
+            "Battle of Harlem Heights",
+            "Landing at Kip's Bay",
+            "Battle of the Clouds",
+            "Battle of Pell's Point",
+            "Battle of the Monongahela",
+            "Battle of Fort Necessity",
+            "Boston campaign",
+            "Battle of Jumonville Glen",
+            "Quasi-War",
+            "Battle of Fort Duquesne",
+            "Battle of the Assunpink Creek",
+            "Fortification of Dorchester Heights",
+            "French and Indian War",
+            "Battle of Fort Washington",
+            "Philadelphia campaign",
+            "Yorktown campaign",
+            "Battle of White Marsh",
+            "American Revolutionary War"
+        ],
+        "Paths": {
+            "George Washington": "George Washington -> military.military_commander.military_commands -> military.military_command.military_conflict"
+        }
+    },
+    "when richard nixon was president": {
+        "Answers": [
+            "1969-01-20"
+        ],
+        "Paths": {
+            "Richard Nixon": "Richard Nixon -> government.politician.government_positions_held -> government.government_position_held.from"
+        }
+    },
+    "what instrument does ringo starr play": {
+        "Answers": [
+            "Organ",
+            "Clarinet",
+            "Drums",
+            "Double bass",
+            "Drums",
+            "Guitar",
+            "Harmonica",
+            "Mandolin",
+            "Keyboard",
+            "Piano",
+            "Saxophone",
+            "Tuba",
+            "Flute",
+            "Percussion"
+        ],
+        "Paths": {
+            "Ringo Starr": "Ringo Starr -> music.group_member.instruments_played"
+        }
+    },
+    "what 's the national sport of puerto rico": {
+        "Answers": [
+            "Capitanes de Arecibo",
+            "Puerto Rico men's national volleyball team",
+            "Puerto Rico women's national volleyball team",
+            "Puerto Rico national football team"
+        ],
+        "Paths": {
+            "Puerto Rico": "Puerto Rico -> sports.sports_team_location.teams"
+        }
+    },
+    "which party was lincoln": {
+        "Answers": [
+            "Republican Party",
+            "Whig Party",
+            "National Union Party",
+            "Illinois Republican Party"
+        ],
+        "Paths": {
+            "Abraham Lincoln": "Abraham Lincoln -> government.politician.party -> government.political_party_tenure.party"
+        }
+    },
+    "what party did paul keating belong to": {
+        "Answers": [
+            "Australian Labor Party"
+        ],
+        "Paths": {
+            "Paul Keating": "Paul Keating -> government.politician.party -> government.political_party_tenure.party"
+        }
+    },
+    "what county is bradenton fl located in": {
+        "Answers": [
+            "Manatee County"
+        ],
+        "Paths": {
+            "Bradenton": "Bradenton -> location.hud_county_place.county"
+        }
+    },
+    "what county is clearwater fl in": {
+        "Answers": [
+            "Pinellas County"
+        ],
+        "Paths": {
+            "Clearwater": "Clearwater -> location.hud_county_place.county"
+        }
+    },
+    "what instruments does katy perry play": {
+        "Answers": [
+            "Vocals"
+        ],
+        "Paths": {
+            "Katy Perry": "Katy Perry -> music.artist.track_contributions -> music.track_contribution.role"
+        }
+    },
+    "what music did antonio vivaldi compose": {
+        "Answers": [
+            "Baroque music",
+            "Classical music"
+        ],
+        "Paths": {
+            "Antonio Vivaldi": "Antonio Vivaldi -> music.artist.genre"
+        }
+    },
+    "what inspired van gogh work": {
+        "Answers": [
+            "Eug\u00e8ne Delacroix",
+            "Claude Monet",
+            "Jean-Fran\u00e7ois Millet",
+            "Jozef Isra\u00ebls",
+            "Anton Mauve",
+            "Paul C\u00e9zanne",
+            "Fernand Cormon",
+            "Rembrandt",
+            "Willem Roelofs",
+            "Peter Paul Rubens"
+        ],
+        "Paths": {
+            "Vincent van Gogh": "Vincent van Gogh -> influence.influence_node.influenced_by"
+        }
+    },
+    "what art movements was henri matisse involved in": {
+        "Answers": [
+            "Modern art",
+            "Impressionism",
+            "Neo-impressionism",
+            "Fauvism",
+            "Modernism"
+        ],
+        "Paths": {
+            "Henri Matisse": "Henri Matisse -> visual_art.visual_artist.associated_periods_or_movements"
+        }
+    },
+    "what years did the knicks win the championship": {
+        "Answers": [
+            "1973 NBA Finals",
+            "1970 NBA Finals"
+        ],
+        "Paths": {
+            "New York Knicks": "New York Knicks -> sports.sports_team.championships"
+        }
+    },
+    "when is the last time chicago bulls won a championship": {
+        "Answers": [
+            "1998 NBA Finals"
+        ],
+        "Paths": {
+            "Chicago Bulls": "Chicago Bulls -> sports.sports_team.championships"
+        }
+    },
+    "what language do iraqi people speak": {
+        "Answers": [
+            "Turkmen Language",
+            "Persian Language",
+            "South Azeri language",
+            "Assyrian Neo-Aramaic Language",
+            "Kurdish languages",
+            "Syriac language",
+            "Arabic Language",
+            "Armenian Language"
+        ],
+        "Paths": {
+            "Iraq": "Iraq -> location.country.languages_spoken"
+        }
+    },
+    "what languages are there in switzerland": {
+        "Answers": [
+            "Italian Language",
+            "German Language",
+            "French",
+            "Romansh language"
+        ],
+        "Paths": {
+            "Switzerland": "Switzerland -> location.country.languages_spoken"
+        }
+    },
+    "where north dakota located": {
+        "Answers": [
+            "United States of America"
+        ],
+        "Paths": {
+            "North Dakota": "North Dakota -> base.aareas.schema.administrative_area.administrative_parent"
+        }
+    },
+    "where is azerbaijan": {
+        "Answers": [
+            "Eurasia"
+        ],
+        "Paths": {
+            "Azerbaijan": "Azerbaijan -> base.locations.countries.continent"
+        }
+    },
+    "what language do u speak in egypt": {
+        "Answers": [
+            "Modern Standard Arabic"
+        ],
+        "Paths": {
+            "Egypt": "Egypt -> location.country.official_language"
+        }
+    },
+    "what language do you speak in iran": {
+        "Answers": [
+            "Azerbaijani language",
+            "Turkmen Language",
+            "Persian Language",
+            "Qashqa'i Language",
+            "Luri language",
+            "Kumzari Language",
+            "Assyrian Neo-Aramaic Language",
+            "Khalaj, Turkic Language",
+            "Mazanderani Language",
+            "Gilaki Language",
+            "Kurdish languages",
+            "Talysh language",
+            "Afshar language",
+            "Khorasani Turkish Language",
+            "Balochi language",
+            "Arabic Language",
+            "Pashto language",
+            "Armenian Language"
+        ],
+        "Paths": {
+            "Iran": "Iran -> location.country.languages_spoken"
+        }
+    },
+    "when did ny giants win the superbowl": {
+        "Answers": [
+            "Super Bowl XLVI",
+            "Super Bowl XLII",
+            "Super Bowl XXI",
+            "Super Bowl XXV"
+        ],
+        "Paths": {
+            "New York Giants": "New York Giants -> sports.sports_team.championships"
+        }
+    },
+    "what year did giants win world series": {
+        "Answers": [
+            "2014 World Series",
+            "2010 World Series",
+            "2012 World Series"
+        ],
+        "Paths": {
+            "San Francisco Giants": "San Francisco Giants -> sports.sports_team.championships"
+        }
+    },
+    "what is the official state flower of arizona": {
+        "Answers": [
+            "Saguaro"
+        ],
+        "Paths": {
+            "Arizona": "Arizona -> government.governmental_jurisdiction.official_symbols -> location.location_symbol_relationship.symbol"
+        }
+    },
+    "what 6 states border south dakota": {
+        "Answers": [
+            "Iowa",
+            "Minnesota",
+            "Montana",
+            "Nebraska",
+            "North Dakota",
+            "Wyoming"
+        ],
+        "Paths": {
+            "South Dakota": "South Dakota -> location.location.adjoin_s -> location.adjoining_relationship.adjoins"
+        }
+    },
+    "what are the basic beliefs of islam religion": {
+        "Answers": [
+            "Mahdi",
+            "Tawhid",
+            "Prophets in Islam",
+            "Predestination in Islam",
+            "Entering Heaven alive",
+            "Monotheism",
+            "Islamic view of angels",
+            "Qiyamah",
+            "Sharia",
+            "Masih ad-Dajjal",
+            "Islamic holy books",
+            "God in Islam",
+            "\u1e6c\u016bb\u0101"
+        ],
+        "Paths": {
+            "Islam": "Islam -> religion.religion.beliefs"
+        }
+    },
+    "what are the major religions in uk": {
+        "Answers": [
+            "Church of England",
+            "Judaism",
+            "Hinduism",
+            "Methodism",
+            "Presbyterianism",
+            "Sikhism",
+            "Catholicism",
+            "Islam"
+        ],
+        "Paths": {
+            "United Kingdom": "United Kingdom -> location.statistical_region.religions -> location.religion_percentage.religion"
+        }
+    },
+    "what is d capital city of south africa": {
+        "Answers": [
+            "Cape Town",
+            "Pretoria",
+            "Bloemfontein"
+        ],
+        "Paths": {
+            "South Africa": "South Africa -> location.country.capital"
+        }
+    },
+    "what is the capital city of germany now": {
+        "Answers": [
+            "Berlin"
+        ],
+        "Paths": {
+            "Germany": "Germany -> location.country.capital"
+        }
+    },
+    "who runs china 2011": {
+        "Answers": [
+            "Hu Jintao"
+        ],
+        "Paths": {
+            "China": "China -> government.governmental_jurisdiction.governing_officials -> government.government_position_held.office_holder"
+        }
+    },
+    "who is the governor of indiana 2012": {
+        "Answers": [
+            "Mitch Daniels"
+        ],
+        "Paths": {
+            "Governor of Indiana": "Governor of Indiana -> government.government_office_or_title.office_holders -> government.government_position_held.office_holder"
+        }
+    },
+    "what did douglas engelbart invent": {
+        "Answers": [
+            "Mouse"
+        ],
+        "Paths": {
+            "Douglas Engelbart": "Douglas Engelbart -> law.inventor.inventions"
+        }
+    },
+    "what are all the things thomas edison invented": {
+        "Answers": [
+            "Movie camera",
+            "Quadruplex telegraph",
+            "Electric Power Distribution",
+            "Mimeograph",
+            "Phonograph",
+            "Incandescent light bulb",
+            "Carbon microphone",
+            "Phonograph cylinder"
+        ],
+        "Paths": {
+            "Thomas Edison": "Thomas Edison -> law.inventor.inventions"
+        }
+    },
+    "when were the texas rangers started": {
+        "Answers": [
+            "1972"
+        ],
+        "Paths": {
+            "Texas Rangers": "Texas Rangers -> sports.sports_team.founded"
+        }
+    },
+    "what else did eli whitney invent": {
+        "Answers": [
+            "Milling",
+            "Interchangeable parts",
+            "Cotton gin"
+        ],
+        "Paths": {
+            "Eli Whitney": "Eli Whitney -> law.inventor.inventions"
+        }
+    },
+    "what currency do i need in egypt": {
+        "Answers": [
+            "Egyptian pound"
+        ],
+        "Paths": {
+            "Egypt": "Egypt -> location.country.currency_used"
+        }
+    },
+    "what type of currency is used in the united kingdom": {
+        "Answers": [
+            "Pound sterling"
+        ],
+        "Paths": {
+            "United Kingdom": "United Kingdom -> location.country.currency_used"
+        }
+    },
+    "where does bradley cooper live now": {
+        "Answers": [
+            "Philadelphia"
+        ],
+        "Paths": {
+            "Bradley Cooper": "Bradley Cooper -> people.person.places_lived -> people.place_lived.location"
+        }
+    },
+    "where does niles crane live": {
+        "Answers": [
+            "Seattle"
+        ],
+        "Paths": {
+            "Niles Crane": "Niles Crane -> fictional_universe.fictional_character.places_lived"
+        }
+    },
+    "where president nixon was born": {
+        "Answers": [
+            "Yorba Linda"
+        ],
+        "Paths": {
+            "Richard Nixon": "Richard Nixon -> people.person.place_of_birth"
+        }
+    },
+    "where was alice paul born": {
+        "Answers": [
+            "Moorestown"
+        ],
+        "Paths": {
+            "Alice Stokes Paul": "Alice Stokes Paul -> people.person.place_of_birth"
+        }
+    },
+    "what is zip code for chicago illinois": {
+        "Answers": [
+            "60626",
+            "60618",
+            "60601",
+            "60610",
+            "60602",
+            "60622",
+            "60614",
+            "60607",
+            "60649",
+            "60660",
+            "60611",
+            "60646",
+            "60657",
+            "60613",
+            "60640",
+            "60619",
+            "60605",
+            "60659",
+            "60616",
+            "60608",
+            "60661",
+            "60625",
+            "60647",
+            "60630",
+            "60603",
+            "60631",
+            "60606",
+            "60655",
+            "60634",
+            "60617",
+            "60609",
+            "60632",
+            "60623",
+            "60629",
+            "60652",
+            "60638",
+            "60645",
+            "60615",
+            "60604",
+            "60637",
+            "60643",
+            "60624",
+            "60653",
+            "60666",
+            "60628",
+            "60641",
+            "60612",
+            "60639",
+            "60636",
+            "60651",
+            "60620",
+            "60654",
+            "60644",
+            "60656",
+            "60621",
+            "60633",
+            "60642",
+            "60701",
+            "60699",
+            "60697",
+            "60696",
+            "60690",
+            "60695",
+            "60694",
+            "60693",
+            "60691",
+            "60689",
+            "60688",
+            "60687",
+            "60686",
+            "60685",
+            "60684",
+            "60682",
+            "60681",
+            "60680",
+            "60678",
+            "60677",
+            "60675",
+            "60674",
+            "60673",
+            "60670",
+            "60669",
+            "60668",
+            "60664",
+            "60290",
+            "60657-3241",
+            "60637-1424"
+        ],
+        "Paths": {
+            "Chicago": "Chicago -> location.citytown.postal_codes"
+        }
+    },
+    "what is the zip code for moorpark ca": {
+        "Answers": [
+            "93021",
+            "93020"
+        ],
+        "Paths": {
+            "Moorpark": "Moorpark -> location.citytown.postal_codes"
+        }
+    },
+    "where is sarajevo located": {
+        "Answers": [
+            "Bosnia and Herzegovina",
+            "Federation of Bosnia and Herzegovina",
+            "Sarajevo Canton",
+            "Sanjak of Bosnia"
+        ],
+        "Paths": {
+            "Sarajevo": "Sarajevo -> location.location.containedby"
+        }
+    },
+    "where is american express located": {
+        "Answers": [
+            "New York City"
+        ],
+        "Paths": {
+            "American Express": "American Express -> organization.organization.headquarters -> location.mailing_address.citytown"
+        }
+    },
+    "what language do australian people speak": {
+        "Answers": [
+            "English Language",
+            "Esperanto Language",
+            "Lojban"
+        ],
+        "Paths": {
+            "Australia": "Australia -> location.country.languages_spoken"
+        }
+    },
+    "what language does people speak in australia": {
+        "Answers": [
+            "English Language",
+            "Esperanto Language",
+            "Lojban"
+        ],
+        "Paths": {
+            "Australia": "Australia -> location.country.languages_spoken"
+        }
+    },
+    "what team does lamar odom play for 2011": {
+        "Answers": [
+            "Dallas Mavericks",
+            "Los Angeles Lakers"
+        ],
+        "Paths": {
+            "Lamar Odom": "Lamar Odom -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+        }
+    },
+    "what team does lamar odom play for 2013": {
+        "Answers": [
+            "Los Angeles Clippers"
+        ],
+        "Paths": {
+            "Lamar Odom": "Lamar Odom -> sports.pro_athlete.teams -> sports.sports_team_roster.team"
+        }
+    },
+    "where is oceania on a map": {
+        "Answers": [
+            "Pacific Ocean",
+            "DVD Region 4"
+        ],
+        "Paths": {
+            "Oceania": "Oceania -> location.location.containedby"
+        }
+    },
+    "on which continent is the usa located": {
+        "Answers": [
+            "North America"
+        ],
+        "Paths": {
+            "United States of America": "United States of America -> base.locations.countries.continent"
+        }
+    },
+    "who is the head coach of the indianapolis colts": {
+        "Answers": [
+            "Chuck Pagano"
+        ],
+        "Paths": {
+            "Indianapolis Colts": "Indianapolis Colts -> american_football.football_team.current_head_coach"
+        }
+    },
+    "who is the chicago bulls head coach": {
+        "Answers": [
+            "Tom Thibodeau"
+        ],
+        "Paths": {
+            "Chicago Bulls": "Chicago Bulls -> basketball.basketball_team.head_coach"
+        }
+    },
+    "what illness did huell howser died of": {
+        "Answers": [
+            "Prostate cancer"
+        ],
+        "Paths": {
+            "Huell Howser": "Huell Howser -> people.deceased_person.cause_of_death"
+        }
+    },
+    "what did alvin smith died from": {
+        "Answers": [
+            "Poison"
+        ],
+        "Paths": {
+            "Alvin Smith": "Alvin Smith -> people.deceased_person.cause_of_death"
+        }
+    },
+    "what does bill gates own": {
+        "Answers": [
+            "Bill Gates's house"
+        ],
+        "Paths": {
+            "Bill Gates": "Bill Gates -> architecture.architectural_structure_owner.structures_owned -> architecture.ownership.structure"
+        }
+    },
+    "who owns audi 2011": {
+        "Answers": [
+            "Volkswagen Group"
+        ],
+        "Paths": {
+            "Audi": "Audi -> organization.organization.parent -> organization.organization_relationship.parent"
+        }
+    },
+    "what is the san francisco giants mascot": {
+        "Answers": [
+            "Crazy Crab",
+            "Lou Seal"
+        ],
+        "Paths": {
+            "San Francisco Giants": "San Francisco Giants -> sports.sports_team.team_mascot"
+        }
+    },
+    "what is the name of the broncos mascot": {
+        "Answers": [
+            "Thunder",
+            "Miles"
+        ],
+        "Paths": {
+            "Denver Broncos": "Denver Broncos -> sports.sports_team.team_mascot"
+        }
+    },
+    "what country speak english as native language": {
+        "Answers": [
+            "Bahamas",
+            "Bangladesh",
+            "Barbados",
+            "Belize",
+            "Bermuda",
+            "Botswana",
+            "Brunei",
+            "Transkei",
+            "Ethiopia",
+            "Kenya",
+            "State of Palestine",
+            "Cameroon",
+            "Cayman Islands",
+            "Cyprus",
+            "Cook Islands",
+            "Territory of Papua and New Guinea",
+            "Dominica",
+            "England",
+            "Timor-Leste",
+            "Fiji",
+            "Jordan",
+            "Japan",
+            "Jersey",
+            "Guyana",
+            "Guam",
+            "Ghana",
+            "Gibraltar",
+            "South Yemen",
+            "Grenada",
+            "Honduras",
+            "Hong Kong",
+            "India",
+            "Republic of Ireland",
+            "Indonesia",
+            "Israel",
+            "Isle of Man",
+            "Kiribati",
+            "Laos",
+            "Lesotho",
+            "Liberia",
+            "Malta",
+            "Marshall Islands",
+            "Montserrat",
+            "Namibia",
+            "Nauru",
+            "Nigeria",
+            "Papua New Guinea",
+            "Puerto Rico",
+            "Pakistan",
+            "Philippines",
+            "Gazankulu",
+            "Qatar",
+            "Rwanda",
+            "Sri Lanka",
+            "Saint Kitts and Nevis",
+            "Sierra Leone",
+            "Saint Lucia",
+            "Saint Vincent and the Grenadines",
+            "Samoa",
+            "Singapore",
+            "Sudan",
+            "Swaziland",
+            "Tanzania",
+            "Tokelau",
+            "Turks and Caicos Islands",
+            "Tuvalu",
+            "United Kingdom",
+            "Uganda",
+            "Vatican City",
+            "Vanuatu",
+            "Zimbabwe",
+            "Zambia",
+            "Malaysia",
+            "Territory of New Guinea",
+            "Australia",
+            "New Zealand",
+            "China",
+            "Canada",
+            "Mandatory Palestine",
+            "Cura\u00e7ao",
+            "Gambia",
+            "South Africa",
+            "Wales",
+            "Antigua and Barbuda",
+            "Bonaire"
+        ],
+        "Paths": {
+            "English Language": "English Language -> language.human_language.countries_spoken_in"
+        }
+    },
+    "what language do you speak in finland": {
+        "Answers": [
+            "Finnish Language",
+            "Saami, Inari Language",
+            "Saami, North Language",
+            "Swedish Language"
+        ],
+        "Paths": {
+            "Finland": "Finland -> location.country.languages_spoken"
+        }
+    }
+}

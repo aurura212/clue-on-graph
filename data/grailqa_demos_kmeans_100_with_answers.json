@@ -1,0 +1,1226 @@
+{
+    "what is the drug formulation for the category animal homeopathic?": {
+        "Answers": [
+            "Sabal serrulata, equisetum hyemale, glandula suprarenalis, hypothalamus, pituitary, folliculinum, alumina, calcarea carbonica, cantharis, 12/12/6/30/12/12/12/12/3/12/6/6/6/12/12 liquid",
+            "Berberis vulg,cantharis,staphysag 0.045/0.09/0.09 granule",
+            "Berberis vulg, cantharis, staphysagris 0.00015/0.0003/0.0003 granule",
+            "Onosmodium, acidum phosphoricum, gelsemium 0.15/0.15/0.15 granule",
+            "Inula, althea, mag phos, kali mur, arsenicum alb, phos 0.0016/0.024/0.0016/0.0048/0.024/0.0048 tablet",
+            "Plantago major, gelsemium sempervirens, cantharis, causticum, alumina 0.4/0.4/0.4/0.4/0.4 liquid",
+            "Echinacea purp,plantago,ferrum phos,kali sulph,mag phos, bryonia 0.18/0.09/0.18/0.18/0.09/0.18 granule",
+            "Berberis vulgaris, carduus marianus, chelidonium majus, dioscorea, leptanra virginica, solidago virgaurea, taraxacum, astragalus menziesii, ceanothus americanus, chionanthus virginica, dolichos, equisetum hyemale, sulphur, lycopodium, nux vomica, cactus grandiflorus, cantharis, carbo vegetabilis 0.8/0.4/0.267/0.4/0.267/0.4/0.267/0.4/0.533/0.8/0.4/0.8/0.267/0.267/0.533/0.4/0.267/0.267 liquid",
+            "Arnica montana, bryonia, hypericum perforatum 30/30/30/30/30 liquid",
+            "Rhus tox, antimonium crudum, pulux irritans, staphysagria 0.4/0.4/0.4/0.4 liquid",
+            "Phosphorus, rhododendron, borax, theridion curassavicum, chamomilla 0.4/0.4/0.4/0.4/0.4 liquid",
+            "Aconitum nap, avena, belladonna, borax, calc phos, glsemium, lycopodium, nat carb, nat mur, passiflora, phos, rhododendron, scutellaria, silica terra, stramonium, staphysag, valeriana 0.667/2/0.467/2/0.4/0.4/0.4/0.467/0.4/0.4/0.467/2/0.4/2/2/2/0.467 liquid",
+            "Agaricus muscarius, alumnia, anagallis arvensis, antimonium tartaricum 0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847 liquid",
+            "Carduus mar, chelidonium maj, hydrastis, kali mur, nat phos, nat sulphuricum 0.0901/0.0901/0.18/0.0901/0.18/0.18 granule",
+            "Ephedra vulgaris, hepatica triloba, lobelia inflata, naphthalinum 0.05/0.05/0.25/0.05 liquid",
+            "Parasites p007 15/15/15/15/15/15/15/15/15/15/15/3/15/15/15/15/15/15/15/15/15/15/15/15/15/15/15/15/15 liquid",
+            "Aconitum napellus, alfalfa, argentum nitricum, arsenicum album, aurum metallicum, avena sativa, baryta carbonica, calcarea phosphorica, chamomilla, gelsemium semperivens, glonoinum, ignatia amara, kali arsenicum, kali phosphoricum, lupulus humulus, muriaticum acidum, natrum phosphoricum, passiflora incarnata, phosphorus, staphysagria, stramonium 0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847 liquid",
+            "Better bladder control 0.12/0.12/0.12/0.6 granule",
+            "Nat mur, nat phos, sulphur, arsenicum alb, nux vom, calc carb, ferrum phos, silica terra, chenopodium anth, filix mas, granatum, kamala, cina, spigelia anth, teucrium mar, thymol, cucurbita pepo, triticum, naphthaline, 0.533/0.267/0.2/0.2/0.2/0.8/0.2/0.333/0.8/0.133/0.2/0.8/0.4/0.4/0.267/0.533/0.4/0.267/0.267 liquid",
+            "Apis, rhus tox, ferrum phos , nat phos , arnica , calc fluor 0.18/0.18/0.18/0.18/0.18/0.901 granule",
+            "Carduus mar, crotalus hor, cina , aconitum nap, ferrum phos 0.15/0.15/5/0.15/0.075 granule",
+            "Arsen alb, phos, baptisia, ferrum phos 0.6/0.6/0.12/0.6 granule",
+            "Verbascum , sambucus nig, ferrum phos , calc sulph , hepar sulph calc 3/6/12/6/3 tablet",
+            "Pulex i., rhus tox., staphysagria, sulphur, urtica, graphites 0.4/0.4/0.4/0.4/0.4/0.4 liquid",
+            "Urtica urens, rhus toxicodendron, pulex irritans, staphysagria, sulphur 0.4/0.4/0.4/0.4/0.4 liquid",
+            "Injury rescue 15/15/15/15/15,3/15/15,3/15/3/15/15,3/15/15/15/15 liquid",
+            "Apis mel, arsenicum alb, canth, rhus tox, caladium s., mez, culx m., pulex i., sepia, dolichos, hyoscyamus, lachesis, staphysag, sulphur, urtica ur 0.4/0.4/2/0.4/0.4/0.4/2/13.333/0.4/0.4/2/2/0.4/0.4/0.4 liquid",
+            "Aconitum napellus, apis mellifica, carbo vegetabilis 30/30/30/30/30/30/30/30/30/30 liquid",
+            "Arnica m., rhus tox, hypericum, calendula o., ham v., lathyrus s., acon n., 0.4/0.4/0.4/0.4/0.4/0.4/0.4 liquid",
+            "Belladonna, hepar sulphuris calcareum, hypericum perforatum, staphysagria 0.4/0.4/0.4/0.4 liquid",
+            "Hypericum, scutellaria , belladonna , nux vom , cantharis 0.75/0.075/0.75/0.075/0.75 granule",
+            "Aconitum nap, arg nit, arsenicum alb, gelsemium, avena, passflora, scutellaria, valeriana, calc phos, causticum, hyoscyamus, nat carb, silica terra, ignatia, phos, lycopodium, staphysag, pulsatilla nutt, stramonium 0.667/0.4/0.267/2/13.333/0.4/0.4/0.4/0.4/0.267/0.4/2/0.267/2/0.4/2/0.4/2/0.267 liquid",
+            "Scutellaria, passiflora , kali phos, arg nit 0.06/0.12/0.06/0.6 granule",
+            "Scutellaria, chamomilla, belladonna, arsenicum alb , hepar sulph calc 0.75/0.75/0.75/0.075/0.075 granule",
+            "Borax, pulsatilla , phos 0.6/0.6/0.12 granule",
+            "Chamomilla, passiflora, mag phos, calc phos, chamomilla 0.0003/0.0003/0.00015,0.0015/0.00015 granule",
+            "Thus toxicodendron, 6 tablet",
+            "Absinthium, artemisia vulgaris, cuprum metallicum 30/30/30/30/30/30/30/30 liquid",
+            "Hypericum,  chamomilla, ignatia, capsicum,  kali phos 0.75/0.075/0.075/0.15/0.75 granule",
+            "Chamomilla, passiflora, mag phos , calc phos , chamomilla 0.075,0.75/0.15/0.075/0.15 granule",
+            "Aconitum nap, belladonna, hepar sulph., silicea, merc sol , sulphur 0.18/0.901/0.901/0.18/0.18/0.18 granule",
+            "Onosmodium, acidum phosphoricum, gelsemium 0.15/0.15/0.15 granule",
+            "Glycyrrhiza, sambucus nig, nat mur, pulsatilla,, kali bich 3/30/30/3/6 tablet",
+            "Aconitum napellus, arnica montana, arsenicum iodatum, belladonna, bellis perenis, bryonia, calendula officinalis, chamomilla matricaria, echinacea angustifolia, echinacea purpurea, graphites, hamamelis virginia, hepar sulphuris, hypericum perforatum, lachesis, ledum, mercurius solubilis, millefolium, phytolacca, rhus toxicodendron, ruta graveolans, silicia, stellaria media, sulphur, symphytum, thuja 0.000214/0.000214/0.000214/0.000571/0.000214/0.000214/0.000214/0.000214/0.000214/0.000214/0.000214/0.000214/0.000571/0.000214/0.000214/0.000571/0.000214/0.000214/0.000571/0.000429/0.000214/0.000214/0.000214/0.000214/0.000214/0.000214 solution",
+            "Actaea spicata, aesculus hippocastanum, arnica montana, bellis perennis 0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847 liquid",
+            "Aceticum acidum, arsenicum album, bryonia alba, calcarea carbonica 0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847 liquid",
+            "Aconitum nap, aloe, arsenicum alb, phos, carbo veg, chelidonium ma, chininum pu, ipecac, phosphoricum ac, podoph pelt, veratrum al, lycopodium, merc solub, nux vom, sulph 13.333/0.4/0.4/0.4/0.267/0.4/0.667/0.4/0.4/0.4/0.4/2/0.533/0.4/0.4 liquid",
+            "Fever infection 15/15/3/15/15/15/30/15/15/15/15/3/15/15/3/30/15/15/15/15/15/15/15/15/30/15/15/15 liquid",
+            "Echinacea purp, bryonia 0.06/0.03 granule",
+            "Inflammation-pets 15/15/15,3/15/15/15/30/15/15/15/15/15/3/15/15/15/15/15/15/15/30/15/15/15/15 liquid",
+            "Scoot stopper p011 15/15/15/15/15/15/3/15/15/15/15/15/15/15/15/15/15/15/15/15/15 liquid",
+            "Chamomilla, pimpinella, mag phos, carbo veg, nux vom 0.0015/0.0003/0.00015/0.00015/0.0015 granule",
+            "Crataegus, arnica , kali phos, calc flour 0.06/0.12/0.06/0.12 granule",
+            "Zingiber, mentha pip, pulsatilla, kali phos , aconitum nap, cocculus 0.901/0.0901/0.901/0.0901/0.18/0.18 granule",
+            "Apis mellifica, arsenicum album, natrum muriaticum, petroleum, rhus toxicodendron, staphysagria, 12/12/12/30/30/12/12/30/30/12/12 liquid",
+            "Cactus grandiflorus, apis mellifica, arsenicum album 30/30/30/30/30/6/30/30 liquid",
+            "Sulphur, staphysagria, calcarea carbonicum, graphites, arsenicum album 0.4/0.4/0.4/0.4/0.4 liquid",
+            "Inula , althea , mag phos , kali mur, arsenicum alb , phosphorus 2/30/2/6/30/6 tablet",
+            "Crataegus, arnica, kali phos, calc flour 0.00015/0.0003/0.00015/0.0003 granule",
+            "Hepar sulphuris calcarem, kali iodatum, gelsemium sempervirens, natrum arsenicosum, muriaticum acidum 0.4/0.4/0.4/0.4/0.4 liquid",
+            "Cocculus, passiflora, valeriana, borax, colchicum autumnale 0.4/0.4/0.4/0.4/0.4 liquid",
+            "Nux vomica, veratrum album, phosphoricum acidum, colocynthis, chamomilla 0.05/0.05/0.05/0.05/0.05 liquid",
+            "Chamomilla, aconitum nap, belladonna , colocynth , nux vom 0.15/0.15/0.15/0.15/0.15 granule",
+            "Drosera rotundifolia, arsenicum album, spongia tosta, baryta carbonica 0.4/0.4/0.4/0.4 liquid",
+            "Rhus toxicodendron, sulphur, hepar sulphuris calcareum, graphites 0.4/0.4/0.4/0.4 liquid",
+            "Flatulence preventer 0.75/0.075/0.15/0.075/0.75 granule",
+            "Arum triph, viola tri. , comocladia, chamomilla, cina 0.15/0.15/0.3/0.15/0.15 granule",
+            "Borax, pulsatilla, phos, feline cali 0.0015/0.0015/0.0003 granule",
+            "Agrimonia eup, zinigiber, belladonna , veratrum alb, arsenicum alb 0.075/0.15/0.75/0.075/0.15 granule",
+            "Chamomilla, lycopus, zingiber, cratageous, nux vom 0.075/0.75/0.15/0.75/0.75 granule",
+            "Hypericum, scutellaria, belladonna, nux vom, cantharis 0.0015/0.0015/0.00015/0.00015/0.0015 granule",
+            "Arsenicum album, pix liquida, thyriodinum, graphites, sulphur, equisetum arvense 0.0833/0.0167/0.05/0.05/0.25/0.05 liquid",
+            "Zingiber, mentha pip, pulsatilla, kali phos, aconitum nap, cocculus 0.0015/0.00015/0.0015/0.00015/0.0003/0.0003 granule",
+            "Chamomilla , kali phos , cina , phosphorus, asarum 0.75/0.15/0.75/0.15/0.15 granule",
+            "Allium cepa, apis mellifica, urtica urens, aralia quinquefolia, ledum palustre, sulphur iodatum, terebinthina 12/6/12/6/12/12/6 liquid",
+            "Antimonium crudum, apis mellifica, baptisia tinctoria, carbo vegetabilis 0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847/0.0847 liquid",
+            "Helianthemum nummularium flower, clematis vitalba flower, impatiens glandulifera flower, prunus cerasifera flower, and ornithogalum umbellatum 5/5/5/5/5 tincture",
+            "Veratrum album, argentum nitricum, colocynthis, pulsatilla nigricans, hypericum perforatum, arsenicum album 0.4/0.4/0.4/0.4/0.4/0.4 liquid",
+            "Rhus tox, pulsatilla, pulex irritans, staphysagria 0.4/0.4/0.4/0.4 liquid"
+        ],
+        "Paths": {
+            "Animal homeopathic": "Animal homeopathic -> medicine.drug_formulation.drug_category"
+        }
+    },
+    "nateglinide 120 tablet has what manufactured drug form?": {
+        "Answers": [
+            "Nateglinide 120 tablet",
+            "Starlix 120 tablet",
+            "Starlix 120 tablet",
+            "Nateglinide 120 tablet"
+        ],
+        "Paths": {
+            "Nateglinide 120 tablet": "Nateglinide 120 tablet -> medicine.manufactured_drug_form.manufactured_form_of"
+        }
+    },
+    "what educational institution has the boston college eagles as an athletic brand?": {
+        "Answers": [
+            "Boston College"
+        ],
+        "Paths": {
+            "Boston College Eagles": "Boston College Eagles -> education.educational_institution.athletics_brand"
+        }
+    },
+    "which educational institution is in boston university?": {
+        "Answers": [
+            "Boston University College of Communication",
+            "Boston University College of Engineering",
+            "Boston University School of Education",
+            "Boston University School of Theology",
+            "Boston University College of Fine Arts",
+            "Boston University School of Medicine",
+            "Boston University School of Law",
+            "Questrom School of Business",
+            "Boston University School of Public Health",
+            "Henry M. Goldman School of Dental Medicine",
+            "Boston University Brussels",
+            "Boston University College of Health and Rehabilitation Sciences",
+            "Boston University School of Social Work",
+            "Boston University College of Arts and Sciences",
+            "Frederick S. Pardee School of Global Studies"
+        ],
+        "Paths": {
+            "Boston University": "Boston University -> education.educational_institution.parent_institution"
+        }
+    },
+    "which is the language writing system for sindarin language and alphabet?": {
+        "Answers": [
+            "Cirth"
+        ],
+        "Paths": {
+            "Alphabet": "Alphabet -> language.language_writing_type.writing_systems",
+            "Sindarin": "Sindarin -> language.human_language.writing_system"
+        }
+    },
+    "what is the language dialect of mari language?": {
+        "Answers": [
+            "Mari, Eastern Language",
+            "Western Mari language"
+        ],
+        "Paths": {
+            "Mari language": "Mari language -> language.language_dialect.language"
+        }
+    },
+    "which isbns are book editions read by tom arnold?": {
+        "Answers": [
+            "9780975404904"
+        ],
+        "Paths": {
+            "Tom Arnold": "Tom Arnold -> book.audio_book_reader.audio_books_read -> book.isbn.book_editions"
+        }
+    },
+    "steven belledin illustrated what edition of the book?": {
+        "Answers": [
+            "Races of the Wild",
+            "Races of Stone",
+            "Unearthed Arcana",
+            "An Adventurer's Guide to Eberron"
+        ],
+        "Paths": {
+            "Steven Belledin": "Steven Belledin -> book.book_edition.interior_illustrations_by"
+        }
+    },
+    "tell me the number of medical treatments that have a side effect of erythema ?": {
+        "Answers": [
+            "1"
+        ],
+        "Paths": {
+            "Erythema": "Erythema -> medicine.medical_treatment.side_effects"
+        }
+    },
+    "how many medical treatments are being tested by health study?": {
+        "Answers": [
+            "2"
+        ],
+        "Paths": {
+            "Physicians' Health Study": "Physicians' Health Study -> medicine.medical_trial.treatment_being_tested"
+        }
+    },
+    "for the musical genre with albums get yer ya-yas out, which music genre is the parent genre?": {
+        "Answers": [
+            "Folk music",
+            "Rock music",
+            "Jam band",
+            "Rock and roll",
+            "Rockabilly",
+            "Acid rock"
+        ],
+        "Paths": {
+            "Get Yer Ya-Ya's Out! The Rolling Stones in Concert": "Get Yer Ya-Ya's Out! The Rolling Stones in Concert -> music.genre.albums -> music.genre.parent_genre"
+        }
+    },
+    "how many media genres have the parent genre of epic fantasy?": {
+        "Answers": [
+            "1"
+        ],
+        "Paths": {
+            "Sword and sorcery": "Sword and sorcery -> media_common.media_genre.parent_genre"
+        }
+    },
+    "what star classification has comets as a subcategory?": {
+        "Answers": [
+            "Small Solar System body"
+        ],
+        "Paths": {
+            "Comet": "Comet -> astronomy.celestial_object_category.subcategories"
+        }
+    },
+    "what is the star of planets hd 118203 b?": {
+        "Answers": [
+            "HD 118203"
+        ],
+        "Paths": {
+            "HD 118203 b": "HD 118203 b -> astronomy.star.planet_s"
+        }
+    },
+    "who is the designer of the ship class dart 18?": {
+        "Answers": [
+            "Rodney March"
+        ],
+        "Paths": {
+            "Dart 18": "Dart 18 -> boats.ship_designer.ship_classes_designed"
+        }
+    },
+    "who is the designer of flight deck?": {
+        "Answers": [
+            "Werner Stengel"
+        ],
+        "Paths": {
+            "Flight Deck": "Flight Deck -> amusement_parks.ride_designer.rides"
+        }
+    },
+    "the seekers universe includes what fictional character?": {
+        "Answers": [
+            "Nisa",
+            "Miki",
+            "Ashia",
+            "Ursa",
+            "Lusa",
+            "Toklo",
+            "Ujurak",
+            "Kallik",
+            "Oka",
+            "Tobi",
+            "Yogi",
+            "Taqqiq",
+            "King"
+        ],
+        "Paths": {
+            "The Seekers Universe": "The Seekers Universe -> fictional_universe.fictional_character.appears_in_these_fictional_universes"
+        }
+    },
+    "what is the ethnicity of the fictional video game character that belongs to the excalibur?": {
+        "Answers": [
+            "Jewish people",
+            "White people",
+            "Asian people"
+        ],
+        "Paths": {
+            "Excalibur": "Excalibur -> fictional_universe.fictional_character.organizations -> fictional_universe.ethnicity_in_fiction.characters_of_this_ethnicity"
+        }
+    },
+    "what artist makes urban art artwork?": {
+        "Answers": [
+            "Dave Halili",
+            "Michael Leavitt",
+            "Alex Cherry",
+            "Guy Denning"
+        ],
+        "Paths": {
+            "Urban art": "Urban art -> visual_art.visual_artist.associated_periods_or_movements"
+        }
+    },
+    "paper supports artworks of which visual art genre?": {
+        "Answers": [
+            "History painting",
+            "Genre art",
+            "Portrait",
+            "Animal Painting",
+            "Landscape painting",
+            "Abstract art",
+            "Still life",
+            "Marine art",
+            "Religious image",
+            "Other"
+        ],
+        "Paths": {
+            "Paper": "Paper -> visual_art.artwork.support -> visual_art.visual_art_genre.artworks"
+        }
+    },
+    "who is the colorist of a comic book story that took place in dp?": {
+        "Answers": [
+            "Alex Sinclair"
+        ],
+        "Paths": {
+            "Daily Planet": "Daily Planet -> fictional_universe.fictional_setting.works_set_here -> comic_books.comic_book_story.colors"
+        }
+    },
+    "what comic book character appears in a comic book story inked by prentis rollins?": {
+        "Answers": [
+            "Bruce Wayne",
+            "Soranik Natu",
+            "Superman",
+            "Hal Jordan / Green Lantern",
+            "Diana Prince / Wonder Woman",
+            "Martian Manhunter",
+            "Kilowog",
+            "John Stewart",
+            "Guy Gardner",
+            "Isamot Kol",
+            "Green Man",
+            "Vath Sarn",
+            "Ganthet",
+            "Salaak",
+            "Stel",
+            "Kyle Rayner",
+            "Brik",
+            "Shorm",
+            "Tarkus Whin"
+        ],
+        "Paths": {
+            "Prentis Rollins": "Prentis Rollins -> comic_books.comic_book_inker.comic_books_inked -> comic_books.comic_book_story.characters"
+        }
+    },
+    "which manufacturer/brand uses x86 in its computers?": {
+        "Answers": [
+            "IBM"
+        ],
+        "Paths": {
+            "x86": "x86 -> computer.computer_processor.used_in_computers -> computer.computer_manufacturer_brand.computer_lines"
+        }
+    },
+    "what computer did the designers of next computer also make?": {
+        "Answers": [
+            "Macintosh",
+            "iPhone",
+            "iMac",
+            "Macintosh 128K"
+        ],
+        "Paths": {
+            "NeXT Computer": "NeXT Computer -> computer.computer.key_designers -> computer.computer.key_designers"
+        }
+    },
+    "\"where humanity sowed faith, hope, and unity, joy\u2019s garden blossomed.\" has what as the quotation address?": {
+        "Answers": [
+            "United States of America"
+        ],
+        "Paths": {
+            "\"Where humanity sowed faith, hope, and unity, Joy\u2019s garden blossomed.\"": "\"Where humanity sowed faith, hope, and unity, Joy\u2019s garden blossomed.\" -> media_common.quotation_addressee.quotations"
+        }
+    },
+    "which appointee is the author of a quotation about passion?": {
+        "Answers": [
+            "Oliver Wendell Holmes, Jr."
+        ],
+        "Paths": {
+            "Passion": "Passion -> media_common.quotation.subjects -> media_common.quotation.author"
+        }
+    },
+    "which organism classifications rank lower than breeds ?": {
+        "Answers": [
+            "Subspecies",
+            "Species"
+        ],
+        "Paths": {
+            "Breed": "Breed -> biology.organism_classification_rank.lower_rank"
+        }
+    },
+    "animal species rank contains how many organism classifications?": {
+        "Answers": [
+            "124336"
+        ],
+        "Paths": {
+            "Species": "Species -> biology.organism_classification_rank.organism_classifications"
+        }
+    },
+    "what is an ingredient featured in the cooking style moroccan cuisine?": {
+        "Answers": [
+            "Rabbit Meat",
+            "Harissa"
+        ],
+        "Paths": {
+            "Moroccan food": "Moroccan food -> food.ingredient.cuisine"
+        }
+    },
+    "what is the dish that is made by using the typical ingredients of soy sauce and harissa?": {
+        "Answers": [
+            "Transcontinental Condiment Violation"
+        ],
+        "Paths": {
+            "Soy sauce": "Soy sauce -> food.ingredient.dishes",
+            "Harissa": "Harissa -> food.dish.ingredients"
+        }
+    },
+    "which chromosome has the genomic locus of human cytogenetic band xp11.21?": {
+        "Answers": [
+            "Chromosome X (human)"
+        ],
+        "Paths": {
+            "Human Cytogenetic Band Xp11.21": "Human Cytogenetic Band Xp11.21 -> biology.cytogenetic_band.locus -> biology.genomic_locus.chromosome"
+        }
+    },
+    "what is the name of the chromosome which has the genomic locus of human cytogenetic band 2p16.2?": {
+        "Answers": [
+            "Chromosome 2 (human)"
+        ],
+        "Paths": {
+            "Human Cytogenetic Band 2p16.2": "Human Cytogenetic Band 2p16.2 -> biology.cytogenetic_band.locus -> biology.genomic_locus.chromosome"
+        }
+    },
+    "what sort of religious group is catholic church?": {
+        "Answers": [
+            "Catholicism"
+        ],
+        "Paths": {
+            "Roman Catholic Church": "Roman Catholic Church -> religion.religion.organizations"
+        }
+    },
+    "chrismation is practiced in what religions?": {
+        "Answers": [
+            "Catholicism",
+            "Christianity",
+            "Eastern Christianity"
+        ],
+        "Paths": {
+            "Chrismation": "Chrismation -> religion.religion.practices"
+        }
+    },
+    "which tropical cyclone is cyclones?": {
+        "Answers": [
+            "1737 Calcutta Cyclone"
+        ],
+        "Paths": {
+            "Cyclone": "Cyclone -> meteorology.tropical_cyclone.category"
+        }
+    },
+    "which tropical cyclone is typhoon?": {
+        "Answers": [
+            "Tropical Storm Grace",
+            "Hurricane Erick",
+            "Hurricane Paul"
+        ],
+        "Paths": {
+            "Tropical cyclone": "Tropical cyclone -> meteorology.tropical_cyclone.category"
+        }
+    },
+    "which sequence of tv episode segments was aired on the tv series the late show?": {
+        "Answers": [
+            "Late Show Top Ten List"
+        ],
+        "Paths": {
+            "Late Show with David Letterman": "Late Show with David Letterman -> tv.sequence_of_tv_episode_segments.tv_series"
+        }
+    },
+    "what is the tv program that the multipart tv episode the end (2) is a part of?": {
+        "Answers": [
+            "Lost"
+        ],
+        "Paths": {
+            "The End (2)": "The End (2) -> tv.multipart_tv_episode.episodes -> tv.tv_program.multipart_episodes"
+        }
+    },
+    "what airline has an iata designator of su?": {
+        "Answers": [
+            "Aeroflot"
+        ],
+        "Paths": {
+            "SU": "SU -> aviation.airline.IATA_designator"
+        }
+    },
+    "b-17f are which airplanes?": {
+        "Answers": [
+            "Sir Baboon McGoon"
+        ],
+        "Paths": {
+            "B-17F": "B-17F -> aviation.aircraft.model"
+        }
+    },
+    "luxury hotel provides which accomodations?": {
+        "Answers": [
+            "Millennium Bostonian Hotel Boston",
+            "Galleria Park Hotel",
+            "The James Royal Palm",
+            "Viceroy Miami",
+            "Hotel Zetta San Francisco",
+            "Viceroy Riviera Maya",
+            "JW Marriott Hotel Rio de Janeiro",
+            "JW Marriott Cusco",
+            "Laurel Inn",
+            "The Benjamin",
+            "Cassa Hotel 45th Street",
+            "Viceroy New York",
+            "St. Regis Monarch Beach",
+            "The James New York",
+            "PlumpJack Squaw Valley Inn",
+            "Millennium Biltmore Hotel",
+            "Thompson Toronto",
+            "Park Hyatt Resort Aviara",
+            "Hilton Anaheim",
+            "Hilton Waterfront Beach Resort",
+            "Dream Inn",
+            "Ventana Inn & Spa",
+            "Renaissance Caracas La Castellana",
+            "JW Marriott Hotel Caracas",
+            "JW Marriott Hotel Lima",
+            "JW Marriott Hotel Quito",
+            "JW Marriott Hotel Mexico City",
+            "CasaMagna Marriott Puerto Vallarta Resort & Spa",
+            "Costa Rica Marriott San Jose Hotel",
+            "Renaissance Sao Paulo Hotel",
+            "L'Ermitage Beverly Hills",
+            "Swinton Park",
+            "Viceroy Santa Monica",
+            "White Swan Inn",
+            "Millennium UN Plaza",
+            "Millennium Hotel Buffalo",
+            "Grand Hyatt San Francisco",
+            "Park Hyatt Washington",
+            "Omni Atlanta Hotel at CNN Center",
+            "Millennium Alaskan Hotel Anchorage",
+            "Cavallo Point",
+            "Americano",
+            "Hotel Rex",
+            "Disney's Grand Floridian Resort & Spa",
+            "Hotel Adagio",
+            "Petite Auberge",
+            "Hotel Durant",
+            "Acqua Hotel",
+            "Mill Valley Inn",
+            "Waters Edge Hotel",
+            "Gaige House",
+            "Yas Viceroy Abu Dhabi Hotel",
+            "New Orleans Marriott",
+            "Panama Marriott Hotel",
+            "Rushton Hall",
+            "The Montague on the Gardens",
+            "Park Hyatt Goa Resort and Spa",
+            "Viceroy Snowmass",
+            "Viceroy Anguilla",
+            "Viceroy Maldives",
+            "Viceroy Palm Springs",
+            "Sugar Beach, A Viceroy Resort",
+            "Pandhotel",
+            "Bonifacius",
+            "H\u00f4tel Costes",
+            "The James Chicago",
+            "Millennium Knickerbocker Hotel Chicago",
+            "Millennium Broadway",
+            "Aulani",
+            "Avalon Hotel Beverly Hills",
+            "The James Hotels",
+            "JW Marriott San Francisco Union Square",
+            "Millennium Harvest House Boulder",
+            "Millennium Hotel Durham",
+            "Millennium Hotel Minneapolis",
+            "Millennium Maxwell House Nashville",
+            "The Premier Hotel New York",
+            "The McCormick Scottsdale",
+            "Viceroy Zihuatanejo"
+        ],
+        "Paths": {
+            "Luxury Hotel": "Luxury Hotel -> travel.accommodation.accommodation_type"
+        }
+    },
+    "which accommodation is provided by luxury resorts?": {
+        "Answers": [
+            "Park Hyatt Resort Aviara",
+            "Cavallo Point",
+            "Aulani"
+        ],
+        "Paths": {
+            "Luxury resorts": "Luxury resorts -> travel.accommodation.accommodation_type"
+        }
+    },
+    "what is the organization sector for soaring association of canada?": {
+        "Answers": [
+            "Gliding"
+        ],
+        "Paths": {
+            "Soaring Association of Canada": "Soaring Association of Canada -> organization.organization_sector.organizations_in_this_sector"
+        }
+    },
+    "what is the organization sector for messrs. peto, brassey and betts?": {
+        "Answers": [
+            "Rail transport"
+        ],
+        "Paths": {
+            "Messrs. Peto, Brassey and Betts": "Messrs. Peto, Brassey and Betts -> organization.organization_sector.organizations_in_this_sector"
+        }
+    },
+    "which spacecraft manufacturer has manufactured a satellite whose launch vehicle was ariane 44 lp?": {
+        "Answers": [
+            "Lockheed Martin Space Systems"
+        ],
+        "Paths": {
+            "Ariane 44 LP": "Ariane 44 LP -> spaceflight.satellite.launch_vehicle -> spaceflight.satellite_manufacturer.spacecraft_manufactured"
+        }
+    },
+    "what consumer product is made by ethan and zachary marketing llc?": {
+        "Answers": [
+            "PBN In A Box"
+        ],
+        "Paths": {
+            "Ethan and Zachary Marketing LLC": "Ethan and Zachary Marketing LLC -> business.company_product_relationship.company -> business.consumer_product.company"
+        }
+    },
+    "which theater character is the plays the gig appears in?": {
+        "Answers": [
+            "Vince",
+            "Jack",
+            "Miss Ricki Valentine",
+            "Marty",
+            "Gil",
+            "Marshall",
+            "Lucy",
+            "Abe Mitgang",
+            "Arthur",
+            "Aaron",
+            "Georgie"
+        ],
+        "Paths": {
+            "The Gig": "The Gig -> theater.theater_character.plays_appears_in"
+        }
+    },
+    "which opera productions are stage directed by caterina mattea?": {
+        "Answers": [
+            "La figlia del mago"
+        ],
+        "Paths": {
+            "Caterina Mattea": "Caterina Mattea -> opera.opera_production.stage_director"
+        }
+    },
+    "who is the record producer that released a musical component with package driven downunder tour '94: souvenir collection?": {
+        "Answers": [
+            "Terry Date"
+        ],
+        "Paths": {
+            "Driven Downunder Tour '94: Souvenir Collection": "Driven Downunder Tour '94: Souvenir Collection -> music.release_component.package -> music.producer.releases_produced"
+        }
+    },
+    "how many musical artists play blakawout?": {
+        "Answers": [
+            "2"
+        ],
+        "Paths": {
+            "Blakawout": "Blakawout -> music.genre.recordings -> music.genre.artists"
+        }
+    },
+    "what team is in the western athletic conference?": {
+        "Answers": [
+            "Cal State Bakersfield Roadrunners men's basketball",
+            "New Mexico State Aggies men's basketball",
+            "Chicago State Cougars men's basketball",
+            "Idaho Vandals Men's Basketball",
+            "UMKC Kangaroos men's basketball",
+            "Grand Canyon Antelopes men's basketball",
+            "Utah Valley Wolverines men's basketball",
+            "Seattle Redhawks men's basketball",
+            "Texas\u2013Pan American Broncs men's basketball"
+        ],
+        "Paths": {
+            "Western Athletic Conference": "Western Athletic Conference -> basketball.basketball_team.conference"
+        }
+    },
+    "what is the name of the professional sports team that has rise as their team mascot?": {
+        "Answers": [
+            "Baltimore Ravens"
+        ],
+        "Paths": {
+            "Rise": "Rise -> sports.sports_team.team_mascot"
+        }
+    },
+    "which of the natural or cultural sites has a supercategory of uwh natural critera?": {
+        "Answers": [
+            "UNESCO World Heritage Site"
+        ],
+        "Paths": {
+            "UWH Natural Critera": "UWH Natural Critera -> protected_sites.site_listing_category.supercategory -> protected_sites.natural_or_cultural_site_designation.categories"
+        }
+    },
+    "category b is the category of which designated natural or cultural site?": {
+        "Answers": [
+            "Listed building"
+        ],
+        "Paths": {
+            "Category B": "Category B -> protected_sites.natural_or_cultural_site_designation.categories"
+        }
+    },
+    "the curator of the history exhibition type exhibitions is who?": {
+        "Answers": [
+            "Richard Rabinowitz",
+            "Hagedorn Foundation Gallery"
+        ],
+        "Paths": {
+            "History exhibition": "History exhibition -> exhibitions.type_of_exhibition.exhibitions_of_this_type -> exhibitions.exhibition.curators"
+        }
+    },
+    "which exhibition is regularly updated exhibition?": {
+        "Answers": [
+            "Antenna"
+        ],
+        "Paths": {
+            "Regularly updated exhibition": "Regularly updated exhibition -> exhibitions.exhibition.exhibition_types"
+        }
+    },
+    "what is the automobile model that is the predecessor of the automobile model first generation pontiac gto?": {
+        "Answers": [
+            "Pontiac G8"
+        ],
+        "Paths": {
+            "First Generation Pontiac GTO": "First Generation Pontiac GTO -> automotive.generation.model -> automotive.model.predecessor"
+        }
+    },
+    "what is the automotive class of automobile model which sister model is geo prizm?": {
+        "Answers": [
+            "Compact car",
+            "Subcompact car"
+        ],
+        "Paths": {
+            "Geo Prizm": "Geo Prizm -> automotive.model.similar -> automotive.model.automotive_class"
+        }
+    },
+    "which are the tennis tournaments won by malisse?": {
+        "Answers": [
+            "Indian Wells Masters"
+        ],
+        "Paths": {
+            "Xavier Malisse": "Xavier Malisse -> tennis.tennis_match.winner -> tennis.tennis_tournament.match_results"
+        }
+    },
+    "what different types of tennis matches has ana ivanovic won?": {
+        "Answers": [
+            "Women's singles"
+        ],
+        "Paths": {
+            "Ana Ivanovic": "Ana Ivanovic -> tennis.tennis_match.winner -> tennis.tennis_match.match_format"
+        }
+    },
+    "name the top level domain registry sponsored by theficora ?": {
+        "Answers": [
+            "FICORA"
+        ],
+        "Paths": {
+            "FICORA": "FICORA -> internet.top_level_domain_sponsor.domains -> internet.top_level_domain.registry"
+        }
+    },
+    "microsoft corporation sponsors which top level domain?": {
+        "Answers": [
+            "mobi"
+        ],
+        "Paths": {
+            "Microsoft Corporation": "Microsoft Corporation -> internet.top_level_domain.sponsor"
+        }
+    },
+    "which musical soundtrack is a traditional pop music album?": {
+        "Answers": [
+            "Xanadu",
+            "The Lady and Her Music",
+            "Hairspray"
+        ],
+        "Paths": {
+            "Traditional pop music": "Traditional pop music -> music.genre.albums",
+            "Soundtrack": "Soundtrack -> music.album.album_content_type"
+        }
+    },
+    "everything a man could need has the tracks of what musical release?": {
+        "Answers": [
+            "Rhinestone Cowboy: The Best of Glen Campbell"
+        ],
+        "Paths": {
+            "Everything a Man Could Need": "Everything a Man Could Need -> music.release.track"
+        }
+    },
+    "what computer emulator has the peripherals of melodik interface?": {
+        "Answers": [
+            "Fuse"
+        ],
+        "Paths": {
+            "Melodik Interface": "Melodik Interface -> computer.computer_emulator.peripherals"
+        }
+    },
+    "which computer emulator uses multiface 1 peripherals?": {
+        "Answers": [
+            "The Spectrum Emulator"
+        ],
+        "Paths": {
+            "Multiface 1": "Multiface 1 -> computer.computer_emulator.peripherals"
+        }
+    },
+    "what engine cycle of the bipropellant rocket also manufactured the rd-215u?": {
+        "Answers": [
+            "Gas-generator cycle",
+            "Externally powered pump cycle",
+            "Staged combustion cycle"
+        ],
+        "Paths": {
+            "RD-215U": "RD-215U -> spaceflight.rocket_engine.manufactured_by -> spaceflight.rocket_engine.manufactured_by -> spaceflight.bipropellant_rocket_engine.engine_cycle"
+        }
+    },
+    "what engine cycle of the bipropellant rocket also manufactured the rd-216m?": {
+        "Answers": [
+            "Gas-generator cycle",
+            "Externally powered pump cycle",
+            "Staged combustion cycle"
+        ],
+        "Paths": {
+            "RD-216M": "RD-216M -> spaceflight.rocket_engine.manufactured_by -> spaceflight.rocket_engine.manufactured_by -> spaceflight.bipropellant_rocket_engine.engine_cycle"
+        }
+    },
+    "what spacecrafts did lockheed corporation manufacture?": {
+        "Answers": [
+            "KH-5 Argon"
+        ],
+        "Paths": {
+            "Lockheed Corporation": "Lockheed Corporation -> spaceflight.spacecraft.manufacturer"
+        }
+    },
+    "what spacecraft manufacturer is responsible for the satellite dnepr launch vehicle?": {
+        "Answers": [
+            "Bigelow Aerospace",
+            "SpaceQuest, Ltd."
+        ],
+        "Paths": {
+            "Dnepr launch vehicle": "Dnepr launch vehicle -> spaceflight.satellite.launch_vehicle -> spaceflight.satellite_manufacturer.spacecraft_manufactured"
+        }
+    },
+    "what was the programming language first introduced by microsoft corporation which was influenced by another language?": {
+        "Answers": [
+            "Java",
+            "PHP"
+        ],
+        "Paths": {
+            "Microsoft Corporation": "Microsoft Corporation -> computer.programming_language_developer.programming_languages_developed -> computer.programming_language.influenced"
+        }
+    },
+    "sun has made how many programming languages?": {
+        "Answers": [
+            "4"
+        ],
+        "Paths": {
+            "Sun Microsystems": "Sun Microsystems -> computer.programming_language.developers"
+        }
+    },
+    "what distilled spirit has a fermentation base that is the fermentation base of grain whisky?": {
+        "Answers": [
+            "Beam Knob Creek",
+            "Ancient Age",
+            "Ezra Brooks",
+            "Booker's",
+            "Eagle Rare",
+            "Conecuh Ridge Whiskey",
+            "New Holland Dutchess Vodka"
+        ],
+        "Paths": {
+            "Grain whisky": "Grain whisky -> distilled_spirits.distilled_spirit_type.fermentation_base -> distilled_spirits.distilled_spirit.fermentation_base"
+        }
+    },
+    "which blended spirit containing single malt whiskey has the least alcohol content?": {
+        "Answers": [
+            "Black Nikka"
+        ],
+        "Paths": {
+            "Single malt whisky": "Single malt whisky -> distilled_spirits.distilled_spirit_type.blends"
+        }
+    },
+    "wcco radio broadcasts what content?": {
+        "Answers": [
+            "WCCO"
+        ],
+        "Paths": {
+            "WCCO": "WCCO -> broadcast.content.producer"
+        }
+    },
+    "name the ksl newsradio internet stream used to broadcast content?": {
+        "Answers": [
+            "KSL.com - News & more from Salt Lake City, UT - 24kbps Stream"
+        ],
+        "Paths": {
+            "KSL": "KSL -> broadcast.producer.produces -> broadcast.broadcast.content"
+        }
+    },
+    "what martial arts share a category with the ji do kwan?": {
+        "Answers": [
+            "Muay Thai",
+            "Kajukenbo",
+            "Jeet Kune Do",
+            "Bando",
+            "Boxing",
+            "Sanshou",
+            "Capoeira",
+            "Pencak Silat",
+            "Silat",
+            "Vovinam",
+            "Karate",
+            "Tai chi",
+            "B\u00e2ton fran\u00e7ais",
+            "Savate",
+            "Systema",
+            "Shid\u014dkan Karate",
+            "Hapkido",
+            "Silat Melayu",
+            "Kuk Sool Won",
+            "Taekkyeon",
+            "Northern Praying Mantis",
+            "Baguazhang",
+            "Kalaripayattu",
+            "Russian All-Round Fighting",
+            "Southern Dragon Kung Fu",
+            "Sikaran",
+            "Krav Maga",
+            "Taid\u014d",
+            "Lethwei",
+            "Jittejutsu",
+            "Hwa Rang Do",
+            "Wing Tsun",
+            "Zui quan",
+            "Pankration",
+            "Juego de man\u00ed",
+            "Bartitsu",
+            "Modern Arnis",
+            "Northern Shaolin",
+            "Subak",
+            "Wing Chun",
+            "Bokator"
+        ],
+        "Paths": {
+            "Jidokwan": "Jidokwan -> martial_arts.martial_arts_organization.martial_arts -> martial_arts.martial_art.category -> martial_arts.martial_art_category.martial_arts"
+        }
+    },
+    "what martial arts are in the same category as chang moo kwan?": {
+        "Answers": [
+            "Muay Thai",
+            "Kajukenbo",
+            "Jeet Kune Do",
+            "Bando",
+            "Boxing",
+            "Sanshou",
+            "Capoeira",
+            "Pencak Silat",
+            "Silat",
+            "Vovinam",
+            "Karate",
+            "Tai chi",
+            "B\u00e2ton fran\u00e7ais",
+            "Savate",
+            "Systema",
+            "Shid\u014dkan Karate",
+            "Hapkido",
+            "Silat Melayu",
+            "Kuk Sool Won",
+            "Taekkyeon",
+            "Northern Praying Mantis",
+            "Baguazhang",
+            "Kalaripayattu",
+            "Russian All-Round Fighting",
+            "Southern Dragon Kung Fu",
+            "Sikaran",
+            "Krav Maga",
+            "Taid\u014d",
+            "Lethwei",
+            "Jittejutsu",
+            "Hwa Rang Do",
+            "Wing Tsun",
+            "Zui quan",
+            "Pankration",
+            "Juego de man\u00ed",
+            "Bartitsu",
+            "Modern Arnis",
+            "Northern Shaolin",
+            "Subak",
+            "Wing Chun",
+            "Bokator"
+        ],
+        "Paths": {
+            "Chang Moo Kwan": "Chang Moo Kwan -> martial_arts.martial_arts_organization.martial_arts -> martial_arts.martial_art.category -> martial_arts.martial_art_category.martial_arts"
+        }
+    },
+    "which camera compressed format is used in the digital camera with sensor shift?": {
+        "Answers": [
+            "JPEG (EXIF 2.2)",
+            "JPEG",
+            "Raw image format"
+        ],
+        "Paths": {
+            "Sensor shift": "Sensor shift -> digicams.image_stabilization_type.digital_camera -> digicams.digital_camera.compressed_formats"
+        }
+    },
+    "what camera image stabilization type is the digital camera with camera iso capability 3200?": {
+        "Answers": [
+            "Lens based optical stabilization",
+            "Sensor shift"
+        ],
+        "Paths": {
+            "3200": "3200 -> digicams.camera_iso.cameras -> digicams.image_stabilization_type.digital_camera"
+        }
+    },
+    "the heir of king christian x rules which kingdom?": {
+        "Answers": [
+            "Denmark"
+        ],
+        "Paths": {
+            "Christian X of Denmark": "Christian X of Denmark -> people.person.parents -> royalty.kingdom.rulers"
+        }
+    },
+    "what monarch is the ruler of a kingdom that is also ruled by konbaung dynasty?": {
+        "Answers": [
+            "Hsinbyushin",
+            "Bodawpaya",
+            "Alaungpaya",
+            "Pagan Min",
+            "Bagyidaw",
+            "Thibaw Min",
+            "Naungdawgyi",
+            "Mindon Min",
+            "Singu Min",
+            "Tharrawaddy Min",
+            "Phaungkaza Maung Maung"
+        ],
+        "Paths": {
+            "Konbaung Dynasty": "Konbaung Dynasty -> royalty.royal_line.kingdom_s_ruled -> royalty.kingdom.rulers"
+        }
+    },
+    "what is the name of the mountain whose type is outcrop?": {
+        "Answers": [
+            "Pylon Peak",
+            "Rabbit Mountain",
+            "Plinth Peak",
+            "Flatiron",
+            "Vulcan's Thumb",
+            "Pyroclastic Peak",
+            "Capricorn Mountain",
+            "Lightning Peak",
+            "Felsite Peak",
+            "Mount Job",
+            "Round Mountain"
+        ],
+        "Paths": {
+            "Outcrop": "Outcrop -> geography.mountain.mountain_type"
+        }
+    },
+    "what mountain pass is in the western ghats mountain range?": {
+        "Answers": [
+            "Palakkad Gap",
+            "Kasara ghat",
+            "Naneghat",
+            "Tamhini Ghat"
+        ],
+        "Paths": {
+            "Western Ghats": "Western Ghats -> geography.mountain_pass.range"
+        }
+    },
+    "which internet protocols is the software olat used by?": {
+        "Answers": [
+            "Hypertext Transfer Protocol",
+            "Hypertext Transfer Protocol over Secure Socket Layer",
+            "WebDAV",
+            "XMPP"
+        ],
+        "Paths": {
+            "OLAT": "OLAT -> computer.internet_protocol.software_used_by"
+        }
+    },
+    "what is the web browser, developed by mozilla, that uses hypertext transfer protocol?": {
+        "Answers": [
+            "SeaMonkey",
+            "Firefox",
+            "Mozilla Application Suite"
+        ],
+        "Paths": {
+            "Hypertext Transfer Protocol": "Hypertext Transfer Protocol -> computer.software.protocols_used",
+            "Mozilla Foundation": "Mozilla Foundation -> computer.software.developer"
+        }
+    },
+    "which olympic games has the demonstration sports of savate?": {
+        "Answers": [
+            "1924 Summer Olympics"
+        ],
+        "Paths": {
+            "Savate": "Savate -> olympics.olympic_games.demonstration_sports"
+        }
+    },
+    "what sports were included in the 1968 summer olympic games ?": {
+        "Answers": [
+            "Shooting sport",
+            "Football",
+            "Swimming",
+            "Boxing",
+            "Sailing",
+            "Rowing",
+            "Volleyball",
+            "Fencing",
+            "Water polo",
+            "Basketball",
+            "Greco-Roman wrestling",
+            "Freestyle wrestling",
+            "Diving",
+            "Road cycling",
+            "Track cycling",
+            "Eventing",
+            "Modern pentathlon",
+            "Artistic gymnastics",
+            "Track and field athletics",
+            "Olympic weightlifting",
+            "Dressage",
+            "Canoe Sprint",
+            "Show jumping"
+        ],
+        "Paths": {
+            "1968 Summer Olympics": "1968 Summer Olympics -> olympics.olympic_sport.olympic_games_contested"
+        }
+    },
+    "what is the name of the primary election that has the election campaign of obama?": {
+        "Answers": [
+            "Democratic Party presidential primaries, 2008"
+        ],
+        "Paths": {
+            "Barack Obama": "Barack Obama -> government.politician.election_campaigns -> government.election_campaign.election"
+        }
+    },
+    "which is the primary election at california\u2019s 8th congressional district of republicans?": {
+        "Answers": [
+            "2008 Republican Primary, California\u2019s 8th Congressional District"
+        ],
+        "Paths": {
+            "California\u2019s 8th congressional district": "California\u2019s 8th congressional district -> government.political_district.elections",
+            "Republican Party": "Republican Party -> government.primary_election.party"
+        }
+    },
+    "on the calendar what months have dec. in the name?": {
+        "Answers": [
+            "February",
+            "January",
+            "May",
+            "October",
+            "March",
+            "November",
+            "June",
+            "July",
+            "September",
+            "August",
+            "April"
+        ],
+        "Paths": {
+            "December": "December -> time.calendar.month_names -> time.calendar.months"
+        }
+    },
+    "what is the name of the day of week of jewish calendar?": {
+        "Answers": [
+            "Shabbat"
+        ],
+        "Paths": {
+            "Hebrew calendar": "Hebrew calendar -> time.day_of_week.calendar_system"
+        }
+    },
+    "what are the government bodies of consumer court?": {
+        "Answers": [
+            "India"
+        ],
+        "Paths": {
+            "Consumer Court": "Consumer Court -> government.governmental_jurisdiction.government_bodies"
+        }
+    },
+    "what is the name of subordinate court of supreme court of judicature?": {
+        "Answers": [
+            "Caribbean Court of Justice"
+        ],
+        "Paths": {
+            "Supreme Court of Judicature": "Supreme Court of Judicature -> law.court.inferior_courts"
+        }
+    },
+    "which amusement park has the ride carousel?": {
+        "Answers": [
+            "Luna Park, Tel Aviv"
+        ],
+        "Paths": {
+            "Carousel": "Carousel -> amusement_parks.park.rides"
+        }
+    },
+    "name the amusement ride type of disney ride designed by baxter?": {
+        "Answers": [
+            "Roller coaster"
+        ],
+        "Paths": {
+            "Tony Baxter": "Tony Baxter -> amusement_parks.ride_designer.rides -> amusement_parks.ride.ride_type"
+        }
+    },
+    "what is the fruit source for wine produced by harrington wines?": {
+        "Answers": [
+            "Purchased Grapes"
+        ],
+        "Paths": {
+            "Harrington Wines": "Harrington Wines -> wine.wine.wine_producer -> wine.wine.fruit_source"
+        }
+    },
+    "lucienne vineyards makes how many different types of wine?": {
+        "Answers": [
+            "2"
+        ],
+        "Paths": {
+            "Lucienne Vineyards": "Lucienne Vineyards -> wine.wine.wine_producer"
+        }
+    },
+    "what is the latest file format created by society?": {
+        "Answers": [
+            "Encoded Archival Description"
+        ],
+        "Paths": {
+            "Society of American Archivists": "Society of American Archivists -> computer.file_format.format_creator"
+        }
+    },
+    "what type of file format is used in windows 9x ?": {
+        "Answers": [
+            "Pwl",
+            "Virtual Device Driver",
+            "Dbw",
+            "Lgo",
+            "Tpw",
+            "MOD"
+        ],
+        "Paths": {
+            "Windows 9X": "Windows 9X -> computer.file_format.used_on"
+        }
+    }
+}

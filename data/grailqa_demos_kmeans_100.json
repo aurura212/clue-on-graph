@@ -1,0 +1,307 @@
+{
+    "what is the drug formulation for the category animal homeopathic?": {
+        "Animal homeopathic": "Animal homeopathic -> medicine.drug_formulation.drug_category"
+    },
+    "nateglinide 120 tablet has what manufactured drug form?": {
+        "Nateglinide 120 tablet": "Nateglinide 120 tablet -> medicine.manufactured_drug_form.manufactured_form_of"
+    },
+    "what educational institution has the boston college eagles as an athletic brand?": {
+        "Boston College Eagles": "Boston College Eagles -> education.educational_institution.athletics_brand"
+    },
+    "which educational institution is in boston university?": {
+        "Boston University": "Boston University -> education.educational_institution.parent_institution"
+    },
+    "which is the language writing system for sindarin language and alphabet?": {
+        "Alphabet": "Alphabet -> language.language_writing_type.writing_systems",
+        "Sindarin": "Sindarin -> language.human_language.writing_system"
+    },
+    "what is the language dialect of mari language?": {
+        "Mari language": "Mari language -> language.language_dialect.language"
+    },
+    "which isbns are book editions read by tom arnold?": {
+        "Tom Arnold": "Tom Arnold -> book.audio_book_reader.audio_books_read -> book.isbn.book_editions"
+    },
+    "steven belledin illustrated what edition of the book?": {
+        "Steven Belledin": "Steven Belledin -> book.book_edition.interior_illustrations_by"
+    },
+    "tell me the number of medical treatments that have a side effect of erythema ?": {
+        "Erythema": "Erythema -> medicine.medical_treatment.side_effects"
+    },
+    "how many medical treatments are being tested by health study?": {
+        "Physicians' Health Study": "Physicians' Health Study -> medicine.medical_trial.treatment_being_tested"
+    },
+    "for the musical genre with albums get yer ya-yas out, which music genre is the parent genre?": {
+        "Get Yer Ya-Ya's Out! The Rolling Stones in Concert": "Get Yer Ya-Ya's Out! The Rolling Stones in Concert -> music.genre.albums -> music.genre.parent_genre"
+    },
+    "how many media genres have the parent genre of epic fantasy?": {
+        "Sword and sorcery": "Sword and sorcery -> media_common.media_genre.parent_genre"
+    },
+    "what star classification has comets as a subcategory?": {
+        "Comet": "Comet -> astronomy.celestial_object_category.subcategories"
+    },
+    "what is the star of planets hd 118203 b?": {
+        "HD 118203 b": "HD 118203 b -> astronomy.star.planet_s"
+    },
+    "who is the designer of the ship class dart 18?": {
+        "Dart 18": "Dart 18 -> boats.ship_designer.ship_classes_designed"
+    },
+    "who is the designer of flight deck?": {
+        "Flight Deck": "Flight Deck -> amusement_parks.ride_designer.rides"
+    },
+    "the seekers universe includes what fictional character?": {
+        "The Seekers Universe": "The Seekers Universe -> fictional_universe.fictional_character.appears_in_these_fictional_universes"
+    },
+    "what is the ethnicity of the fictional video game character that belongs to the excalibur?": {
+        "Excalibur": "Excalibur -> fictional_universe.fictional_character.organizations -> fictional_universe.ethnicity_in_fiction.characters_of_this_ethnicity"
+    },
+    "what artist makes urban art artwork?": {
+        "Urban art": "Urban art -> visual_art.visual_artist.associated_periods_or_movements"
+    },
+    "paper supports artworks of which visual art genre?": {
+        "Paper": "Paper -> visual_art.artwork.support -> visual_art.visual_art_genre.artworks"
+    },
+    "who is the colorist of a comic book story that took place in dp?": {
+        "Daily Planet": "Daily Planet -> fictional_universe.fictional_setting.works_set_here -> comic_books.comic_book_story.colors"
+    },
+    "what comic book character appears in a comic book story inked by prentis rollins?": {
+        "Prentis Rollins": "Prentis Rollins -> comic_books.comic_book_inker.comic_books_inked -> comic_books.comic_book_story.characters"
+    },
+    "which manufacturer/brand uses x86 in its computers?": {
+        "x86": "x86 -> computer.computer_processor.used_in_computers -> computer.computer_manufacturer_brand.computer_lines"
+    },
+    "what computer did the designers of next computer also make?": {
+        "NeXT Computer": "NeXT Computer -> computer.computer.key_designers -> computer.computer.key_designers"
+    },
+    "\"where humanity sowed faith, hope, and unity, joy\u2019s garden blossomed.\" has what as the quotation address?": {
+        "\"Where humanity sowed faith, hope, and unity, Joy\u2019s garden blossomed.\"": "\"Where humanity sowed faith, hope, and unity, Joy\u2019s garden blossomed.\" -> media_common.quotation_addressee.quotations"
+    },
+    "which appointee is the author of a quotation about passion?": {
+        "Passion": "Passion -> media_common.quotation.subjects -> media_common.quotation.author"
+    },
+    "which organism classifications rank lower than breeds ?": {
+        "Breed": "Breed -> biology.organism_classification_rank.lower_rank"
+    },
+    "animal species rank contains how many organism classifications?": {
+        "Species": "Species -> biology.organism_classification_rank.organism_classifications"
+    },
+    "what is an ingredient featured in the cooking style moroccan cuisine?": {
+        "Moroccan food": "Moroccan food -> food.ingredient.cuisine"
+    },
+    "what is the dish that is made by using the typical ingredients of soy sauce and harissa?": {
+        "Soy sauce": "Soy sauce -> food.ingredient.dishes",
+        "Harissa": "Harissa -> food.dish.ingredients"
+    },
+    "which chromosome has the genomic locus of human cytogenetic band xp11.21?": {
+        "Human Cytogenetic Band Xp11.21": "Human Cytogenetic Band Xp11.21 -> biology.cytogenetic_band.locus -> biology.genomic_locus.chromosome"
+    },
+    "what is the name of the chromosome which has the genomic locus of human cytogenetic band 2p16.2?": {
+        "Human Cytogenetic Band 2p16.2": "Human Cytogenetic Band 2p16.2 -> biology.cytogenetic_band.locus -> biology.genomic_locus.chromosome"
+    },
+    "what sort of religious group is catholic church?": {
+        "Roman Catholic Church": "Roman Catholic Church -> religion.religion.organizations"
+    },
+    "chrismation is practiced in what religions?": {
+        "Chrismation": "Chrismation -> religion.religion.practices"
+    },
+    "which tropical cyclone is cyclones?": {
+        "Cyclone": "Cyclone -> meteorology.tropical_cyclone.category"
+    },
+    "which tropical cyclone is typhoon?": {
+        "Tropical cyclone": "Tropical cyclone -> meteorology.tropical_cyclone.category"
+    },
+    "which sequence of tv episode segments was aired on the tv series the late show?": {
+        "Late Show with David Letterman": "Late Show with David Letterman -> tv.sequence_of_tv_episode_segments.tv_series"
+    },
+    "what is the tv program that the multipart tv episode the end (2) is a part of?": {
+        "The End (2)": "The End (2) -> tv.multipart_tv_episode.episodes -> tv.tv_program.multipart_episodes"
+    },
+    "what airline has an iata designator of su?": {
+        "SU": "SU -> aviation.airline.IATA_designator"
+    },
+    "b-17f are which airplanes?": {
+        "B-17F": "B-17F -> aviation.aircraft.model"
+    },
+    "luxury hotel provides which accomodations?": {
+        "Luxury Hotel": "Luxury Hotel -> travel.accommodation.accommodation_type"
+    },
+    "which accommodation is provided by luxury resorts?": {
+        "Luxury resorts": "Luxury resorts -> travel.accommodation.accommodation_type"
+    },
+    "what is the organization sector for soaring association of canada?": {
+        "Soaring Association of Canada": "Soaring Association of Canada -> organization.organization_sector.organizations_in_this_sector"
+    },
+    "what is the organization sector for messrs. peto, brassey and betts?": {
+        "Messrs. Peto, Brassey and Betts": "Messrs. Peto, Brassey and Betts -> organization.organization_sector.organizations_in_this_sector"
+    },
+    "which spacecraft manufacturer has manufactured a satellite whose launch vehicle was ariane 44 lp?": {
+        "Ariane 44 LP": "Ariane 44 LP -> spaceflight.satellite.launch_vehicle -> spaceflight.satellite_manufacturer.spacecraft_manufactured"
+    },
+    "what consumer product is made by ethan and zachary marketing llc?": {
+        "Ethan and Zachary Marketing LLC": "Ethan and Zachary Marketing LLC -> business.company_product_relationship.company -> business.consumer_product.company"
+    },
+    "which theater character is the plays the gig appears in?": {
+        "The Gig": "The Gig -> theater.theater_character.plays_appears_in"
+    },
+    "which opera productions are stage directed by caterina mattea?": {
+        "Caterina Mattea": "Caterina Mattea -> opera.opera_production.stage_director"
+    },
+    "who is the record producer that released a musical component with package driven downunder tour '94: souvenir collection?": {
+        "Driven Downunder Tour '94: Souvenir Collection": "Driven Downunder Tour '94: Souvenir Collection -> music.release_component.package -> music.producer.releases_produced"
+    },
+    "how many musical artists play blakawout?": {
+        "Blakawout": "Blakawout -> music.genre.recordings -> music.genre.artists"
+    },
+    "what team is in the western athletic conference?": {
+        "Western Athletic Conference": "Western Athletic Conference -> basketball.basketball_team.conference"
+    },
+    "what is the name of the professional sports team that has rise as their team mascot?": {
+        "Rise": "Rise -> sports.sports_team.team_mascot"
+    },
+    "which of the natural or cultural sites has a supercategory of uwh natural critera?": {
+        "UWH Natural Critera": "UWH Natural Critera -> protected_sites.site_listing_category.supercategory -> protected_sites.natural_or_cultural_site_designation.categories"
+    },
+    "category b is the category of which designated natural or cultural site?": {
+        "Category B": "Category B -> protected_sites.natural_or_cultural_site_designation.categories"
+    },
+    "the curator of the history exhibition type exhibitions is who?": {
+        "History exhibition": "History exhibition -> exhibitions.type_of_exhibition.exhibitions_of_this_type -> exhibitions.exhibition.curators"
+    },
+    "which exhibition is regularly updated exhibition?": {
+        "Regularly updated exhibition": "Regularly updated exhibition -> exhibitions.exhibition.exhibition_types"
+    },
+    "what is the automobile model that is the predecessor of the automobile model first generation pontiac gto?": {
+        "First Generation Pontiac GTO": "First Generation Pontiac GTO -> automotive.generation.model -> automotive.model.predecessor"
+    },
+    "what is the automotive class of automobile model which sister model is geo prizm?": {
+        "Geo Prizm": "Geo Prizm -> automotive.model.similar -> automotive.model.automotive_class"
+    },
+    "which are the tennis tournaments won by malisse?": {
+        "Xavier Malisse": "Xavier Malisse -> tennis.tennis_match.winner -> tennis.tennis_tournament.match_results"
+    },
+    "what different types of tennis matches has ana ivanovic won?": {
+        "Ana Ivanovic": "Ana Ivanovic -> tennis.tennis_match.winner -> tennis.tennis_match.match_format"
+    },
+    "name the top level domain registry sponsored by theficora ?": {
+        "FICORA": "FICORA -> internet.top_level_domain_sponsor.domains -> internet.top_level_domain.registry"
+    },
+    "microsoft corporation sponsors which top level domain?": {
+        "Microsoft Corporation": "Microsoft Corporation -> internet.top_level_domain.sponsor"
+    },
+    "which musical soundtrack is a traditional pop music album?": {
+        "Traditional pop music": "Traditional pop music -> music.genre.albums",
+        "Soundtrack": "Soundtrack -> music.album.album_content_type"
+    },
+    "everything a man could need has the tracks of what musical release?": {
+        "Everything a Man Could Need": "Everything a Man Could Need -> music.release.track"
+    },
+    "what computer emulator has the peripherals of melodik interface?": {
+        "Melodik Interface": "Melodik Interface -> computer.computer_emulator.peripherals"
+    },
+    "which computer emulator uses multiface 1 peripherals?": {
+        "Multiface 1": "Multiface 1 -> computer.computer_emulator.peripherals"
+    },
+    "what engine cycle of the bipropellant rocket also manufactured the rd-215u?": {
+        "RD-215U": "RD-215U -> spaceflight.rocket_engine.manufactured_by -> spaceflight.rocket_engine.manufactured_by -> spaceflight.bipropellant_rocket_engine.engine_cycle"
+    },
+    "what engine cycle of the bipropellant rocket also manufactured the rd-216m?": {
+        "RD-216M": "RD-216M -> spaceflight.rocket_engine.manufactured_by -> spaceflight.rocket_engine.manufactured_by -> spaceflight.bipropellant_rocket_engine.engine_cycle"
+    },
+    "what spacecrafts did lockheed corporation manufacture?": {
+        "Lockheed Corporation": "Lockheed Corporation -> spaceflight.spacecraft.manufacturer"
+    },
+    "what spacecraft manufacturer is responsible for the satellite dnepr launch vehicle?": {
+        "Dnepr launch vehicle": "Dnepr launch vehicle -> spaceflight.satellite.launch_vehicle -> spaceflight.satellite_manufacturer.spacecraft_manufactured"
+    },
+    "what was the programming language first introduced by microsoft corporation which was influenced by another language?": {
+        "Microsoft Corporation": "Microsoft Corporation -> computer.programming_language_developer.programming_languages_developed -> computer.programming_language.influenced"
+    },
+    "sun has made how many programming languages?": {
+        "Sun Microsystems": "Sun Microsystems -> computer.programming_language.developers"
+    },
+    "what distilled spirit has a fermentation base that is the fermentation base of grain whisky?": {
+        "Grain whisky": "Grain whisky -> distilled_spirits.distilled_spirit_type.fermentation_base -> distilled_spirits.distilled_spirit.fermentation_base"
+    },
+    "which blended spirit containing single malt whiskey has the least alcohol content?": {
+        "Single malt whisky": "Single malt whisky -> distilled_spirits.distilled_spirit_type.blends"
+    },
+    "wcco radio broadcasts what content?": {
+        "WCCO": "WCCO -> broadcast.content.producer"
+    },
+    "name the ksl newsradio internet stream used to broadcast content?": {
+        "KSL": "KSL -> broadcast.producer.produces -> broadcast.broadcast.content"
+    },
+    "what martial arts share a category with the ji do kwan?": {
+        "Jidokwan": "Jidokwan -> martial_arts.martial_arts_organization.martial_arts -> martial_arts.martial_art.category -> martial_arts.martial_art_category.martial_arts"
+    },
+    "what martial arts are in the same category as chang moo kwan?": {
+        "Chang Moo Kwan": "Chang Moo Kwan -> martial_arts.martial_arts_organization.martial_arts -> martial_arts.martial_art.category -> martial_arts.martial_art_category.martial_arts"
+    },
+    "which camera compressed format is used in the digital camera with sensor shift?": {
+        "Sensor shift": "Sensor shift -> digicams.image_stabilization_type.digital_camera -> digicams.digital_camera.compressed_formats"
+    },
+    "what camera image stabilization type is the digital camera with camera iso capability 3200?": {
+        "3200": "3200 -> digicams.camera_iso.cameras -> digicams.image_stabilization_type.digital_camera"
+    },
+    "the heir of king christian x rules which kingdom?": {
+        "Christian X of Denmark": "Christian X of Denmark -> people.person.parents -> royalty.kingdom.rulers"
+    },
+    "what monarch is the ruler of a kingdom that is also ruled by konbaung dynasty?": {
+        "Konbaung Dynasty": "Konbaung Dynasty -> royalty.royal_line.kingdom_s_ruled -> royalty.kingdom.rulers"
+    },
+    "what is the name of the mountain whose type is outcrop?": {
+        "Outcrop": "Outcrop -> geography.mountain.mountain_type"
+    },
+    "what mountain pass is in the western ghats mountain range?": {
+        "Western Ghats": "Western Ghats -> geography.mountain_pass.range"
+    },
+    "which internet protocols is the software olat used by?": {
+        "OLAT": "OLAT -> computer.internet_protocol.software_used_by"
+    },
+    "what is the web browser, developed by mozilla, that uses hypertext transfer protocol?": {
+        "Hypertext Transfer Protocol": "Hypertext Transfer Protocol -> computer.software.protocols_used",
+        "Mozilla Foundation": "Mozilla Foundation -> computer.software.developer"
+    },
+    "which olympic games has the demonstration sports of savate?": {
+        "Savate": "Savate -> olympics.olympic_games.demonstration_sports"
+    },
+    "what sports were included in the 1968 summer olympic games ?": {
+        "1968 Summer Olympics": "1968 Summer Olympics -> olympics.olympic_sport.olympic_games_contested"
+    },
+    "what is the name of the primary election that has the election campaign of obama?": {
+        "Barack Obama": "Barack Obama -> government.politician.election_campaigns -> government.election_campaign.election"
+    },
+    "which is the primary election at california\u2019s 8th congressional district of republicans?": {
+        "California\u2019s 8th congressional district": "California\u2019s 8th congressional district -> government.political_district.elections",
+        "Republican Party": "Republican Party -> government.primary_election.party"
+    },
+    "on the calendar what months have dec. in the name?": {
+        "December": "December -> time.calendar.month_names -> time.calendar.months"
+    },
+    "what is the name of the day of week of jewish calendar?": {
+        "Hebrew calendar": "Hebrew calendar -> time.day_of_week.calendar_system"
+    },
+    "what are the government bodies of consumer court?": {
+        "Consumer Court": "Consumer Court -> government.governmental_jurisdiction.government_bodies"
+    },
+    "what is the name of subordinate court of supreme court of judicature?": {
+        "Supreme Court of Judicature": "Supreme Court of Judicature -> law.court.inferior_courts"
+    },
+    "which amusement park has the ride carousel?": {
+        "Carousel": "Carousel -> amusement_parks.park.rides"
+    },
+    "name the amusement ride type of disney ride designed by baxter?": {
+        "Tony Baxter": "Tony Baxter -> amusement_parks.ride_designer.rides -> amusement_parks.ride.ride_type"
+    },
+    "what is the fruit source for wine produced by harrington wines?": {
+        "Harrington Wines": "Harrington Wines -> wine.wine.wine_producer -> wine.wine.fruit_source"
+    },
+    "lucienne vineyards makes how many different types of wine?": {
+        "Lucienne Vineyards": "Lucienne Vineyards -> wine.wine.wine_producer"
+    },
+    "what is the latest file format created by society?": {
+        "Society of American Archivists": "Society of American Archivists -> computer.file_format.format_creator"
+    },
+    "what type of file format is used in windows 9x ?": {
+        "Windows 9X": "Windows 9X -> computer.file_format.used_on"
+    }
+}
