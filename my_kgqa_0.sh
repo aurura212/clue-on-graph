@@ -1,4 +1,4 @@
-python my_readi/kgqa.py\
+python src/kgqa.py\
     --dataset WebQSP \
     --a 0 \
     --b 800 \
