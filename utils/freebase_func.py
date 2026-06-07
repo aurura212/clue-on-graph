@@ -1,4 +1,14 @@
-from SPARQLWrapper import SPARQLWrapper, JSON
+try:
+    from SPARQLWrapper import SPARQLWrapper, JSON
+except ImportError:
+    SPARQLWrapper = None
+    JSON = None
+
+
+def require_sparqlwrapper():
+    if SPARQLWrapper is None or JSON is None:
+        raise ImportError("SPARQLWrapper is required for Freebase queries.")
+    return SPARQLWrapper, JSON
 
 SPARQLPATH = "http://127.0.0.1:8890/sparql"  # depend on your own internal address and port, shown in Freebase readme.md
 
@@ -29,6 +39,7 @@ def abandon_rels(relation):
 
 
 def type_search(mid):
+    SPARQLWrapper, JSON = require_sparqlwrapper()
     sparql = SPARQLWrapper(SPARQLPATH)
     query = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  ns:%s ?relation ?x .\n}"""
     type_list = []
@@ -52,6 +63,7 @@ def type_search(mid):
     return type_list
 
 def execute_sparql(sparql_txt):
+    SPARQLWrapper, JSON = require_sparqlwrapper()
     sparql_txt = 'PREFIX : <http://rdf.freebase.com/ns/>\n'+sparql_txt
     try:
         sparql = SPARQLWrapper(SPARQLPATH)
@@ -78,6 +90,7 @@ def id2entity_name_or_type_en(entity_id):
     if entity_id.startswith("m.") == False and entity_id.startswith("g.") == False:
         return entity_id
     
+    SPARQLWrapper, JSON = require_sparqlwrapper()
     sparql_query = sparql_id % (entity_id, entity_id)
     sparql = SPARQLWrapper(SPARQLPATH)
     sparql.setQuery(sparql_query)
@@ -116,3 +129,84 @@ def table_result_to_list(res):
             result[key] = list(set([item[key] for item in res]))
         return result
 
+
+def freebase_value_to_id_or_literal(value):
+    value = str(value)
+    if value.startswith("http://rdf.freebase.com/ns/"):
+        return value.rsplit("/", 1)[-1]
+    return value
+
+
+def get_relation_neighbors(entity_id, relation, direction="forward"):
+    if direction == "forward":
+        query = """SELECT ?tailEntity
+WHERE {
+  :%s :%s ?tailEntity .
+}""" % (entity_id, relation)
+    elif direction == "backward":
+        query = """SELECT ?tailEntity
+WHERE {
+  ?tailEntity :%s :%s .
+}""" % (relation, entity_id)
+    else:
+        raise ValueError("Unsupported direction: %s" % direction)
+
+    rows = execute_sparql(query)
+    return [
+        freebase_value_to_id_or_literal(row.get("tailEntity", ""))
+        for row in rows
+        if row.get("tailEntity")
+    ]
+
+
+def instantiate_relation_path(entity_id, entity_label, relations, max_que=150, directions=None):
+    if directions is None:
+        directions = ("forward", "backward")
+
+    queue = [(entity_id, entity_label, [])]
+    failure_reasons = []
+    max_grounded_depth = 0
+
+    for depth, relation in enumerate(relations):
+        next_queue = []
+        for current_id, current_label, current_path in queue:
+            neighbors = []
+            for direction in directions:
+                try:
+                    for neighbor_id in get_relation_neighbors(current_id, relation, direction):
+                        neighbors.append((neighbor_id, direction))
+                except Exception as exc:
+                    failure_reasons.append(
+                        "%s: query failed for %s/%s: %s"
+                        % (current_label, relation, direction, exc)
+                    )
+
+            if not neighbors:
+                failure_reasons.append(
+                    "%s: relation %s has no direct neighbor" % (current_label, relation)
+                )
+                continue
+
+            max_grounded_depth = max(max_grounded_depth, depth + 1)
+            for neighbor_id, direction in neighbors[:max_que]:
+                neighbor_label = id2entity_name_or_type_en(neighbor_id)
+                rel_text = relation if direction == "forward" else "(R %s)" % relation
+                next_queue.append((
+                    neighbor_id,
+                    neighbor_label,
+                    current_path + [(current_label, rel_text, neighbor_label)],
+                ))
+                if len(next_queue) >= max_que:
+                    break
+            if len(next_queue) >= max_que:
+                break
+
+        queue = next_queue
+        if not queue:
+            break
+
+    result_paths = [
+        path for _, _, path in queue
+        if path and len(path) == len(relations)
+    ]
+    return result_paths, max_grounded_depth, failure_reasons

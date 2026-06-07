@@ -9,7 +9,6 @@ from sentence_transformers import util, SentenceTransformer
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from utils.freebase_func import *
-import openai
 import time
 
 
@@ -51,10 +50,13 @@ def get_openai_embedding(input_message, openai_api_keys, model):
 
 
 def run_llm(prompt, temperature, max_tokens, llm_calls, openai_api_keys=None, llm_model=None, llm_tokenizer=None, pipe=None, engine="gpt-3.5-turbo"):
+    openai = None
     print("engine:", engine)
     f = 0
     result = ''
     if 'gpt' in engine or 'deepseek' in engine or 'qwen3-80b' in engine:
+        import openai
+
         messages = []
         message_prompt = {"role":"user","content":prompt}
         messages.append(message_prompt)
