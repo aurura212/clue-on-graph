@@ -1,5 +1,5 @@
 python build_revolution_reference.py \
-  --dataset cwq \
+  --dataset WebQSP \
   --limit 10 \
   --use_llm_gold_clue \
   --use_llm_blind \
