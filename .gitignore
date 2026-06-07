@@ -1,9 +1,8 @@
-/ReasoningBank_阅读笔记.md
-/CoG.pdf
-/SRP.pdf
-/tmp_srp.txt
+ReasoningBank_阅读笔记.md
+CoG.pdf
+SRP.pdf
+run_build_revolution_reference.sh
 /data/raw_train_set/
-/reference_build/run_build_revolution_reference.sh
 /data/revolution_reference/
 /reference_build/__pycache__/
 /src/__pycache__/
