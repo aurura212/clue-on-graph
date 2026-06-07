@@ -752,7 +752,7 @@ def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
     count = 0
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.write(json.dumps(row, ensure_ascii=False, indent=2) + "\n")
             count += 1
     return count
 
