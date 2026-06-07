@@ -498,7 +498,12 @@ def verify_blind_with_kg(ref: Dict[str, Any], options: argparse.Namespace) -> Di
         return verify_blind_with_direct_freebase(ref, relations, options)
 
     try:
-        from kg_instantiation import bfs_for_each_path, relation_binding
+        kg_instantiation = load_module_from_path(
+            "clue_on_graph_kg_instantiation",
+            PROJECT_ROOT / "src" / "kg_instantiation.py",
+        )
+        bfs_for_each_path = kg_instantiation.bfs_for_each_path
+        relation_binding = kg_instantiation.relation_binding
     except Exception as exc:
         ref["blind"]["retrieval_result"] = []
         ref["blind"]["hit"] = False
