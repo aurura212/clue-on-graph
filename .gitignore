@@ -2,6 +2,7 @@ ReasoningBank_阅读笔记.md
 CoG.pdf
 SRP.pdf
 run_build_revolution_reference.sh
+run_kgqa.sh
 /data/raw_train_set/
 /data/revolution_reference/
 /reference_build/__pycache__/

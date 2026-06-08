@@ -40,6 +40,10 @@ def parse_args():
     parser.add_argument("--use_edit", type=int, default=1)
     parser.add_argument("--external_knowledge", type=int, default=1)
     parser.add_argument("--random_knowledge", type=int, default=0)
+    parser.add_argument("--reference_mode", type=str, choices=["legacy", "revolution", "none"], default="legacy")
+    parser.add_argument("--reference_base_path", type=str, default="")
+    parser.add_argument("--reference_limit", type=int, default=-1)
+    parser.add_argument("--reference_top_k", type=int, default=4)
     parser.add_argument("--llm", type=str, choices=LLM_BASE.keys(), default="gpt35", help="base LLM model.")
     parser.add_argument("--openai_api_keys", type=str, help="opeani_api_keys", default="", required=True)
     parser.add_argument("--count_token_cost", type=bool, help="count_token_cost", default=True)
@@ -77,6 +81,9 @@ def relation_search(ett_list):
     return rel_list
 
 def similar_question_select(cand_questions, init_text, top_k=2):
+    if len(cand_questions) == 0:
+        return []
+    top_k = min(top_k, len(cand_questions))
     cand_encode_list = np.asarray([enc_model.encode(r) for r in cand_questions])
     init_encode = np.asarray([enc_model.encode(init_text)])
     d = len(cand_encode_list[0])
@@ -86,6 +93,164 @@ def similar_question_select(cand_questions, init_text, top_k=2):
     index = I
     selected_questions = [cand_questions[i] for i in I[0]]
     return selected_questions
+
+def read_jsonl_file(file_path):
+    data = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        text = f.read().strip()
+    if not text:
+        return data
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            return parsed
+        return [parsed]
+    except json.JSONDecodeError:
+        pass
+
+    try:
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                data.append(json.loads(line))
+        return data
+    except json.JSONDecodeError:
+        data = []
+
+    decoder = json.JSONDecoder()
+    index = 0
+    while index < len(text):
+        while index < len(text) and text[index].isspace():
+            index += 1
+        if index >= len(text):
+            break
+        obj, index = decoder.raw_decode(text, index)
+        data.append(obj)
+    return data
+
+def get_dataset_prefix(dataset):
+    if 'WebQSP' in dataset:
+        return 'WebQSP'
+    if 'cwq' in dataset:
+        return 'cwq'
+    if 'grailqa' in dataset:
+        return 'grailqa'
+    return dataset.split('_')[0]
+
+def get_reference_limit_suffix(limit):
+    return "all" if limit < 0 else f"limit{limit}"
+
+def get_default_revolution_reference_path(dataset, limit=-1):
+    dataset_prefix = get_dataset_prefix(dataset)
+    limit_suffix = get_reference_limit_suffix(limit)
+    candidates = [
+        f"data/revolution_reference/{dataset_prefix}_reference_{limit_suffix}.jsonl",
+        f"data/revolution_reference/{dataset_prefix.lower()}_reference_{limit_suffix}.jsonl",
+        f"data/revolution_reference/{dataset_prefix}_reference.jsonl",
+        f"data/revolution_reference/{dataset_prefix.lower()}_reference.jsonl",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return candidates[0]
+
+def load_reference_bank(options):
+    if options.reference_mode == "none" or options.external_knowledge != 1:
+        return {}
+    if options.reference_mode == "legacy":
+        dataset_prefix = get_dataset_prefix(options.dataset)
+        with open(f"data/{dataset_prefix}_demos_kmeans_100_with_answers.json", encoding='utf-8') as f_demo:
+            return json.load(f_demo)
+    if options.reference_mode == "revolution":
+        reference_path = options.reference_base_path or get_default_revolution_reference_path(
+            options.dataset,
+            options.reference_limit,
+        )
+        if not os.path.exists(reference_path):
+            raise FileNotFoundError(
+                f"Revolution reference base not found: {reference_path}. "
+                f"Use --reference_limit to select a generated limit-specific file, "
+                f"or --reference_base_path to provide an explicit path."
+            )
+        return read_jsonl_file(reference_path)
+    raise ValueError(f"Unknown reference_mode: {options.reference_mode}")
+
+def mask_question_with_entities(question, topic_ent_list):
+    masked_question = question
+    for ent in topic_ent_list:
+        masked_question = masked_question.replace(ent, "*")
+    return masked_question
+
+def select_reference_items(reference_bank, question, topic_ent_list, options):
+    if options.reference_mode == "none" or options.external_knowledge != 1:
+        return []
+    if options.reference_mode == "legacy":
+        demo_question = [i for i, _ in reference_bank.items()]
+        if len(demo_question) == 0:
+            return []
+        if options.random_knowledge == 1:
+            return random.sample(demo_question, min(options.reference_top_k, len(demo_question)))
+        masked_question = mask_question_with_entities(question, topic_ent_list)
+        return similar_question_select(demo_question, masked_question, top_k=options.reference_top_k)
+    if options.reference_mode == "revolution":
+        if len(reference_bank) == 0:
+            return []
+        if options.random_knowledge == 1:
+            return random.sample(reference_bank, min(options.reference_top_k, len(reference_bank)))
+        masked_question = mask_question_with_entities(question, topic_ent_list)
+        cand_questions = [ref.get("masked_question") or ref.get("question", "") for ref in reference_bank]
+        selected_questions = similar_question_select(cand_questions, masked_question, top_k=options.reference_top_k)
+        selected_set = set(selected_questions)
+        selected_refs = []
+        for ref in reference_bank:
+            ref_question = ref.get("masked_question") or ref.get("question", "")
+            if ref_question in selected_set:
+                selected_refs.append(ref)
+            if len(selected_refs) >= options.reference_top_k:
+                break
+        return selected_refs
+    return []
+
+def format_revolution_relation_paths(ref):
+    paths = {}
+    relation_path = ref.get("gold", {}).get("relation_path", "")
+    topic_entities = ref.get("topic_entities", [])
+    if topic_entities:
+        for ent in topic_entities:
+            label = ent.get("label") or ent.get("id")
+            if label and relation_path:
+                paths[label] = f"{label} -> {relation_path}"
+    elif relation_path:
+        paths["Topic Entity"] = relation_path
+    return paths
+
+def build_reference_demo_strings(reference_bank, question, topic_ent_list, options):
+    if options.reference_mode == "none" or options.external_knowledge != 1:
+        return "", ""
+    selected_items = select_reference_items(reference_bank, question, topic_ent_list, options)
+    demo_str_check = ''
+    demo_str_prune = ''
+    if options.reference_mode == "legacy":
+        for q in selected_items:
+            r_path = list(reference_bank[q]['Paths'].values())[0]
+            demo_str_check += "Question: " + q + '\n' + 'Relation_path: ' + str(reference_bank[q]['Paths']) + '\n'
+            demo_str_prune += "Question: " + q + '\n' + 'Relation_path: ' + r_path + '\n' + 'Answer: ' + "; ".join(reference_bank[q]['Answers'][:3]) + '\n'
+    elif options.reference_mode == "revolution":
+        for ref in selected_items:
+            q = ref.get("question", "")
+            paths = format_revolution_relation_paths(ref)
+            answers = [ans.get("label", "") for ans in ref.get("answers", []) if ans.get("label")]
+            clue_reasoning = ref.get("gold", {}).get("clue_reasoning", [])
+            relation_path = ref.get("gold", {}).get("relation_path", "")
+            demo_str_check += "Question: " + q + '\n'
+            demo_str_check += 'Relation_path: ' + str(paths) + '\n'
+            if clue_reasoning:
+                demo_str_check += 'Clue_reasoning: ' + str(clue_reasoning) + '\n'
+            demo_str_prune += "Question: " + q + '\n'
+            demo_str_prune += 'Relation_path: ' + relation_path + '\n'
+            demo_str_prune += 'Answer: ' + "; ".join(answers[:3]) + '\n'
+    return demo_str_check, demo_str_prune
 
 def LLM_edit(reasoning_path_LLM_init, demo_str, entity_label, feedback, question, count_of_error_edit, options, pipeline=None, ett_id_dict=None, candidate_rel_dict=None, input_token_cnt=0, output_token_cnt=0, llm_calls=0):
     """
@@ -812,17 +977,7 @@ def main():
     wf = open(process_ana_file, 'w+', encoding='utf-8')
     wrong_index = []
 
-    if options.external_knowledge == 1:
-        if 'WebQSP' in options.dataset:
-            dataset_prefix = 'WebQSP'
-        elif 'cwq' in options.dataset:
-            dataset_prefix = 'cwq'
-        elif 'grailqa' in options.dataset:
-            dataset_prefix = 'grailqa'
-        with open(f"data/{dataset_prefix}_demos_kmeans_100_with_answers.json") as f_demo:
-            demo_questions_and_path = json.load(f_demo)
-    else:
-        demo_questions_and_path = {}
+    reference_bank = load_reference_bank(options)
 
     for index, item in enumerate(tqdm(dataset, total=len(dataset), desc='dataset')):
         topic_ent_list = get_topic_entity_list(item, input_file)
@@ -875,24 +1030,12 @@ def main():
         # reasoning path generation
         topic_ent_relation = {j: [] for i, j in topic_ent_dict.items()}
 
-        if options.external_knowledge == 1:
-            demo_question = [i for i, _ in demo_questions_and_path.items()]
-            if options.random_knowledge == 1:
-                top_4_questions = random.sample(demo_question, 4)
-            else:
-                masked_question = question
-                for i in topic_ent_list:
-                    masked_question = masked_question.replace(i, "*")
-                top_4_questions = similar_question_select(demo_question, masked_question, top_k=4)
-            demo_str_check = ''
-            demo_str_prune = ''
-            for i, q in enumerate(top_4_questions):
-                r_path = list(demo_questions_and_path[q]['Paths'].values())[0]
-                demo_str_check += "Question: " + q + '\n' + 'Relation_path: ' + str(demo_questions_and_path[q]['Paths']) + '\n'
-                demo_str_prune += "Question: " + q + '\n' + 'Relation_path: ' + r_path + '\n' + 'Answer: ' + "; ".join(demo_questions_and_path[q]['Answers'][:3]) + '\n'
-        else:
-            demo_str_check = ''
-            demo_str_prune = ''
+        demo_str_check, demo_str_prune = build_reference_demo_strings(
+            reference_bank,
+            question,
+            topic_ent_list,
+            options,
+        )
         
         if options.relation_check == 1:
             for entity_id, entity_label in topic_ent_dict.items():

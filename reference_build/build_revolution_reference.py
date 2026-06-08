@@ -752,9 +752,22 @@ def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
     count = 0
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False, indent=2) + "\n")
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
             count += 1
     return count
+
+
+def get_limit_suffix(limit: int) -> str:
+    return "all" if limit < 0 else f"limit{limit}"
+
+
+def get_default_output_file(dataset_key: str, limit: int) -> Path:
+    return (
+        PROJECT_ROOT
+        / "data"
+        / "revolution_reference"
+        / f"{dataset_key}_reference_{get_limit_suffix(limit)}.jsonl"
+    )
 
 
 def build_references(
@@ -807,7 +820,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output_file",
         default="",
-        help="Output JSONL path. Defaults to data/revolution_reference/{dataset}_reference.jsonl.",
+        help="Output JSONL path. Defaults to data/revolution_reference/{dataset}_reference_{limit}.jsonl.",
     )
     parser.add_argument("--limit", type=int, default=-1, help="Maximum number of source samples to process.")
     parser.add_argument("--use_llm_gold_clue", action="store_true", help="Call prompt_revolution/gold_clue_reasoning.md.")
@@ -867,7 +880,7 @@ def main() -> None:
     output_file = (
         Path(args.output_file).resolve()
         if args.output_file
-        else PROJECT_ROOT / "data" / "revolution_reference" / f"{dataset_key}_reference.jsonl"
+        else get_default_output_file(dataset_key, args.limit)
     )
 
     refs: List[Dict[str, Any]] = []
@@ -892,6 +905,7 @@ def main() -> None:
     print(json.dumps(
         {
             "dataset": args.dataset,
+            "limit": args.limit,
             "input_file": str(input_file),
             "output_file": str(output_file),
             "stats": stats,
