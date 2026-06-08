@@ -225,6 +225,65 @@ def format_revolution_relation_paths(ref):
         paths["Topic Entity"] = relation_path
     return paths
 
+def compact_path_string(path):
+    if not path:
+        return ""
+    triples = path[0] if isinstance(path, list) and path and isinstance(path[0], list) else path
+    if not triples:
+        return ""
+    parts = []
+    for i, triple in enumerate(triples):
+        if not isinstance(triple, list) or len(triple) != 3:
+            continue
+        h, r, t = triple
+        if i == 0:
+            parts.append(str(h))
+        parts.extend([str(r), str(t)])
+    return " -> ".join(parts)
+
+def first_non_empty(values):
+    if not values:
+        return ""
+    return str(values[0])
+
+def format_revolution_retrieval_context(ref):
+    retrieval_result = ref.get("blind", {}).get("retrieval_result", [])
+    if not retrieval_result:
+        return ""
+    result = retrieval_result[0]
+    lines = []
+    failure_reasons = ref.get("blind", {}).get("verification", {}).get("failure_reasons", [])
+    partial_path = compact_path_string(result.get("partial_paths", []))
+    if result.get("reasoning_path"):
+        lines.append("Blind Path: " + str(result.get("reasoning_path")))
+    if failure_reasons:
+        lines.append("Failure: " + first_non_empty(failure_reasons))
+    if partial_path:
+        lines.append("Partial Path: " + partial_path)
+    return "\n".join(lines)
+
+def format_revolution_reference_item(ref, include_answer=True):
+    q = ref.get("question", "")
+    gold_relation_path = ref.get("gold", {}).get("relation_path", "")
+    evaluation = ref.get("evaluation", {})
+    answers = [ans.get("label", "") for ans in ref.get("answers", []) if ans.get("label")]
+
+    lines = ["Reference Question: " + q]
+    retrieval_context = format_revolution_retrieval_context(ref)
+    if retrieval_context:
+        lines.append(retrieval_context)
+    topic_entities = ref.get("topic_entities", [])
+    if topic_entities:
+        label = topic_entities[0].get("label") or topic_entities[0].get("id") or "Topic Entity"
+        lines.append("Correct Path: " + str(label) + " -> " + gold_relation_path)
+    else:
+        lines.append("Correct Path: " + gold_relation_path)
+    if evaluation.get("correction"):
+        lines.append("Rule: " + str(evaluation.get("correction", "")))
+    if include_answer:
+        lines.append("Answer: " + "; ".join(answers[:3]))
+    return "\n".join(lines) + "\n"
+
 def build_reference_demo_strings(reference_bank, question, topic_ent_list, options):
     if options.reference_mode == "none" or options.external_knowledge != 1:
         return "", ""
@@ -238,18 +297,8 @@ def build_reference_demo_strings(reference_bank, question, topic_ent_list, optio
             demo_str_prune += "Question: " + q + '\n' + 'Relation_path: ' + r_path + '\n' + 'Answer: ' + "; ".join(reference_bank[q]['Answers'][:3]) + '\n'
     elif options.reference_mode == "revolution":
         for ref in selected_items:
-            q = ref.get("question", "")
-            paths = format_revolution_relation_paths(ref)
-            answers = [ans.get("label", "") for ans in ref.get("answers", []) if ans.get("label")]
-            clue_reasoning = ref.get("gold", {}).get("clue_reasoning", [])
-            relation_path = ref.get("gold", {}).get("relation_path", "")
-            demo_str_check += "Question: " + q + '\n'
-            demo_str_check += 'Relation_path: ' + str(paths) + '\n'
-            if clue_reasoning:
-                demo_str_check += 'Clue_reasoning: ' + str(clue_reasoning) + '\n'
-            demo_str_prune += "Question: " + q + '\n'
-            demo_str_prune += 'Relation_path: ' + relation_path + '\n'
-            demo_str_prune += 'Answer: ' + "; ".join(answers[:3]) + '\n'
+            demo_str_check += format_revolution_reference_item(ref, include_answer=False) + "\n"
+            demo_str_prune += format_revolution_reference_item(ref, include_answer=True) + "\n"
     return demo_str_check, demo_str_prune
 
 def LLM_edit(reasoning_path_LLM_init, demo_str, entity_label, feedback, question, count_of_error_edit, options, pipeline=None, ett_id_dict=None, candidate_rel_dict=None, input_token_cnt=0, output_token_cnt=0, llm_calls=0):
@@ -605,7 +654,15 @@ def check_ending(result_paths, grounded_knowledge_current_0, ungrounded_neighbor
                 for i, p in enumerate(cand_list):
                     tp_seq_str += "\n" + f"{i+1}." + str(p) 
                 if len(demo_str) > 0:
-                    prompt_prefix = "Here are 4 examples of some questions, associated relation and answer of question.\n" + demo_str + '\n'
+                    if options.reference_mode == "revolution":
+                        prompt_prefix = (
+                            "Here are reference cases showing blind KGQA failures, partial instantiated paths, "
+                            "gold correction paths, and answers. Use them to judge whether the current triplet "
+                            "sequences already reach the answer or only reach an intermediate/failing node.\n"
+                            + demo_str + '\n'
+                        )
+                    else:
+                        prompt_prefix = "Here are 4 examples of some questions, associated relation and answer of question.\n" + demo_str + '\n'
                     print("prune_prefix:\n" + prompt_prefix)
                     #prompt_prune = prompt_prune % (prompt_prefix)
                     prompt_1 = prompt_prefix + prompt_prune + "\nQuestion: " + question + "\nTriplet sequences: " + tp_seq_str + "\nThinking Process:"
@@ -914,7 +971,15 @@ def relation_extract(question, topic_entity, topic_ent_list, cand_relation, demo
     ).read()
     if len(demo_str) > 0:
         print("demo_str:\n", demo_str)
-        insert_text = "Here are 4 examples of questions and associated relation paths which connect to correct answer of question:\n" + demo_str
+        if options.reference_mode == "revolution":
+            insert_text = (
+                "Here are reference cases from training questions. Each case shows a blind initial prediction, "
+                "the KG retrieval failure or partial path, and the corrected gold relation path. "
+                "Use similar cases to prioritize candidate relations that avoid the same failure pattern:\n"
+                + demo_str
+            )
+        else:
+            insert_text = "Here are reference cases of questions and associated relation paths which connect to correct answer of question:\n" + demo_str
     else:
         insert_text = demo_str
     

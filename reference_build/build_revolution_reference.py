@@ -369,6 +369,12 @@ def extract_tail_candidates(paths: List[List[Tuple[Any, Any, Any]]]) -> List[str
     return candidates
 
 
+def get_path_depth(paths: List[List[Tuple[Any, Any, Any]]]) -> int:
+    if not paths:
+        return 0
+    return max(len(path) for path in paths)
+
+
 def parse_blueprint_relations(blueprint: Any) -> List[str]:
     if isinstance(blueprint, list):
         raw_items = blueprint
@@ -423,6 +429,7 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
     ]
     retrieval_result = []
     all_tail_candidates: List[str] = []
+    all_partial_tail_candidates: List[str] = []
     max_grounded_depth = 0
     failure_reasons: List[str] = []
 
@@ -432,21 +439,26 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
         reasoning_path = ref["blind"].get("reasoning_paths", {}).get(label)
         entity_relations = extract_relations_from_reasoning_path(reasoning_path) if reasoning_path else relations
         reasoning_path = reasoning_path or (label + " -> " + " -> ".join(entity_relations))
+        partial_paths = []
         try:
-            result_paths, cur_depth, cur_failures = instantiate_relation_path(
+            verify_result = instantiate_relation_path(
                 entity_id,
                 label,
                 entity_relations,
                 max_que=options.max_que,
                 directions=options.direct_relation_directions,
+                return_partial=True,
             )
+            result_paths, cur_depth, cur_failures, partial_paths = verify_result
         except Exception as exc:
             result_paths = []
             cur_depth = 0
             cur_failures = [f"{label}: direct Freebase verification failed: {exc}"]
 
         tail_candidates = extract_tail_candidates(result_paths)
+        partial_tail_candidates = extract_tail_candidates(partial_paths)
         all_tail_candidates.extend(tail_candidates)
+        all_partial_tail_candidates.extend(partial_tail_candidates)
         max_grounded_depth = max(max_grounded_depth, cur_depth)
         failure_reasons.extend(cur_failures)
 
@@ -457,7 +469,10 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
             "status": "ok" if result_paths else "empty",
             "mode": "direct_freebase",
             "paths": [path_to_serializable(path) for path in result_paths[:options.max_saved_paths]],
+            "partial_paths": [path_to_serializable(path) for path in partial_paths[:options.max_saved_paths]],
+            "partial_path_depth": get_path_depth(partial_paths),
             "tail_candidates": tail_candidates[:options.max_saved_candidates],
+            "partial_tail_candidates": partial_tail_candidates[:options.max_saved_candidates],
         })
 
     return finalize_kg_verification(
@@ -465,6 +480,7 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
         relations,
         retrieval_result,
         all_tail_candidates,
+        all_partial_tail_candidates,
         max_grounded_depth,
         failure_reasons,
         options.max_saved_candidates,
@@ -476,17 +492,20 @@ def finalize_kg_verification(
     relations: List[str],
     retrieval_result: List[Dict[str, Any]],
     all_tail_candidates: List[str],
+    all_partial_tail_candidates: Optional[List[str]],
     max_grounded_depth: int,
     failure_reasons: List[str],
     max_saved_candidates: int,
 ) -> Dict[str, Any]:
+    if all_partial_tail_candidates is None:
+        all_partial_tail_candidates = []
     hit = any(hit_answer_text(candidate, ref["answers"]) for candidate in all_tail_candidates)
     if hit:
         failure_type = "correct"
-    elif not all_tail_candidates:
-        failure_type = "no_instantiated_answer_candidate"
     elif max_grounded_depth < len(relations):
         failure_type = "path_not_fully_instantiated"
+    elif not all_tail_candidates:
+        failure_type = "no_instantiated_answer_candidate"
     else:
         failure_type = "instantiated_but_answer_mismatch"
 
@@ -499,6 +518,7 @@ def finalize_kg_verification(
         "max_grounded_depth": max_grounded_depth,
         "target_depth": len(relations),
         "tail_candidates": all_tail_candidates[:max_saved_candidates],
+        "partial_tail_candidates": all_partial_tail_candidates[:max_saved_candidates],
         "failure_reasons": failure_reasons[:max_saved_candidates],
     }
     return ref
@@ -609,6 +629,7 @@ def verify_blind_with_kg(ref: Dict[str, Any], options: argparse.Namespace) -> Di
         relations,
         retrieval_result,
         all_tail_candidates,
+        [],
         max_grounded_depth,
         failure_reasons,
         options.max_saved_candidates,

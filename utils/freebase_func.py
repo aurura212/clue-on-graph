@@ -159,11 +159,12 @@ WHERE {
     ]
 
 
-def instantiate_relation_path(entity_id, entity_label, relations, max_que=150, directions=None):
+def instantiate_relation_path(entity_id, entity_label, relations, max_que=150, directions=None, return_partial=False):
     if directions is None:
         directions = ("forward", "backward")
 
     queue = [(entity_id, entity_label, [])]
+    partial_paths = []
     failure_reasons = []
     max_grounded_depth = 0
 
@@ -201,6 +202,8 @@ def instantiate_relation_path(entity_id, entity_label, relations, max_que=150, d
             if len(next_queue) >= max_que:
                 break
 
+        if next_queue:
+            partial_paths = [path for _, _, path in next_queue]
         queue = next_queue
         if not queue:
             break
@@ -209,4 +212,6 @@ def instantiate_relation_path(entity_id, entity_label, relations, max_que=150, d
         path for _, _, path in queue
         if path and len(path) == len(relations)
     ]
+    if return_partial:
+        return result_paths, max_grounded_depth, failure_reasons, partial_paths
     return result_paths, max_grounded_depth, failure_reasons
