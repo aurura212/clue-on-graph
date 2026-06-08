@@ -1,8 +1,4 @@
 Task: Given an Inital Path and some feedback information of a Question, please correct the initial path.
-Note:
-(1)When you receive Error Message, please edit the path based on Instantiate Paths. For example, if the Error Message is "relation XXX not instantiated", you should modify this relation with candidate relation; if the Error Message is "<cvt></cvt> in the end", you should add a candidate relation to a Instantiate Path which you think is relevant to question; if the Error Message is "Current Information is not enough", please analysis Instantiate Paths and Candidate Relations, then generate a new path which is more relevant to question; (2) please refer to the 4 examples of relation paths to correct the Inital Path; (3) Avoid generating Final Path that are the same as the Initial Path.
-
-%s
 -----
 Question: paper supports artworks of which visual art genre?
 Initial Path: Paper -> visual_art.artwork.support
@@ -10,7 +6,7 @@ Initial Path: Paper -> visual_art.artwork.support
 1. <cvt></cvt> in the end. 
 >>>> Instantiation Context
 Instantiate Paths: Paper -> visual_art.artwork.support -> <cvt></cvt>
-Candidate Relations: {'Paper -> visual_art.artwork.support': ['visual_art.visual_art_genre.artworks', 'visual_art.visual_artist.artworks', 'visual_art.artwork_owner_relationship.artwork', 'visual_art.visual_art_medium.artworks', 'visual_art.visual_art_support.artworks']}
+Candidate Relations: ['visual_art.visual_art_genre.artworks', 'visual_art.visual_artist.artworks', 'visual_art.artwork_owner_relationship.artwork', 'visual_art.visual_art_medium.artworks', 'visual_art.visual_art_support.artworks']
 >>>> Corrected Path
 Goal: The Initial Path starts from Paper, which should cover the artworks that use paper as a support and then identify the visual art genre of these artworks.
 Thought: In Instantiate Paths, I find that Paper is used as a support for artworks, described by a cvt node.
@@ -24,7 +20,7 @@ Initial Path: Ana Ivanovic -> tennis.championship.winner -> tennis.tennis_match.
 1. relation "tennis.championship.winner" not instantiated.
 >>>> Instantiation Context
 Instantiate Paths: 
-Candidate Relations: {'Ana Ivanovic': ['tennis.tennis_tournament_championship.winner', 'tennis.tennis_match.winner', 'tennis.tennis_tournament_champion.tennis_titles', 'tennis.tennis_player.matches_won']}
+Candidate Relations: ['tennis.tennis_tournament_championship.winner', 'tennis.tennis_match.winner', 'tennis.tennis_tournament_champion.tennis_titles', 'tennis.tennis_player.matches_won']
 >>>> Corrected Path
 Goal: The Initial Path starts from Ana Ivanovic and should cover the different types of tennis matches she has won.
 Thought: In the Candidate Relations, "tennis.tennis_tournament_championship.winner" and "tennis.tennis_match.winner" are relevant to Ana Ivanovic winning matches. The goal is to determine the types of matches she has won. Therefore, "tennis.tennis_match.match_format" is relevant to the match types.
@@ -36,7 +32,7 @@ Initial Path: Soy sauce -> food.ingredient.dishes -> food.dish.name
 1. relation "food.dish.name" not instantiated.
 >>>> Instantiation Context
 Instantiate Paths: Soy sauce -> food.ingredient.dishes
-Candidate Relations: {'Soy sauce -> food.ingredient.dishes': ['dining.cuisine.dishes', 'food.ingredient.dishes']}
+Candidate Relations: ['dining.cuisine.dishes', 'food.ingredient.dishes']
 >>>> Corrected Path
 Goal:
 The Initial Path starts from Soy sauce, which should cover the dishes made using soy sauce and harissa.
@@ -51,7 +47,7 @@ Initial Path: Adobe Acrobat -> computer.software_compatibility.software -> compu
 2. relation "computer.operating_system.software_compatibility" not instantiated.
 >>>> Instantiation Context
 Instantiate Paths: Adobe Acrobat -> computer.software_compatibility.software
-Candidate Relations: {'Adobe Acrobat -> computer.software_compatibility.software': ['computer.software_compatibility.operating_system', 'computer.software_compatibility.software', 'computer.software.compatible_oses']}
+Candidate Relations: ['computer.software_compatibility.operating_system', 'computer.software_compatibility.software', 'computer.software.compatible_oses']
 >>>> Corrected Path
 Goal
 The Initial Path should start from Adobe Acrobat, which should cover the operating system that uses advanced audio coding and supports the file formats written by Adobe Acrobat.

@@ -1,8 +1,4 @@
 Task: Given an Inital Path and some feedback information of a Question, please correct the initial path.
-Note:
-(1)When you receive Error Message, please edit the path based on Instantiate Paths. For example, if the Error Message is "relation XXX not instantiated", you should modify this relation with candidate relation; if the Error Message is "<cvt></cvt> in the end", you should add a candidate relation to a Instantiate Path which you think is relevant to question; if the Error Message is "Current Information is not enough", please analysis Instantiate Paths and Candidate Relations, then generate a new path which is more relevant to question; (2) please refer to the 4 examples of relation paths to correct the Inital Path; (3) Avoid generating Final Path that are the same as the Initial Path.
-
-%s
 -----
 Question: The movie featured Miley Cyrus and was produced by Tobin Armbrust?
 Initial Path: Miley Cyrus -> film.film.actor -> film.film.producer
@@ -11,7 +7,7 @@ Initial Path: Miley Cyrus -> film.film.actor -> film.film.producer
 2. relation "film.film.producer" not instantiated.
 >>>> Instantiation Context
 Instantiate Paths: Miley Cyrus -> film.actor.film -> <cvt></cvt>
-Candidate Relations: {'Miley Cyrus -> film.actor.film': ['dataworld.gardening_hint.last_referenced_by', 'dataworld.gardening_hint.replaced_by', 'film.director.film', 'film.film.country', 'film.film.directed_by', 'film.film.genre', 'film.film.initial_release_date', 'film.film.language', 'film.film.prequel', 'film.film.release_date_s', 'film.film.runtime', 'film.film.sequel', 'film.film.starring', 'film.film.written_by', 'film.film_cut.film', 'film.film_genre.films_in_this_genre', 'film.film_regional_release_date.film', 'film.performance.film', 'film.writer.film', 'imdb.topic.title_id', 'kg.object_profile.prominent_type', 'tv.tv_director.episodes_directed', 'tv.tv_program.episodes', 'tv.tv_series_episode.air_date', 'tv.tv_series_episode.director', 'tv.tv_series_episode.episode_number', 'tv.tv_series_episode.next_episode', 'tv.tv_series_episode.season', 'tv.tv_series_episode.season_number', 'tv.tv_series_episode.series', 'tv.tv_series_episode.writer']}
+Candidate Relations: ['dataworld.gardening_hint.last_referenced_by', 'dataworld.gardening_hint.replaced_by', 'film.director.film', 'film.film.country', 'film.film.directed_by', 'film.film.genre', 'film.film.initial_release_date', 'film.film.language', 'film.film.prequel', 'film.film.release_date_s', 'film.film.runtime', 'film.film.sequel', 'film.film.starring', 'film.film.written_by', 'film.film_cut.film', 'film.film_genre.films_in_this_genre', 'film.film_regional_release_date.film', 'film.performance.film', 'film.writer.film', 'imdb.topic.title_id', 'kg.object_profile.prominent_type', 'tv.tv_director.episodes_directed', 'tv.tv_program.episodes', 'tv.tv_series_episode.air_date', 'tv.tv_series_episode.director', 'tv.tv_series_episode.episode_number', 'tv.tv_series_episode.next_episode', 'tv.tv_series_episode.season', 'tv.tv_series_episode.season_number', 'tv.tv_series_episode.series', 'tv.tv_series_episode.writer']
 >>>> Corrected Path
 Goal: The Initial Path starts from Miley Cyrus, which should cover the movies featured by Miley Cyrus.
 Thought: In Instantiate Paths I know that Miley Cyrus acts some films, described by a cvt node.
@@ -25,7 +21,7 @@ Initial Path: National Anthem of Bolivia -> country.country.composer -> person.p
 1. relation "country.country.composer" not instantiated.
 >>>> Instantiation Context
 Instantiate Paths: 
-Candidate Relations: {'National Anthem of Bolivia': ['dataworld.gardening_hint.last_referenced_by', 'government.national_anthem.national_anthem_of', 'government.national_anthem_of_a_country.anthem', 'kg.object_profile.prominent_type', 'music.composer.compositions', 'music.composition.composer', 'music.composition.lyricist', 'music.composition.recordings', 'music.lyricist.lyrics_written', 'music.recording.song']}
+Candidate Relations: ['dataworld.gardening_hint.last_referenced_by', 'government.national_anthem.national_anthem_of', 'government.national_anthem_of_a_country.anthem', 'kg.object_profile.prominent_type', 'music.composer.compositions', 'music.composition.composer', 'music.composition.lyricist', 'music.composition.recordings', 'music.lyricist.lyrics_written', 'music.recording.song']
 >>>> Corrected Path
 Goal: The Initial Path starts from National Anthem of Bolivia, which should cover the country whose national anthem is National Anthem of Bolivia, and then the countries bordering this country.
 Thought: In candidates, I find "government.national_anthem.national_anthem_of" most relevant to get the country with that national anthem.
@@ -38,7 +34,7 @@ Initial Path: Bolivian boliviano -> country.country.currency -> country.country.
 1. relation "country.country.bordering" not instantiated.
 >>>> Instantiation Context
 Instantiate Paths: Bolivian boliviano -> finance.currency.countries_used -> Bolivia
-Candidate Relations: {'Bolivian boliviano -> finance.currency.countries_used': []}
+Candidate Relations: []
 >>>> Corrected Path
 Goal: The Initial Path starts from Bolivian boliviano, which should cover the country whose currency is Bolivian boliviano, and then the countries bordering this country.
 Thought: In Instantiate Paths, I find that Bolivian boliviano is the currency used in Bolivia. No candidates are given, so I should pick some relations on my own.
@@ -51,7 +47,7 @@ Initial Path: Rift Valley Province -> place.administrative_division.country -> p
 2. relation "location.mailing_address.state_province_region" not instantiated.
 >>>> Instantiation Message
 Instantiate Paths: Rift Valley Province -> location.administrative_division.country -> Kenya -> location.location.geolocation -> <cvt></cvt>
-Candidate Relations: {'Rift Valley Province -> location.administrative_division.country -> location.location.geolocation': ['location.geocode.latitude', 'location.geocode.longitude']}
+Candidate Relations: ['location.geocode.latitude', 'location.geocode.longitude']
 >>>> Corrected Path
 Goal: Information needed in this path is from Rift Valley Province to the nation it is located in and then the form of currency used in this nation.
 Thought: In Instantiate Paths, I find that Rift Valley Province is located in Kenya. And Kenya has some geolocations.
@@ -70,7 +66,7 @@ United Kingdom -> location.statistical_region.religions -> <cvt></cvt>
 United Kingdom -> location.location.contains -> Bakersfield, Nottingham
 United Kingdom -> location.location.contains -> Knockloughrim
 United Kingdom -> location.location.contains -> Oakenshaw
-Candidate Relations: {'United Kingdom -> location.statistical_region.religions': ['location.religion_percentage.date', 'location.religion_percentage.percentage', 'location.religion_percentage.religion'], 'United Kingdom -> location.location.contains': ['location.location.containedby', 'location.location.geolocation', 'type.object.type']}
+Candidate Relations: ['location.location.containedby', 'location.location.geolocation', 'location.religion_percentage.date', 'location.religion_percentage.percentage', 'location.religion_percentage.religion', 'type.object.type']
 >>>> Corrected Path
 Goal: The Initial Path starts from United Kingdom, which should cover the major religion in United Kingdom.
 Thought: In Instantiate Paths, I find that United Kingdom has some religions, described by a cvt node.

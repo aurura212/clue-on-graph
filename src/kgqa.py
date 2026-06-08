@@ -24,6 +24,14 @@ PROMPT_PATH = "src/prompt_md"
 enc_model = SentenceTransformer("./all-MiniLM-L6-v2")
 
 
+def set_prompt_path(reference_mode):
+    global PROMPT_PATH
+    if reference_mode == "revolution":
+        PROMPT_PATH = "src/prompt_md_revolution"
+    else:
+        PROMPT_PATH = "src/prompt_md"
+
+
 def parse_args():
     parser = ArgumentParser("KGQA for cwq or WebQSP")
     parser.add_argument("--full", action="store_true", help="full dataset.")
@@ -1005,6 +1013,7 @@ def relation_extract(question, topic_entity, topic_ent_list, cand_relation, demo
 
 def main():    
     options.LLM_type = LLM_BASE[options.llm]
+    set_prompt_path(options.reference_mode)
     input_file = get_dataset_file(options.dataset, hop=options.hop)
     print(input_file)
     print(f"relation_check: {options.relation_check}; use_prune: {options.use_prune}; use_edit: {options.use_edit}; external_knowledge: {options.external_knowledge}; random_knowledge: {options.random_knowledge}")
