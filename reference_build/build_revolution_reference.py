@@ -40,7 +40,7 @@ def load_module_from_path(module_name: str, path: Path):
 
 
 LLM_BASE = load_llm_base()
-KGQA_MODULE = None
+UTILS_MODULE = None
 
 DEFAULT_INPUTS = {
     "cwq": [
@@ -632,14 +632,9 @@ def call_prompt_json(
     llm_calls: int,
     **kwargs: Any,
 ) -> Tuple[Dict[str, Any], int]:
-    utils_module = load_module_from_path(
-        "clue_on_graph_utils",
-        PROJECT_ROOT / "utils" / "utils.py",
-    )
-    run_llm = utils_module.run_llm
-
+    utils_module = load_utils_module()
     prompt = render_prompt(prompt_name, **kwargs)
-    response, llm_calls = run_llm(
+    response, llm_calls = utils_module.run_llm(
         prompt,
         temperature=options.temperature,
         max_tokens=options.max_token,
@@ -650,14 +645,134 @@ def call_prompt_json(
     return extract_json_object(response), llm_calls
 
 
-def load_kgqa_module():
-    global KGQA_MODULE
-    if KGQA_MODULE is None:
-        KGQA_MODULE = load_module_from_path(
-            "clue_on_graph_kgqa",
-            PROJECT_ROOT / "src" / "kgqa.py",
+def load_utils_module():
+    global UTILS_MODULE
+    if UTILS_MODULE is None:
+        UTILS_MODULE = load_module_from_path(
+            "clue_on_graph_utils",
+            PROJECT_ROOT / "utils" / "utils.py",
         )
-    return KGQA_MODULE
+    return UTILS_MODULE
+
+
+def count_tokens_if_available(text: str) -> int:
+    try:
+        import tiktoken
+
+        encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        return len(encoding.encode(text))
+    except Exception:
+        return 0
+
+
+def kgqa_relation_extract(
+    question: str,
+    topic_entity: str,
+    cand_relation: List[str],
+    options: argparse.Namespace,
+    input_token_cnt: int,
+    output_token_cnt: int,
+    llm_calls: int,
+) -> Tuple[List[Tuple[Any, ...]], int, int, int]:
+    utils_module = load_utils_module()
+    prompt = (PROJECT_ROOT / "src" / "prompt_md" / "extract_relation.md").read_text(encoding="utf-8")
+    relation_str = "; ".join(cand_relation)
+    prompt_1 = (
+        prompt % ""
+        + "\nQuestion:" + question
+        + "\nTopic Entity:" + topic_entity
+        + "\nRelations" + relation_str
+        + "\nAnswer:"
+    )
+    response, llm_calls = utils_module.run_llm(
+        prompt_1,
+        options.temperature,
+        options.max_token,
+        llm_calls,
+        options.openai_api_keys,
+        pipe=None,
+        engine=options.LLM_type,
+    )
+    rel_with_score = re.findall(r"\([\s\S]*?\)", response, re.DOTALL)
+    rel_score_tuple: List[Tuple[Any, ...]] = []
+    for item in rel_with_score:
+        try:
+            parsed = eval(item)
+            if isinstance(parsed, tuple):
+                rel_score_tuple.append(parsed)
+        except Exception:
+            continue
+
+    if options.count_token_cost:
+        input_token_cnt += count_tokens_if_available(prompt_1)
+        output_token_cnt += count_tokens_if_available(response)
+
+    return rel_score_tuple, input_token_cnt, output_token_cnt, llm_calls
+
+
+def kgqa_get_init_reasoning_path(
+    question: str,
+    topic_ent: List[str],
+    options: argparse.Namespace,
+    input_token_cnt: int,
+    output_token_cnt: int,
+    llm_calls: int,
+    cand_relation: Optional[Dict[str, List[str]]] = None,
+) -> Tuple[Dict[str, str], int, int, int]:
+    utils_module = load_utils_module()
+    dataset_name = get_kgqa_dataset_name(options.dataset).split("_")[0]
+    if options.relation_check == 1:
+        prompt_path = PROJECT_ROOT / "src" / "prompt_md" / f"{dataset_name}_init_with_relation.md"
+        prompt_init_path = prompt_path.read_text(encoding="utf-8")
+        prompt_init_path += (
+            "Question: " + question
+            + "\nTopic Entities:" + ", ".join(topic_ent)
+            + "\nValuable Relations:" + str(cand_relation)
+            + "\nThought:"
+        )
+    else:
+        prompt_path = PROJECT_ROOT / "src" / "prompt_md" / f"{dataset_name}_init.md"
+        prompt_init_path = prompt_path.read_text(encoding="utf-8")
+        prompt_init_path += (
+            "Question: " + question
+            + "\nTopic Entities:" + ", ".join(topic_ent)
+            + "\nThought:"
+        )
+
+    default_relation_path = {entity: entity for entity in topic_ent}
+    init_reasoning_path = default_relation_path.copy()
+    response = ""
+    for _ in range(3):
+        try:
+            response, llm_calls = utils_module.run_llm(
+                prompt_init_path,
+                options.temperature,
+                options.max_token_reasoning,
+                llm_calls,
+                openai_api_keys=options.openai_api_keys,
+                pipe=None,
+                engine=options.LLM_type,
+            )
+            response_dict = eval(response.split("Path:")[-1].strip())
+            for key, value in response_dict.items():
+                if isinstance(value, list) and value:
+                    if isinstance(value[0], str):
+                        init_reasoning_path[key] = value[0]
+                    elif value[0]:
+                        init_reasoning_path[key] = value[0][0]
+            if isinstance(init_reasoning_path, dict):
+                break
+        except Exception as exc:
+            init_reasoning_path = default_relation_path.copy()
+            if options.verbose:
+                print(f"initial reasoning path prediction failed: {exc}")
+                print(response)
+
+    if options.count_token_cost:
+        input_token_cnt += count_tokens_if_available(prompt_init_path)
+        output_token_cnt += count_tokens_if_available(response)
+
+    return init_reasoning_path, input_token_cnt, output_token_cnt, llm_calls
 
 
 def build_blind_with_kgqa_initial_prediction(
@@ -666,9 +781,9 @@ def build_blind_with_kgqa_initial_prediction(
     llm_calls: int,
 ) -> Tuple[Dict[str, Any], int]:
     """Generate blind paths with kgqa.py's initial prediction flow, without demos or reflection."""
-    kgqa = load_kgqa_module()
     if options.openai_api_base:
         os.environ["OPENAI_API_BASE"] = options.openai_api_base
+    utils_module = load_utils_module()
     origin_dataset = options.dataset
     options.dataset = get_kgqa_dataset_name(origin_dataset)
     question = ref["question"]
@@ -685,17 +800,15 @@ def build_blind_with_kgqa_initial_prediction(
                 entity_id = str(entity.get("id", ""))
                 label = topic_entity_label(entity)
                 try:
-                    neighbor_relations = kgqa.get_ent_one_hop_rel(entity_id)
-                    rel_score_tuple, input_token_cnt, output_token_cnt, llm_calls = kgqa.relation_extract(
+                    neighbor_relations = utils_module.get_ent_one_hop_rel(entity_id)
+                    rel_score_tuple, input_token_cnt, output_token_cnt, llm_calls = kgqa_relation_extract(
                         question,
                         label,
-                        topic_ent_list,
                         neighbor_relations,
-                        "",
+                        options,
                         input_token_cnt,
                         output_token_cnt,
                         llm_calls,
-                        options,
                     )
                     selected_relations = [
                         item[0] for item in rel_score_tuple
@@ -709,11 +822,10 @@ def build_blind_with_kgqa_initial_prediction(
                         f"{label}: relation extraction failed: {exc}"
                     )
 
-        reasoning_paths, input_token_cnt, output_token_cnt, llm_calls = kgqa.get_init_reasoning_path(
+        reasoning_paths, input_token_cnt, output_token_cnt, llm_calls = kgqa_get_init_reasoning_path(
             question,
             topic_ent_list,
             options,
-            pipeline=None,
             input_token_cnt=input_token_cnt,
             output_token_cnt=output_token_cnt,
             llm_calls=llm_calls,
