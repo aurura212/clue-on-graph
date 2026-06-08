@@ -40,6 +40,7 @@ def load_module_from_path(module_name: str, path: Path):
 
 
 LLM_BASE = load_llm_base()
+KGQA_MODULE = None
 
 DEFAULT_INPUTS = {
     "cwq": [
@@ -91,6 +92,17 @@ def normalize_dataset_name(dataset: str) -> str:
     return lowered
 
 
+def get_kgqa_dataset_name(dataset: str) -> str:
+    dataset_key = normalize_dataset_name(dataset)
+    if dataset_key == "webqsp":
+        return "WebQSP"
+    if dataset_key == "cwq":
+        return "cwq"
+    if dataset_key == "grailqa":
+        return "grailqa"
+    return dataset
+
+
 def resolve_default_input(dataset: str) -> Path:
     for path in DEFAULT_INPUTS[normalize_dataset_name(dataset)]:
         if path.exists():
@@ -137,6 +149,25 @@ def clean_relation(rel: str) -> Optional[str]:
     if "." not in rel:
         return None
     return rel
+
+
+def extract_relations_from_reasoning_path(path: Any) -> List[str]:
+    if isinstance(path, list):
+        if not path:
+            return []
+        path = path[0]
+    if not isinstance(path, str):
+        return []
+
+    relations: List[str] = []
+    seen = set()
+    parts = [x.strip() for x in path.split("->")]
+    for part in parts[1:]:
+        rel = clean_relation(part)
+        if rel and rel not in seen:
+            relations.append(rel)
+            seen.add(rel)
+    return relations
 
 
 def extract_relation_skeleton_from_sparql(sparql: Optional[str]) -> List[str]:
@@ -398,12 +429,14 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
     for entity in topic_entities:
         entity_id = str(entity["id"])
         label = topic_entity_label(entity)
-        reasoning_path = label + " -> " + " -> ".join(relations)
+        reasoning_path = ref["blind"].get("reasoning_paths", {}).get(label)
+        entity_relations = extract_relations_from_reasoning_path(reasoning_path) if reasoning_path else relations
+        reasoning_path = reasoning_path or (label + " -> " + " -> ".join(entity_relations))
         try:
             result_paths, cur_depth, cur_failures = instantiate_relation_path(
                 entity_id,
                 label,
-                relations,
+                entity_relations,
                 max_que=options.max_que,
                 directions=options.direct_relation_directions,
             )
@@ -420,6 +453,7 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
         retrieval_result.append({
             "topic_entity": entity,
             "reasoning_path": reasoning_path,
+            "relations": entity_relations,
             "status": "ok" if result_paths else "empty",
             "mode": "direct_freebase",
             "paths": [path_to_serializable(path) for path in result_paths[:options.max_saved_paths]],
@@ -521,17 +555,19 @@ def verify_blind_with_kg(ref: Dict[str, Any], options: argparse.Namespace) -> Di
     for entity in topic_entities:
         entity_id = str(entity["id"])
         label = topic_entity_label(entity)
-        reasoning_path = label + " -> " + " -> ".join(relations)
+        reasoning_path = ref["blind"].get("reasoning_paths", {}).get(label)
+        entity_relations = extract_relations_from_reasoning_path(reasoning_path) if reasoning_path else relations
+        reasoning_path = reasoning_path or (label + " -> " + " -> ".join(entity_relations))
         init_reasoning_path = {label: reasoning_path}
         try:
             binded_relations = relation_binding(init_reasoning_path, topk=options.relation_binding_topk)
             sequential_relation_candidates = [
                 binded_relations.get(relation, [relation])
-                for relation in relations
+                for relation in entity_relations
             ]
             result_paths, grounded_knowledge_current, ungrounded_neighbor_relation_dict, _ = bfs_for_each_path(
                 entity_id,
-                relations,
+                entity_relations,
                 sequential_relation_candidates,
                 options,
                 options.max_que,
@@ -558,6 +594,7 @@ def verify_blind_with_kg(ref: Dict[str, Any], options: argparse.Namespace) -> Di
         retrieval_result.append({
             "topic_entity": entity,
             "reasoning_path": reasoning_path,
+            "relations": entity_relations,
             "status": "ok",
             "paths": [path_to_serializable(path) for path in result_paths[:options.max_saved_paths]],
             "tail_candidates": tail_candidates[:options.max_saved_candidates],
@@ -613,6 +650,114 @@ def call_prompt_json(
     return extract_json_object(response), llm_calls
 
 
+def load_kgqa_module():
+    global KGQA_MODULE
+    if KGQA_MODULE is None:
+        KGQA_MODULE = load_module_from_path(
+            "clue_on_graph_kgqa",
+            PROJECT_ROOT / "src" / "kgqa.py",
+        )
+    return KGQA_MODULE
+
+
+def build_blind_with_kgqa_initial_prediction(
+    ref: Dict[str, Any],
+    options: argparse.Namespace,
+    llm_calls: int,
+) -> Tuple[Dict[str, Any], int]:
+    """Generate blind paths with kgqa.py's initial prediction flow, without demos or reflection."""
+    kgqa = load_kgqa_module()
+    if options.openai_api_base:
+        os.environ["OPENAI_API_BASE"] = options.openai_api_base
+    origin_dataset = options.dataset
+    options.dataset = get_kgqa_dataset_name(origin_dataset)
+    question = ref["question"]
+    topic_entities = ref["topic_entities"]
+    topic_ent_list = [topic_entity_label(entity) for entity in topic_entities]
+    topic_ent_relation = {label: [] for label in topic_ent_list}
+    input_token_cnt = 0
+    output_token_cnt = 0
+    first_relations: Dict[str, List[str]] = {}
+
+    try:
+        if options.relation_check == 1:
+            for entity in topic_entities:
+                entity_id = str(entity.get("id", ""))
+                label = topic_entity_label(entity)
+                try:
+                    neighbor_relations = kgqa.get_ent_one_hop_rel(entity_id)
+                    rel_score_tuple, input_token_cnt, output_token_cnt, llm_calls = kgqa.relation_extract(
+                        question,
+                        label,
+                        topic_ent_list,
+                        neighbor_relations,
+                        "",
+                        input_token_cnt,
+                        output_token_cnt,
+                        llm_calls,
+                        options,
+                    )
+                    selected_relations = [
+                        item[0] for item in rel_score_tuple
+                        if isinstance(item, tuple) and len(item) > 0 and isinstance(item[0], str)
+                    ]
+                    topic_ent_relation[label] = selected_relations
+                    first_relations[label] = selected_relations
+                except Exception as exc:
+                    first_relations[label] = []
+                    ref["blind"].setdefault("prediction_errors", []).append(
+                        f"{label}: relation extraction failed: {exc}"
+                    )
+
+        reasoning_paths, input_token_cnt, output_token_cnt, llm_calls = kgqa.get_init_reasoning_path(
+            question,
+            topic_ent_list,
+            options,
+            pipeline=None,
+            input_token_cnt=input_token_cnt,
+            output_token_cnt=output_token_cnt,
+            llm_calls=llm_calls,
+            cand_relation=topic_ent_relation,
+        )
+    except Exception as exc:
+        ref["blind"].setdefault("prediction_errors", []).append(
+            f"initial reasoning path prediction failed: {exc}"
+        )
+        reasoning_paths = {label: label for label in topic_ent_list}
+    finally:
+        options.dataset = origin_dataset
+
+    if not isinstance(reasoning_paths, dict):
+        ref["blind"].setdefault("prediction_errors", []).append(
+            f"initial reasoning path prediction returned non-dict: {type(reasoning_paths)}"
+        )
+        reasoning_paths = {label: label for label in topic_ent_list}
+
+    blueprint: List[str] = []
+    seen = set()
+    for path in reasoning_paths.values():
+        for relation in extract_relations_from_reasoning_path(path):
+            if relation not in seen:
+                blueprint.append(relation)
+                seen.add(relation)
+
+    ref["blind"]["blueprint"] = blueprint
+    ref["blind"]["reasoning_paths"] = reasoning_paths
+    ref["blind"]["first_relations"] = first_relations
+    ref["blind"]["clue_reasoning"] = [
+        f"{label}: {path}" for label, path in reasoning_paths.items()
+    ]
+    ref["blind"]["answer_type"] = ref["blind"].get("answer_type", "unknown")
+    ref["blind"]["constraints"] = ref["blind"].get("constraints", [])
+    ref["blind"]["prediction_source"] = "src/kgqa.py:get_init_reasoning_path_without_reference_or_reflection"
+    ref["blind"]["token_count"] = {
+        "input_token": input_token_cnt,
+        "output_token": output_token_cnt,
+    }
+
+    return ref, llm_calls
+
+
 def maybe_enrich_with_prompt_revolution(
     ref: Dict[str, Any],
     options: argparse.Namespace,
@@ -635,17 +780,7 @@ def maybe_enrich_with_prompt_revolution(
             ref["gold"]["clue_reasoning_source"] = "prompt_revolution/gold_clue_reasoning.md"
 
     if options.use_llm_blind:
-        result, llm_calls = call_prompt_json(
-            "blind_clue_reasoning.md",
-            options,
-            llm_calls,
-            question=ref["question"],
-            topic_entities=topic_entities,
-        )
-        ref["blind"]["blueprint"] = result.get("blueprint", [])
-        ref["blind"]["clue_reasoning"] = result.get("clue_reasoning", [])
-        ref["blind"]["answer_type"] = result.get("answer_type", "unknown")
-        ref["blind"]["constraints"] = result.get("constraints", [])
+        ref, llm_calls = build_blind_with_kgqa_initial_prediction(ref, options, llm_calls)
 
     if options.verify_blind_kg:
         ref = verify_blind_with_kg(ref, options)
@@ -670,22 +805,6 @@ def maybe_enrich_with_prompt_revolution(
             "error_step": result.get("error_step", ""),
             "correction": result.get("correction", ""),
             "guardrail": result.get("guardrail", ""),
-        })
-
-    if options.use_llm_memory:
-        result, llm_calls = call_prompt_json(
-            "memory_item.md",
-            options,
-            llm_calls,
-            question=ref["question"],
-            gold_blueprint=ref["gold"]["blueprint"],
-            blind_blueprint=ref["blind"].get("blueprint", []),
-            evaluation=ref["evaluation"],
-        )
-        ref["memory_item"].update({
-            "title": result.get("title", ""),
-            "description": result.get("description", ""),
-            "content": result.get("content", ""),
         })
 
     return ref, llm_calls
@@ -752,7 +871,7 @@ def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> int:
     count = 0
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.write(json.dumps(row, ensure_ascii=False, indent=4) + "\n")
             count += 1
     return count
 
@@ -824,9 +943,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--limit", type=int, default=-1, help="Maximum number of source samples to process.")
     parser.add_argument("--use_llm_gold_clue", action="store_true", help="Call prompt_revolution/gold_clue_reasoning.md.")
-    parser.add_argument("--use_llm_blind", action="store_true", help="Call prompt_revolution/blind_clue_reasoning.md.")
+    parser.add_argument(
+        "--use_llm_blind",
+        action="store_true",
+        help="Generate blind initial paths with src/kgqa.py without reference examples or reflection.",
+    )
     parser.add_argument("--use_llm_evaluation", action="store_true", help="Call prompt_revolution/evaluate_blind_reference.md.")
-    parser.add_argument("--use_llm_memory", action="store_true", help="Call prompt_revolution/memory_item.md.")
+    parser.add_argument("--use_llm_memory", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--verify_blind_kg", action="store_true", help="Verify blind blueprint with KG retrieval.")
     parser.add_argument("--kg_verify_mode", choices=["direct", "instantiation"], default="direct")
     parser.add_argument(
@@ -842,6 +965,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max_token", type=int, default=1024)
+    parser.add_argument("--max_token_reasoning", type=int, default=2048)
+    parser.add_argument("--relation_check", type=int, default=1)
+    parser.add_argument("--count_token_cost", type=bool, default=True)
     parser.add_argument("--llm", type=str, choices=LLM_BASE.keys(), default="gpt35")
     parser.add_argument("--openai_api_keys", type=str, default="")
     parser.add_argument("--openai_api_base", type=str, default="")
@@ -861,7 +987,6 @@ def uses_prompt_revolution(options: argparse.Namespace) -> bool:
             options.use_llm_gold_clue,
             options.use_llm_blind,
             options.use_llm_evaluation,
-            options.use_llm_memory,
         ]
     )
 
