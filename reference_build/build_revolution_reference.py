@@ -429,7 +429,6 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
     ]
     retrieval_result = []
     all_tail_candidates: List[str] = []
-    all_partial_tail_candidates: List[str] = []
     max_grounded_depth = 0
     failure_reasons: List[str] = []
 
@@ -456,9 +455,9 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
             cur_failures = [f"{label}: direct Freebase verification failed: {exc}"]
 
         tail_candidates = extract_tail_candidates(result_paths)
-        partial_tail_candidates = extract_tail_candidates(partial_paths)
+        saved_paths = result_paths if result_paths else partial_paths
+        saved_tail_candidates = extract_tail_candidates(saved_paths)
         all_tail_candidates.extend(tail_candidates)
-        all_partial_tail_candidates.extend(partial_tail_candidates)
         max_grounded_depth = max(max_grounded_depth, cur_depth)
         failure_reasons.extend(cur_failures)
 
@@ -468,11 +467,10 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
             "relations": entity_relations,
             "status": "ok" if result_paths else "empty",
             "mode": "direct_freebase",
-            "paths": [path_to_serializable(path) for path in result_paths[:options.max_saved_paths]],
-            "partial_paths": [path_to_serializable(path) for path in partial_paths[:options.max_saved_paths]],
-            "partial_path_depth": get_path_depth(partial_paths),
-            "tail_candidates": tail_candidates[:options.max_saved_candidates],
-            "partial_tail_candidates": partial_tail_candidates[:options.max_saved_candidates],
+            "paths": [path_to_serializable(path) for path in saved_paths[:options.max_saved_paths]],
+            "path_complete": bool(result_paths),
+            "path_depth": get_path_depth(saved_paths),
+            "tail_candidates": saved_tail_candidates[:options.max_saved_candidates],
         })
 
     return finalize_kg_verification(
@@ -480,7 +478,6 @@ def verify_blind_with_direct_freebase(ref: Dict[str, Any], relations: List[str],
         relations,
         retrieval_result,
         all_tail_candidates,
-        all_partial_tail_candidates,
         max_grounded_depth,
         failure_reasons,
         options.max_saved_candidates,
@@ -492,13 +489,10 @@ def finalize_kg_verification(
     relations: List[str],
     retrieval_result: List[Dict[str, Any]],
     all_tail_candidates: List[str],
-    all_partial_tail_candidates: Optional[List[str]],
     max_grounded_depth: int,
     failure_reasons: List[str],
     max_saved_candidates: int,
 ) -> Dict[str, Any]:
-    if all_partial_tail_candidates is None:
-        all_partial_tail_candidates = []
     hit = any(hit_answer_text(candidate, ref["answers"]) for candidate in all_tail_candidates)
     if hit:
         failure_type = "correct"
@@ -518,7 +512,6 @@ def finalize_kg_verification(
         "max_grounded_depth": max_grounded_depth,
         "target_depth": len(relations),
         "tail_candidates": all_tail_candidates[:max_saved_candidates],
-        "partial_tail_candidates": all_partial_tail_candidates[:max_saved_candidates],
         "failure_reasons": failure_reasons[:max_saved_candidates],
     }
     return ref
@@ -629,7 +622,6 @@ def verify_blind_with_kg(ref: Dict[str, Any], options: argparse.Namespace) -> Di
         relations,
         retrieval_result,
         all_tail_candidates,
-        [],
         max_grounded_depth,
         failure_reasons,
         options.max_saved_candidates,
@@ -990,11 +982,6 @@ def build_reference_item(dataset: str, item: Dict[str, Any], index: int) -> Opti
             "error_step": "",
             "correction": "",
             "guardrail": "",
-        },
-        "memory_item": {
-            "title": "",
-            "description": "",
-            "content": "",
         },
     }
 

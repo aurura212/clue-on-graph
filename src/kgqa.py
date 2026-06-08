@@ -253,13 +253,14 @@ def format_revolution_retrieval_context(ref):
     result = retrieval_result[0]
     lines = []
     failure_reasons = ref.get("blind", {}).get("verification", {}).get("failure_reasons", [])
-    partial_path = compact_path_string(result.get("partial_paths", []))
+    retrieved_path = compact_path_string(result.get("paths", []))
     if result.get("reasoning_path"):
         lines.append("Blind Path: " + str(result.get("reasoning_path")))
     if failure_reasons:
         lines.append("Failure: " + first_non_empty(failure_reasons))
-    if partial_path:
-        lines.append("Partial Path: " + partial_path)
+    if retrieved_path:
+        path_label = "Complete Path" if result.get("path_complete") else "Partial Path"
+        lines.append(path_label + ": " + retrieved_path)
     return "\n".join(lines)
 
 def format_revolution_reference_item(ref, include_answer=True):
