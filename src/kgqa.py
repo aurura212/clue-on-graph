@@ -20,7 +20,7 @@ import tiktoken
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ['OPENAI_API_BASE'] = "https://cn2us02.opapi.win/v1"#"https://jeniya.cn/v1" "https://ai-yyds.com/v1"
-PROMPT_PATH = "my_readi/prompt_1"
+PROMPT_PATH = "src/prompt_md"
 enc_model = SentenceTransformer("./all-MiniLM-L6-v2")
 
 
@@ -945,7 +945,7 @@ def main():
     output_file = os.path.join(OUTPUT_FILE_PATH, 
                                f"KGQA/{options.dataset}_{options.llm}_{get_timestamp()}_{options.relation_check}{options.use_prune}{options.use_edit}{options.external_knowledge}{options.random_knowledge}_{options.a}_{options.b}.jsonl")
     output_metrics = os.path.join(OUTPUT_FILE_PATH, f"KGQA/{options.dataset}_{options.llm}_{get_timestamp()}_{options.relation_check}{options.use_prune}{options.use_edit}{options.external_knowledge}{options.random_knowledge}_{options.a}_{options.b}_metrics.json")
-    process_ana_file = os.path.join("my_readi/process_analysis", f"{options.dataset}_{options.llm}_{get_timestamp()}_wrong_{options.a}_{options.b}.jsonl")
+    process_ana_file = os.path.join("src/process_analysis", f"{options.dataset}_{options.llm}_{get_timestamp()}_wrong_{options.a}_{options.b}.jsonl")
     question_string = get_question_string(options.dataset)
     dataset = question_process(input_file)[options.a:options.b] #[14, 19, 20, 22, 23, 32, 33]
     
