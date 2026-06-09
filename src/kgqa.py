@@ -1017,10 +1017,18 @@ def main():
     input_file = get_dataset_file(options.dataset, hop=options.hop)
     print(input_file)
     print(f"relation_check: {options.relation_check}; use_prune: {options.use_prune}; use_edit: {options.use_edit}; external_knowledge: {options.external_knowledge}; random_knowledge: {options.random_knowledge}")
-    output_file = os.path.join(OUTPUT_FILE_PATH, 
-                               f"KGQA/{options.dataset}_{options.llm}_{get_timestamp()}_{options.relation_check}{options.use_prune}{options.use_edit}{options.external_knowledge}{options.random_knowledge}_{options.a}_{options.b}.jsonl")
-    output_metrics = os.path.join(OUTPUT_FILE_PATH, f"KGQA/{options.dataset}_{options.llm}_{get_timestamp()}_{options.relation_check}{options.use_prune}{options.use_edit}{options.external_knowledge}{options.random_knowledge}_{options.a}_{options.b}_metrics.json")
-    process_ana_file = os.path.join("src/process_analysis", f"{options.dataset}_{options.llm}_{get_timestamp()}_wrong_{options.a}_{options.b}.jsonl")
+    run_stamp = get_timestamp()
+    reference_mode_tag = {
+        "revolution": "rev",
+        "legacy": "leg",
+        "none": "non",
+    }.get(options.reference_mode, options.reference_mode[:3])
+    reference_suffix = f"{reference_mode_tag}_{get_reference_limit_suffix(options.reference_limit)}"
+    option_flags = f"{options.relation_check}{options.use_prune}{options.use_edit}{options.external_knowledge}{options.random_knowledge}"
+    run_name = f"{options.dataset}_{options.llm}_{run_stamp}_{option_flags}_{reference_suffix}_{options.a}_{options.b}"
+    output_file = os.path.join(OUTPUT_FILE_PATH, f"KGQA/{run_name}.jsonl")
+    output_metrics = os.path.join(OUTPUT_FILE_PATH, f"KGQA/{run_name}_metrics.json")
+    process_ana_file = os.path.join("src/process_analysis", f"{run_name}_wrong.jsonl")
     question_string = get_question_string(options.dataset)
     dataset = question_process(input_file)[options.a:options.b] #[14, 19, 20, 22, 23, 32, 33]
     
