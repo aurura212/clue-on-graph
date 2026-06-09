@@ -34,7 +34,6 @@ def savejson(file_name, new_data):
 def get_openai_embedding(input_message, openai_api_keys, model):
     
     ok = False
-    openai.api_key = openai_api_keys
     while not ok:
         try:
             '''response = openai.Embedding.create(model="text-embedding-ada-002",
