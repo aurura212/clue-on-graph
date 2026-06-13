@@ -3,6 +3,7 @@ CoG.pdf
 SRP.pdf
 run_build_revolution_reference.sh
 run_*.sh
+/msmarco-distilbert-base-tas-b
 /data/raw_train_set/
 /data/revolution_reference/
 /reference_build/__pycache__/
@@ -14,3 +15,6 @@ run_*.sh
 /all-MiniLM-L6-v2
 /results
 /src/process_analysis
+/PoG/__pycache__/
+/mem_PoG
+PoG*.jsonl

@@ -24,7 +24,7 @@ def retrieve_top_docs(query, docs, model, width=3):
     top_scores = [pair[1] for pair in doc_score_pairs[:width]]
     return top_docs, top_scores
 
-def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="gpt-3.5-turbo", print_in=True, print_out=True):
+def run_llm(prompt, temperature, max_tokens, openai_api_keys, engine="gpt-3.5-turbo", print_in=True, print_out=True):
     if print_in:
         print(color_green+prompt+color_end)
 
@@ -32,7 +32,7 @@ def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="gpt-3.5-tu
         messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
         message_prompt = {"role":"user","content":prompt}
         messages.append(message_prompt)
-        client = openai.OpenAI(api_key=opeani_api_keys)
+        client = openai.OpenAI(api_key=openai_api_keys, base_url=os.environ['OPENAI_API_BASE'])
         completion = client.chat.completions.create(
                 model=engine,
                 messages = messages,
@@ -102,10 +102,13 @@ def extract_reason_and_anwer(string):
     last_brace_p = string.rfind('}')
     string = string[first_brace_p:last_brace_p+1]
     answer = re.search(r'"Answer":\s*"(.*?)"', string)
-    if answer:
-        answer = answer.group(1)
-    else:
-        answer = re.search(r'"Answer":\s*(\[[^\]]+\])', string).group(1)
+    try:
+        if answer:
+            answer = answer.group(1)
+        else:
+            answer = re.search(r'"Answer":\s*(\[[^\]]+\])', string).group(1)
+    except:
+        return None, None, None
 
     reason = re.search(r'"R":\s*"(.*?)"', string).group(1)
     sufficient = re.search(r'"Sufficient":\s*"(.*?)"', string).group(1)
@@ -219,12 +222,36 @@ def prepare_dataset(dataset_name):
         with open('../data/cwq.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
+    elif dataset_name == 'cwq0':
+        with open('../data/cwq0.json',encoding='utf-8') as f:
+            datas = json.load(f)
+        question_string = 'question'
+    elif dataset_name == 'cwq1':
+        with open('../data/cwq1.json',encoding='utf-8') as f:
+            datas = json.load(f)
+        question_string = 'question'
+    elif dataset_name == 'cwq2':
+        with open('../data/cwq2.json',encoding='utf-8') as f:
+            datas = json.load(f)
+        question_string = 'question'
+    elif dataset_name == 'cwq_split':
+        with open('../data/cwq_split.json',encoding='utf-8') as f:
+            datas = json.load(f)
+        question_string = 'question'
     elif dataset_name == 'webqsp':
         with open('../data/WebQSP.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'RawQuestion'
+    elif dataset_name == 'webqsp_split':
+        with open('../data/WebQSP_split.json',encoding='utf-8') as f:
+            datas = json.load(f)
+        question_string = 'RawQuestion'
     elif dataset_name == 'grailqa':
         with open('../data/grailqa.json',encoding='utf-8') as f:
+            datas = json.load(f)
+        question_string = 'question'
+    elif dataset_name == 'grailqa_split':
+        with open('../data/grailqa_split.json',encoding='utf-8') as f:
             datas = json.load(f)
         question_string = 'question'
     else:

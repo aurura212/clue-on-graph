@@ -23,7 +23,7 @@ sparql_id = """PREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?tailEn
 #     return any(s.endswith(word) for word in words)
 
 def abandon_rels(relation):
-    if relation == "type.object.type" or relation == "type.object.name" or relation.startswith("common.") or relation.startswith("freebase.") or "sameAs" in relation:
+    if relation.startswith("http://") or relation == "type.object.type" or relation == "type.object.name" or relation.startswith("common.") or relation.startswith("freebase.") or "sameAs" in relation:
         return True
 
 
@@ -313,7 +313,7 @@ def add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, ent
     return add_entities_id, add_relations, add_head, new_ent_rel_ent_dict
 
 def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args):
-    with open(q_mem_f_path+'/mem', 'r', encoding='utf-8') as f:
+    with open(q_mem_f_path+'/mem_PoG', 'r', encoding='utf-8') as f:
         his_mem = f.read()
     prompt = update_mem_prompt + question + '\nSubobjectives: '+str(subquestions)+'\nMemory: ' + his_mem
 
@@ -352,7 +352,7 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
     prompt += "\nKnowledge Triplets:\n" + chain_prompt
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
-    
+    print("Response from reasoning:", response)
     answer, reason, sufficient = extract_reason_and_anwer(response)
     return response, answer, sufficient, token_num
 
