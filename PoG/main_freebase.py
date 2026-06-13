@@ -2,6 +2,12 @@ from tqdm import tqdm
 import argparse
 from utils import *
 from freebase_func import *
+from reference_utils import (
+    build_reference_context,
+    get_output_file_tag,
+    load_reference_bank,
+    set_current_reference_context,
+)
 import os
 import pprint
 
@@ -47,15 +53,26 @@ if __name__ == '__main__':
                         default="gpt-3.5-turbo", help="base LLM model.")
     parser.add_argument("--opeani_api_keys", type=str,
                         default="", help="if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys.")
+    parser.add_argument("--reference_mode", type=str, choices=["none", "cog", "revolution"],
+                        default="none", help="PoG reference mode. cog uses related questions and correct paths; revolution also uses blind LLM reasoning and retrieval feedback.")
+    parser.add_argument("--reference_base_path", type=str,
+                        default="", help="Path to a revolution reference JSONL file.")
+    parser.add_argument("--reference_limit", type=int,
+                        default=-1, help="Reference file limit suffix. -1 selects the full reference file.")
+    parser.add_argument("--reference_top_k", type=int,
+                        default=4, help="Number of similar reference cases to inject.")
+    parser.add_argument("--random_knowledge", type=int,
+                        default=0, help="Use random reference cases instead of similar-question retrieval.")
     args = parser.parse_args()
 
     while True:
         try:
             processed_question = []
             datas, question_string = prepare_dataset(args.dataset)
+            output_file_tag = get_output_file_tag(args)
             #datas = datas[args.a:args.b]
-            if os.path.exists(f"PoG_{args.dataset}_{args.LLM_type}.jsonl"):
-                with open(f"PoG_{args.dataset}_{args.LLM_type}.jsonl", "r") as f:
+            if os.path.exists(f"PoG_{output_file_tag}.jsonl"):
+                with open(f"PoG_{output_file_tag}.jsonl", "r") as f:
                     for line in f:
                         data = json.loads(line)
                         processed_question.append(data[question_string])
@@ -70,6 +87,9 @@ if __name__ == '__main__':
             #     datas = get_one_data(datas, question_string, 'Which countries both contain the Delnita River and fall in Eastern Europe?')
             #     print(datas)
             model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
+            reference_bank = load_reference_bank(args)
+            if args.reference_mode != "none":
+                print(f"Loaded {len(reference_bank)} reference cases for PoG reference_mode={args.reference_mode}.")
             part_q = False
             if part_q:
                 q_set = []
@@ -89,7 +109,17 @@ if __name__ == '__main__':
 
                 question = data[question_string]
                 print('New question start:', question)
-                q_mem_f_path = '../mem_PoG/'+args.dataset+'/'+args.LLM_type+'/'+question[:255]
+                reference_context = build_reference_context(
+                    reference_bank,
+                    question,
+                    data.get('topic_entity', {}),
+                    args,
+                    model,
+                )
+                set_current_reference_context(args, reference_context)
+                if reference_context:
+                    print("PoG reference context:\n", reference_context)
+                q_mem_f_path = '../mem_PoG/'+output_file_tag+'/'+question[:255]
                 if not os.path.exists(q_mem_f_path):
                     os.makedirs(q_mem_f_path)
                 with open(q_mem_f_path+'/mem_PoG', 'w', encoding='utf-8') as f:
@@ -119,7 +149,7 @@ if __name__ == '__main__':
                     
                     new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                     reverse_rec['ent'] = new_e_rev_list
-                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, file_name=args.dataset+'_'+args.LLM_type)
+                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, file_name=output_file_tag)
                     continue
 
                 pre_relations = []
@@ -218,7 +248,7 @@ if __name__ == '__main__':
                             print("PoG stoped at depth %d." % depth)
                             new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                             reverse_rec['ent'] = new_e_rev_list
-                            save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time, file_name=args.dataset+'_'+args.LLM_type)
+                            save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time, file_name=output_file_tag)
                             flag_printed = True
                             break
                         else:
@@ -272,7 +302,7 @@ if __name__ == '__main__':
                     
                     new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                     reverse_rec['ent'] = new_e_rev_list
-                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, file_name=args.dataset+'_'+args.LLM_type)
+                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, file_name=output_file_tag)
                 '''except:
                     continue'''
         except:

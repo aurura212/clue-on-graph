@@ -9,6 +9,7 @@ from prompt_list import *
 from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 import os
+from reference_utils import maybe_prepend_reference_context
 
 color_yellow = "\033[93m"
 color_green = "\033[92m"
@@ -135,6 +136,7 @@ def extract_add_and_reason(string):
 
 def generate_without_explored_paths(question, subquestions, args):
     prompt = cot_prompt + question 
+    prompt = maybe_prepend_reference_context(prompt, args)
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     return response, token_num
@@ -186,6 +188,7 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     
     prompt = judge_reverse+question+'\nEntities set to be retrieved: ' + str(list(set(sorted([entid_name[ent_i] for ent_i in new_lst])))) +'\nMemory: '+his_mem+'\nKnowledge Triplets:'+chain_prompt
+    prompt = maybe_prepend_reference_context(prompt, args)
 
     cur_call_time += 1
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
@@ -201,6 +204,7 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         print('filter already', [entid_name[ent_i] for ent_i in new_lst], [entid_name[ent_i] for ent_i in all_ent_set], other_entities_name)
 
         prompt = add_ent_prompt+question+'\nReason: '+reason+'\nCandidate Entities: ' + str(sorted(other_entities_name))+'\nMemory: '+his_mem
+        prompt = maybe_prepend_reference_context(prompt, args)
 
         cur_call_time += 1
         response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)

@@ -9,6 +9,7 @@ import openai
 import re
 from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
+from reference_utils import get_output_file_tag, maybe_prepend_reference_context
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
 
 # pre-defined sparqls
@@ -78,7 +79,8 @@ def select_relations(string, entity_id, head_relations, tail_relations):
 
 
 def construct_relation_prune_prompt(question, sub_questions, entity_name, total_relations, args):
-    return extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
+    prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
+    return maybe_prepend_reference_context(prompt, args)
 
 
 def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, pre_head, question, args):
@@ -169,13 +171,14 @@ def half_stop(question, question_string, subquestions, cluster_chain_of_entities
     for kk in token_num.keys():
         all_t[kk] += token_num[kk]
 
-    save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=args.dataset+'_'+args.LLM_type)
+    save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=get_output_file_tag(args))
 
 
 def generate_answer(question, subquestions, cluster_chain_of_entities, args): 
     prompt = answer_prompt + question 
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     prompt += "\nKnowledge Triplets: " + chain_prompt
+    prompt = maybe_prepend_reference_context(prompt, args)
     result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     return result, token_num
 
@@ -325,6 +328,7 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
                 chain_prompt += entid_name[topic_e] + ' ' + rela + ' ' + str(sorted_e_list) + '\n'
 
     prompt += "\nKnowledge Triplets:\n" + chain_prompt
+    prompt = maybe_prepend_reference_context(prompt, args)
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     
@@ -350,6 +354,7 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
                 chain_prompt += entid_name[topic_e] + ', ' + rela + ', ' + str(sorted_e_list) + '\n'
 
     prompt += "\nKnowledge Triplets:\n" + chain_prompt
+    prompt = maybe_prepend_reference_context(prompt, args)
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     print("Response from reasoning:", response)
