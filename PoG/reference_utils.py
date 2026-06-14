@@ -245,7 +245,28 @@ def set_current_reference_context(args, context):
     setattr(args, "current_reference_context", context or "")
 
 
-def maybe_prepend_reference_context(prompt, args):
+def should_use_reference_at_stage(args, stage):
+    if getattr(args, "reference_mode", "none") == "none":
+        return False
+    stages = getattr(args, "reference_stages", "relation")
+    if stages is None:
+        stages = "relation"
+    if isinstance(stages, str):
+        selected_stages = {
+            item.strip().lower()
+            for item in stages.replace(",", " ").split()
+            if item.strip()
+        }
+    else:
+        selected_stages = {str(item).strip().lower() for item in stages if str(item).strip()}
+    if "none" in selected_stages:
+        return False
+    return "all" in selected_stages or stage in selected_stages
+
+
+def maybe_prepend_reference_context(prompt, args, stage="relation"):
+    if not should_use_reference_at_stage(args, stage):
+        return prompt
     context = getattr(args, "current_reference_context", "")
     if not context:
         return prompt

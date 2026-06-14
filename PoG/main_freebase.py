@@ -61,6 +61,8 @@ if __name__ == '__main__':
                         default=-1, help="Reference file limit suffix. -1 selects the full reference file.")
     parser.add_argument("--reference_top_k", type=int,
                         default=4, help="Number of similar reference cases to inject.")
+    parser.add_argument("--reference_stages", type=str,
+                        default="relation", help="Stages that can use reference: relation, memory, reasoning, answer, cot, reverse, add_entity, all, none. Separate multiple stages with spaces or commas.")
     parser.add_argument("--random_knowledge", type=int,
                         default=0, help="Use random reference cases instead of similar-question retrieval.")
     args = parser.parse_args()
