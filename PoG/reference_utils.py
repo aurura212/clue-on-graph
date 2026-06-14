@@ -273,9 +273,30 @@ def maybe_prepend_reference_context(prompt, args, stage="relation"):
     return context + "\n\nCurrent task:\n" + prompt
 
 
+def get_reference_stages_suffix(args):
+    stages = getattr(args, "reference_stages", "relation")
+    if stages is None:
+        stages = "relation"
+    if isinstance(stages, str):
+        selected_stages = [
+            item.strip().lower()
+            for item in stages.replace(",", " ").split()
+            if item.strip()
+        ]
+    else:
+        selected_stages = [str(item).strip().lower() for item in stages if str(item).strip()]
+    if not selected_stages:
+        selected_stages = ["relation"]
+    return "-".join(selected_stages)
+
+
 def get_output_file_tag(args):
     tag = f"{args.dataset}_{args.LLM_type}"
     mode = getattr(args, "reference_mode", "none")
     if mode != "none":
-        tag += f"_{mode}_top{getattr(args, 'reference_top_k', 4)}_{get_reference_limit_suffix(getattr(args, 'reference_limit', -1))}"
+        tag += (
+            f"_{mode}_top{getattr(args, 'reference_top_k', 4)}_"
+            f"{get_reference_limit_suffix(getattr(args, 'reference_limit', -1))}_"
+            f"stages-{get_reference_stages_suffix(args)}"
+        )
     return tag
