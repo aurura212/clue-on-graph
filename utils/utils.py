@@ -9,6 +9,7 @@ from sentence_transformers import util, SentenceTransformer
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from utils.freebase_func import *
+from utils.llm_api import get_chat_completion_extra_kwargs, is_openai_compatible_engine
 import time
 
 
@@ -49,18 +50,19 @@ def get_openai_embedding(input_message, openai_api_keys, model):
 
 
 def run_llm(prompt, temperature, max_tokens, llm_calls, openai_api_keys=None, llm_model=None, llm_tokenizer=None, pipe=None, engine="gpt-3.5-turbo"):
-    openai = None
+    client = None
     print("engine:", engine)
     f = 0
     result = ''
-    if 'gpt' in engine or 'deepseek' in engine or 'qwen3-80b' in engine:
+    if is_openai_compatible_engine(engine):
         import openai
 
         messages = []
         message_prompt = {"role":"user","content":prompt}
         messages.append(message_prompt)
-        openai.api_key = os.getenv("OPENAI_KEY", default=openai_api_keys)
-        openai.api_base = os.environ['OPENAI_API_BASE']
+        api_key = os.getenv("OPENAI_KEY", default=openai_api_keys)
+        base_url = os.environ.get("OPENAI_API_BASE")
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
     elif pipe == None:
         model = llm_model
         tokenizer = llm_tokenizer
@@ -68,16 +70,18 @@ def run_llm(prompt, temperature, max_tokens, llm_calls, openai_api_keys=None, ll
         pipeline = pipe
     while(f <= 5):
         try:
-            if 'gpt' in engine or 'deepseek' in engine or 'qwen3-80b' in engine:
-                response = openai.ChatCompletion.create(
-                    model=engine,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    frequency_penalty=0,
-                    presence_penalty=0,
-                )
-                result = response["choices"][0]['message']['content'].strip()
+            if is_openai_compatible_engine(engine):
+                completion_kwargs = {
+                    "model": engine,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "frequency_penalty": 0,
+                    "presence_penalty": 0,
+                }
+                completion_kwargs.update(get_chat_completion_extra_kwargs(engine))
+                response = client.chat.completions.create(**completion_kwargs)
+                result = response.choices[0].message.content.strip()
                 llm_calls += 1
             elif pipe == None:
                 messages = [{"role": "user", "content": prompt}]
@@ -135,7 +139,7 @@ def run_llm(prompt, temperature, max_tokens, llm_calls, openai_api_keys=None, ll
             if "gpt-4" in engine:
                 messages[-1] = {"role":"user","content": prompt[:32767]}
                 time.sleep(10)
-            elif 'gpt' in engine:
+            elif is_openai_compatible_engine(engine):
                 messages[-1] = {"role":"user","content": prompt[:16384]}
                 time.sleep(5)
             else:

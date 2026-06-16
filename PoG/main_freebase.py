@@ -3,15 +3,17 @@ import argparse
 from utils import *
 from freebase_func import *
 from reference_utils import (
+    build_decomposition_reference_context,
     build_reference_context,
     get_output_file_tag,
     load_reference_bank,
+    set_current_decomposition_reference_context,
     set_current_reference_context,
 )
 import os
 import pprint
 
-os.environ['OPENAI_API_BASE'] = "https://cn2us02.opapi.win/v1"
+# os.environ['OPENAI_API_BASE'] = "https://cn2us02.opapi.win/v1"
 
 def repeat_unanswer(dataset, datas, question_string, model_name):
     answered_set = set()
@@ -52,7 +54,9 @@ if __name__ == '__main__':
     parser.add_argument("--LLM_type", type=str,
                         default="gpt-3.5-turbo", help="base LLM model.")
     parser.add_argument("--opeani_api_keys", type=str,
-                        default="", help="if the LLM_type is gpt-3.5-turbo or gpt-4, you need add your own openai api keys.")
+                        default="", help="API key for OpenAI-compatible models (GPT, DeepSeek, etc.).")
+    parser.add_argument("--openai_api_base", type=str, default="",
+                        help="OpenAI-compatible API base URL, e.g. https://api.deepseek.com")
     parser.add_argument("--reference_mode", type=str, choices=["none", "cog", "revolution"],
                         default="none", help="PoG reference mode. cog uses related questions and correct paths; revolution also uses blind LLM reasoning and retrieval feedback.")
     parser.add_argument("--reference_base_path", type=str,
@@ -62,10 +66,14 @@ if __name__ == '__main__':
     parser.add_argument("--reference_top_k", type=int,
                         default=4, help="Number of similar reference cases to inject.")
     parser.add_argument("--reference_stages", type=str,
-                        default="relation", help="Stages that can use reference: relation, memory, reasoning, answer, cot, reverse, add_entity, all, none. Separate multiple stages with spaces or commas.")
+                        default="relation", help="Stages that can use reference: relation, memory, reasoning, answer, cot, reverse, add_entity, decomposition, all, none. Separate multiple stages with spaces or commas. decomposition uses gold.clue_reasoning from the reference bank.")
     parser.add_argument("--random_knowledge", type=int,
                         default=0, help="Use random reference cases instead of similar-question retrieval.")
     args = parser.parse_args()
+    if args.openai_api_base:
+        os.environ["OPENAI_API_BASE"] = args.openai_api_base
+    elif "OPENAI_API_BASE" not in os.environ:
+        raise ValueError("OPENAI_API_BASE is required. Set it in the environment or pass --openai_api_base.")
 
     while True:
         try:
@@ -121,6 +129,16 @@ if __name__ == '__main__':
                 set_current_reference_context(args, reference_context)
                 if reference_context:
                     print("PoG reference context:\n", reference_context)
+                decomposition_reference_context = build_decomposition_reference_context(
+                    reference_bank,
+                    question,
+                    data.get('topic_entity', {}),
+                    args,
+                    model,
+                )
+                set_current_decomposition_reference_context(args, decomposition_reference_context)
+                if decomposition_reference_context:
+                    print("PoG decomposition reference context:\n", decomposition_reference_context)
                 q_mem_f_path = '../mem_PoG/'+output_file_tag+'/'+question[:255]
                 if not os.path.exists(q_mem_f_path):
                     os.makedirs(q_mem_f_path)

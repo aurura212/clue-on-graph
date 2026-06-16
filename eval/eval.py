@@ -1,17 +1,16 @@
 import argparse
 import numpy as np
-from utils import *
+import json
 import re
-
-
-
+from utils import *
+import ast
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str,
-                        default="cwq", help="choose the dataset.")
+                        default="grailqa", help="choose the dataset.")
     parser.add_argument("--output_file", type=str,
-                        default="../PoG/PoG_cwq_gpt-3.5-turbo", help="the output file name.") # gpt-3.5-turbo gpt-4.1-mini
+                        default="PoG_grailqa_gpt-3.5-turbo-0125", help="the output file name.")
 
     args = parser.parse_args()
 
@@ -25,6 +24,13 @@ if __name__ == '__main__':
     num_right = 0
     num_error = 0
     error_question = []
+
+    # === 新增 F1 统计变量 ===
+    total_precision = 0
+    total_recall = 0
+    total_f1 = 0
+    num_questions_f1 = 0
+    # ======================
 
     type_field = ''
     part_q = False
@@ -67,7 +73,7 @@ if __name__ == '__main__':
             
     if part_q:
         q_set = []
-        with open('../../pog/eval/analysis_question', 'r', encoding='utf-8') as f:
+        with open('../eval/analysis_question', 'r', encoding='utf-8') as f:
             for line in f.readlines():
                 q_set.append(line.strip())
 
@@ -89,6 +95,11 @@ if __name__ == '__main__':
             if ori_data[type_field] not in count_q.keys():
                 count_q[ori_data[type_field]] = 0
             count_q[ori_data[type_field]] += 1
+        
+        # === 准备用于计算F1的字符串变量 ===
+        pred_str_for_f1 = ""
+        # ==============================
+
         start_i = data['results'].find('{')
         if start_i != -1:
             try:
@@ -98,6 +109,8 @@ if __name__ == '__main__':
                 else:
                     response = results['Answer']
                 
+                # F1 准备：转为字符串
+                pred_str_for_f1 = str(response)
 
                 if exact_match(str(response), answers):
                     num_right+=1
@@ -113,6 +126,10 @@ if __name__ == '__main__':
                 match_ = list(re.finditer(pattern, data['results'][start_i:]))
                 if match_:
                     response = match_[-1].group(1)
+                    
+                    # F1 准备
+                    pred_str_for_f1 = str(response)
+
                     if exact_match(response, answers):
                         num_right+=1
                         if type_field:
@@ -127,32 +144,30 @@ if __name__ == '__main__':
                     match_ = re.search(pattern, data['results'][start_i:])
                     if match_:
                         list_string = match_.group(1)
-                        try:
-                            list_obj = json.loads(list_string)
-                            flag = 0
-                            for response in list_obj:
-                                if exact_match(str(response), answers):
-                                    if type_field:
-                                        if ori_data[type_field] not in right_q.keys():
-                                            right_q[ori_data[type_field]] = 0
-                                        right_q[ori_data[type_field]] += 1
-                                    num_right+=1
-                                    flag = 1
-                                    break
-                            if not flag:
-                                num_error+=1
-                                error_question.append(data[question_string])
-                        except:
+                        #list_obj = json.loads(list_string)
+                        list_obj = ast.literal_eval(list_string)
+                        
+                        # F1 准备：列表转逗号分隔字符串，以适配原 calculate_f1 的 .split(',')
+                        pred_str_for_f1 = ",".join([str(x) for x in list_obj])
+
+                        flag = 0
+                        for response in list_obj:
                             if exact_match(str(response), answers):
                                 if type_field:
                                     if ori_data[type_field] not in right_q.keys():
                                         right_q[ori_data[type_field]] = 0
                                     right_q[ori_data[type_field]] += 1
                                 num_right+=1
-                            else:
-                                num_error+=1
-                                error_question.append(data[question_string])
+                                flag = 1
+                                break
+                        if not flag:
+                            num_error+=1
+                            error_question.append(data[question_string])
+                            
                     else:
+                        response = data['results'] # Fallback if json parse fails but { exists
+                        pred_str_for_f1 = str(response)
+
                         if exact_match(str(response), answers):
                             if type_field:
                                 if ori_data[type_field] not in right_q.keys():
@@ -164,6 +179,10 @@ if __name__ == '__main__':
                             error_question.append(data[question_string])
         else:
             response = data['results']
+            
+            # F1 准备
+            pred_str_for_f1 = str(response)
+
             if exact_match(response, answers):
                 if type_field:
                     if ori_data[type_field] not in right_q.keys():
@@ -173,10 +192,27 @@ if __name__ == '__main__':
             else:
             
                 num_error+=1
+                error_question.append(data[question_string])
+
+        # === 每一题结束后，计算 F1 ===
+        if pred_str_for_f1:
+            f1, precision, recall = calculate_f1(pred_str_for_f1, answers)
+            total_precision += precision
+            total_recall += recall
+            total_f1 += f1
+            num_questions_f1 += 1
+        # ===========================
 
     print("All: ", len(output_datas))
-    print("method: ", args.output_file)
     print("Exact Match: {}".format(float(num_right/len(output_datas)))) 
+
+    # === 打印 F1 结果 ===
+    if num_questions_f1 > 0:
+        print(f"Average F1: {total_f1/num_questions_f1:.4f}")
+        print(f"Average Precision: {total_precision/num_questions_f1:.4f}")
+        print(f"Average Recall: {total_recall/num_questions_f1:.4f}")
+    # ==================
+
     print("right: {}, error: {}".format(num_right, num_error))
     print(sorted(count_q.items(), key=lambda x:x[0]))
     print(sorted(right_q.items(), key=lambda x:x[0]))

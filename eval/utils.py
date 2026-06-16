@@ -2,7 +2,9 @@ import json
 
 def read_output(file_path, question_string):
     answered_dict = {}
-    file_path = file_path + '.jsonl'
+    # 如果已经是绝对或相对路径，不要再拼接 '../PoG/' 和 '.jsonl'
+    if not file_path.endswith('.jsonl'):
+        file_path += '.jsonl'
     with open(file_path, 'r', encoding='utf-8') as file:
         for i, line in enumerate(file):
             data = json.loads(line)
@@ -34,7 +36,6 @@ def prepare_dataset_for_eval(dataset_name, output_file):
 
 def align(dataset_name, question_string, data, ground_truth_datas, aname_dict, alias_dict, add_ans_alias_dict):
     answer_list= []
-
     origin_data = [j for j in ground_truth_datas if j[question_string] == data[question_string]][0]
     if dataset_name == 'cwq':
         add_data = aname_dict[data[question_string]]
@@ -44,7 +45,6 @@ def align(dataset_name, question_string, data, ground_truth_datas, aname_dict, a
             answers = origin_data["answers"]
         else:
             answers = origin_data["answer"]
-            
         if answers not in add_data:
             add_data.append(answers)
         
@@ -90,3 +90,28 @@ def exact_match(response, answers):
         if clean_result == clean_answer or clean_result in clean_answer or clean_answer in clean_result:
             return True
     return False
+
+
+
+def calculate_f1(prediction, answers):
+
+    if len(prediction) == 0:
+        return 0, 0, 0
+    matched = 0
+    p_matched=0
+    prediction_str = ' '.join(prediction)
+    for a in answers:
+        if exact_match(prediction_str, a):
+            matched += 1
+    prediction_parts = [p.strip() for p in prediction.split(',') if p.strip()]
+    if not prediction_parts:
+        return 0, 0, 0
+    for part in prediction_parts:
+        if exact_match(part,answers):
+            p_matched+=1
+    precision = p_matched / len(prediction_parts) if len(prediction_parts)>0 else 0
+    recall = matched / len(answers) if len(answers)>0 else 0
+    if precision + recall == 0:
+        return 0, precision, recall
+    else:
+        return 2 * precision * recall / (precision + recall), precision, recall

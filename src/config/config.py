@@ -43,6 +43,9 @@ LLM_BASE = {
     'gpt-4.1-mini': "gpt-4.1-mini",
     'Llama': "Llama3.1",
     'deepseek-chat': "deepseek-chat",
+    'deepseek-v4-pro': "deepseek-v4-pro",
+    'deepseek-v4-flash': "deepseek-v4-flash",
+    'deepseek-reasoner': "deepseek-reasoner",
     'gpt-5': "gpt-5",
     'qwen-3': 'qwen3-next-80b-a3b-thinking',
     'qwen3-8b': 'qwen3-8b'

@@ -213,6 +213,45 @@ def format_reference_item(ref, mode):
     return "\n".join([line for line in lines if line.strip()])
 
 
+def format_gold_clue_reasoning(ref):
+    clue_reasoning = ref.get("gold", {}).get("clue_reasoning", [])
+    if not clue_reasoning:
+        return ""
+    if isinstance(clue_reasoning, str):
+        return "Clue Reasoning: " + clue_reasoning
+    steps = [str(step).strip() for step in clue_reasoning if str(step).strip()]
+    if not steps:
+        return ""
+    numbered_steps = "\n".join(f"{index + 1}. {step}" for index, step in enumerate(steps))
+    return "Clue Reasoning:\n" + numbered_steps
+
+
+def format_decomposition_reference_item(ref):
+    lines = [
+        "Reference Question: " + ref.get("question", ""),
+    ]
+    clue_text = format_gold_clue_reasoning(ref)
+    if clue_text:
+        lines.append(clue_text)
+    return "\n".join([line for line in lines if line.strip()])
+
+
+def build_decomposition_reference_context(reference_bank, question, topic_entity, args, model):
+    if getattr(args, "reference_mode", "none") == "none":
+        return ""
+    selected_refs = select_reference_items(reference_bank, question, topic_entity, args, model)
+    if not selected_refs:
+        return ""
+
+    header = (
+        "Reference cases selected from training questions. Each case contains a related question "
+        "and its gold clue reasoning steps. Use these steps as guidance for decomposing the current "
+        "question into subobjectives, but do not copy entities or answers from the references."
+    )
+    body = "\n\n".join(format_decomposition_reference_item(ref) for ref in selected_refs)
+    return header + "\n" + body
+
+
 def build_reference_context(reference_bank, question, topic_entity, args, model):
     mode = getattr(args, "reference_mode", "none")
     if mode == "none":
@@ -245,6 +284,10 @@ def set_current_reference_context(args, context):
     setattr(args, "current_reference_context", context or "")
 
 
+def set_current_decomposition_reference_context(args, context):
+    setattr(args, "current_decomposition_reference_context", context or "")
+
+
 def should_use_reference_at_stage(args, stage):
     if getattr(args, "reference_mode", "none") == "none":
         return False
@@ -267,7 +310,10 @@ def should_use_reference_at_stage(args, stage):
 def maybe_prepend_reference_context(prompt, args, stage="relation"):
     if not should_use_reference_at_stage(args, stage):
         return prompt
-    context = getattr(args, "current_reference_context", "")
+    if stage == "decomposition":
+        context = getattr(args, "current_decomposition_reference_context", "")
+    else:
+        context = getattr(args, "current_reference_context", "")
     if not context:
         return prompt
     return context + "\n\nCurrent task:\n" + prompt

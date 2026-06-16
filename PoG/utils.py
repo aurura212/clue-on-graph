@@ -9,6 +9,18 @@ from prompt_list import *
 from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 import os
+import importlib.util
+
+_llm_api_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+    "utils",
+    "llm_api.py",
+)
+_llm_api_spec = importlib.util.spec_from_file_location("clue_on_graph_llm_api", _llm_api_path)
+_llm_api = importlib.util.module_from_spec(_llm_api_spec)
+_llm_api_spec.loader.exec_module(_llm_api)
+get_chat_completion_extra_kwargs = _llm_api.get_chat_completion_extra_kwargs
+is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
 
 color_yellow = "\033[93m"
@@ -29,18 +41,21 @@ def run_llm(prompt, temperature, max_tokens, openai_api_keys, engine="gpt-3.5-tu
     if print_in:
         print(color_green+prompt+color_end)
 
-    if 'gpt' in engine:
+    if is_openai_compatible_engine(engine):
         messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
         message_prompt = {"role":"user","content":prompt}
         messages.append(message_prompt)
         client = openai.OpenAI(api_key=openai_api_keys, base_url=os.environ['OPENAI_API_BASE'])
-        completion = client.chat.completions.create(
-                model=engine,
-                messages = messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                frequency_penalty=0,
-                presence_penalty=0)
+        completion_kwargs = {
+            "model": engine,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "frequency_penalty": 0,
+            "presence_penalty": 0,
+        }
+        completion_kwargs.update(get_chat_completion_extra_kwargs(engine))
+        completion = client.chat.completions.create(**completion_kwargs)
 
         result = completion.choices[0].message.content
 
@@ -49,6 +64,8 @@ def run_llm(prompt, temperature, max_tokens, openai_api_keys, engine="gpt-3.5-tu
         if print_out:
             print(color_yellow + result + color_end)
         return result, token_num
+
+    raise ValueError(f"Unsupported LLM engine: {engine}")
 
 
 def convert_dict_name(ent_rel_ent_dict, entid_name):
@@ -143,6 +160,7 @@ def generate_without_explored_paths(question, subquestions, args):
 
 def break_question(question, args): 
     prompt = subobjective_prompt + question
+    prompt = maybe_prepend_reference_context(prompt, args, stage="decomposition")
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     first_brace_p = response.find('[')
     last_brace_p = response.rfind(']')

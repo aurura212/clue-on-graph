@@ -37,11 +37,16 @@ def parse_args():
     parser.add_argument("--b", type=int, default=-1)
     parser.add_argument("--llm", type=str, choices=LLM_BASE.keys(), default="gpt35", help="base LLM model.")
     parser.add_argument("--openai_api_keys", type=str, help="openai_api_keys", default="", required=True)
+    parser.add_argument("--openai_api_base", type=str, default="", help="OpenAI-compatible API base URL, e.g. https://api.deepseek.com")
     parser.add_argument("--count_token_cost", type=bool, help="count_token_cost", default=False)
     parser.add_argument("--initial_path_eval", type=bool, help="evaluate initial reasoning path (ablation study)", default=False)
     parser.add_argument("--hop", type=int, default=0)
     args = parser.parse_args()
     args.LLM_type = LLM_BASE[args.llm]
+    if args.openai_api_base:
+        os.environ["OPENAI_API_BASE"] = args.openai_api_base
+    elif "OPENAI_API_BASE" not in os.environ:
+        os.environ["OPENAI_API_BASE"] = DEFAULT_OPENAI_API_BASE
     return args
 
 
