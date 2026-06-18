@@ -9,7 +9,7 @@ import openai
 import re
 from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
-from reference_utils import get_output_file_tag, maybe_prepend_reference_context
+from reference_utils import maybe_prepend_reference_context
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
 
 # pre-defined sparqls
@@ -92,6 +92,9 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     tail_relations = execurte_sparql(sparql_relations_extract_tail)
     tail_relations = replace_relation_prefix(tail_relations)
 
+    head_relations_raw = list(head_relations)
+    tail_relations_raw = list(tail_relations)
+
     if args.remove_unnecessary_rel:
         head_relations = [relation for relation in head_relations if not abandon_rels(relation)]
         tail_relations = [relation for relation in tail_relations if not abandon_rels(relation)]
@@ -109,12 +112,25 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
 
     prompt = construct_relation_prune_prompt(question, sub_questions, entity_name, total_relations, args)
     result, token_num = run_llm(prompt, args.temperature_exploration, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
-    flag, retrieve_relations = select_relations(result, entity_id, head_relations, tail_relations) 
+    flag, retrieve_relations = select_relations(result, entity_id, head_relations, tail_relations)
+
+    rel_trace = {
+        "entity_id": entity_id,
+        "entity_name": entity_name,
+        "head_relations_before_filter": sorted(head_relations_raw),
+        "tail_relations_before_filter": sorted(tail_relations_raw),
+        "candidate_relations_sent_to_llm": total_relations,
+        "selected_relations": [
+            {"relation": r["relation"], "head": r["head"]} for r in (retrieve_relations if flag else [])
+        ],
+        "llm_raw_output": result,
+        "selection_success": bool(flag),
+    }
 
     if flag:
-        return retrieve_relations, token_num
+        return retrieve_relations, token_num, rel_trace
     else:
-        return [], token_num # format error or too small max_length
+        return [], token_num, rel_trace
     
     
 def entity_search(entity, relation, head=True):
@@ -163,7 +179,7 @@ def update_history(entity_candidates, ent_rel, entity_candidates_id, total_candi
     return total_candidates, total_relations, total_entities_id, total_topic_entities, total_head
 
 
-def half_stop(question, question_string, subquestions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args):
+def half_stop(question, question_string, subquestions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=None):
     print("No new knowledge added during search depth %d, stop searching." % depth)
     call_num += 1
     answer, token_num = generate_answer(question, subquestions, cluster_chain_of_entities, args)
@@ -171,7 +187,17 @@ def half_stop(question, question_string, subquestions, cluster_chain_of_entities
     for kk in token_num.keys():
         all_t[kk] += token_num[kk]
 
-    save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=get_output_file_tag(args))
+    if pog_trace is not None:
+        pog_trace["final_stop_reason"] = "half_stop"
+        pog_trace["final_stop_depth"] = depth
+        if pog_trace["depths"]:
+            pog_trace["depths"][-1]["stop_reason"] = pog_trace["depths"][-1].get("stop_reason") or "half_stop"
+        pog_trace["final_answer_generation"] = {
+            "method": "generate_answer",
+            "llm_response": answer,
+        }
+
+    save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, pog_trace=pog_trace)
 
 
 def generate_answer(question, subquestions, cluster_chain_of_entities, args): 
@@ -204,21 +230,29 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
     new_ent_rel_ent_dict = {}
     no_prune = ['time', 'number', 'date']
     filter_entities_id, filter_tops, filter_relations, filter_candidates, filter_head = [], [], [], [], []
+    entity_prune_details = []
     for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
+                prune_method = "llm"
+                llm_raw = None
+                candidates_before = [entid_name[e_id] for e_id in sorted(e_list)]
+
                 if is_all_digits(e_list) or rela in no_prune or len(e_list) <= 1:
-                    sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
+                    sorted_e_list = candidates_before
                     select_ent = sorted_e_list
+                    prune_method = "skip_auto_keep"
                 else:
                     if all(entid_name[item].startswith('m.') for item in e_list) and len(e_list) > 10:
                         e_list = random.sample(e_list, 10)
+                        prune_method = "llm_after_random10"
 
                     if len(e_list) > 70:
                         sorted_e_list = [entid_name[e_id] for e_id in e_list]
                         topn_entities, topn_scores = retrieve_top_docs(question, sorted_e_list, model, 70)
                         e_list = [name_entid[e_n] for e_n in topn_entities]
                         print('sentence:', topn_entities)
+                        prune_method = "llm_after_embedding_top70"
 
                     prompt = prune_entity_prompt + question +'\nTriples: '
                     sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
@@ -229,6 +263,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                     for kk in token_num.keys():
                         cur_token[kk] += token_num[kk]
 
+                    llm_raw = result
                     last_brace_l = result.rfind('[')
                     last_brace_r = result.rfind(']')
                     
@@ -243,6 +278,19 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
 
                     select_ent = sorted(result)
                     select_ent = [x for x in select_ent if x in sorted_e_list]
+
+                dropped = sorted(set(candidates_before) - set(select_ent))
+                entity_prune_details.append({
+                    "topic_entity": entid_name[topic_e],
+                    "topic_entity_id": topic_e,
+                    "head_or_tail": h_t,
+                    "relation": rela,
+                    "candidates_before_prune": candidates_before,
+                    "candidates_after_prune": list(select_ent),
+                    "dropped_candidates": dropped,
+                    "prune_method": prune_method,
+                    "llm_raw_output": llm_raw,
+                })
 
                 if len(select_ent) == 0 or all(x == '' for x in select_ent):
                     continue
@@ -268,11 +316,11 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
 
 
     if len(filter_entities_id) == 0:
-        return False, [], [], [], [], new_ent_rel_ent_dict, cur_call_time, cur_token
+        return False, [], [], [], [], new_ent_rel_ent_dict, cur_call_time, cur_token, entity_prune_details
 
 
     cluster_chain_of_entities = [[(filter_tops[i], filter_relations[i], filter_candidates[i]) for i in range(len(filter_candidates))]]
-    return True, cluster_chain_of_entities, filter_entities_id, filter_relations, filter_head, new_ent_rel_ent_dict, cur_call_time, cur_token
+    return True, cluster_chain_of_entities, filter_entities_id, filter_relations, filter_head, new_ent_rel_ent_dict, cur_call_time, cur_token, entity_prune_details
 
 def add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, entid_name, name_entid, args):
     add_entities_id = sorted(add_ent_list)
@@ -336,7 +384,13 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
     print(mem)
     with open(q_mem_f_path+'/mem', 'w', encoding='utf-8') as f:
         f.write(mem)
-    return token_num
+    mem_trace = {
+        "memory_before": his_mem,
+        "memory_after": mem,
+        "llm_raw_output": response,
+        "knowledge_triplets_prompt": chain_prompt.strip(),
+    }
+    return token_num, mem_trace
 
 
 def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args):

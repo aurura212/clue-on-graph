@@ -18,5 +18,7 @@ PoG*.jsonl
 /results
 /src/process_analysis
 /PoG/__pycache__/
+/PoG/result/
 /mem_PoG
 /eval/__pycache__/
+/pog_diagnosis

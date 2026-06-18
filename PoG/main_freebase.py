@@ -5,11 +5,12 @@ from freebase_func import *
 from reference_utils import (
     build_decomposition_reference_context,
     build_reference_context,
-    get_output_file_tag,
     load_reference_bank,
     set_current_decomposition_reference_context,
     set_current_reference_context,
 )
+from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
+from output_paths import init_run_output, load_processed_questions, get_current_run
 import os
 import pprint
 
@@ -36,6 +37,23 @@ def get_one_data(datas, question_string, question):
     for data in datas:
         if data[question_string] == question:
             return [data]
+    return []
+
+
+def select_questions(datas, question_string, start, limit, question):
+    """Select a subset of questions for testing."""
+    if question:
+        selected = get_one_data(datas, question_string, question)
+        if not selected:
+            raise ValueError(f"Question not found in dataset: {question}")
+        return selected
+
+    start = max(0, start)
+    if limit >= 0:
+        return datas[start:start + limit]
+    if start > 0:
+        return datas[start:]
+    return datas
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -52,7 +70,7 @@ if __name__ == '__main__':
     parser.add_argument("--remove_unnecessary_rel", type=bool,
                         default=True, help="whether removing unnecessary relations.")
     parser.add_argument("--LLM_type", type=str,
-                        default="gpt-3.5-turbo", help="base LLM model.")
+                        default="gpt-3.5-turbo-0125", help="base LLM model.")
     parser.add_argument("--opeani_api_keys", type=str,
                         default="", help="API key for OpenAI-compatible models (GPT, DeepSeek, etc.).")
     parser.add_argument("--openai_api_base", type=str, default="",
@@ -69,6 +87,14 @@ if __name__ == '__main__':
                         default="relation", help="Stages that can use reference: relation, memory, reasoning, answer, cot, reverse, add_entity, decomposition, all, none. Separate multiple stages with spaces or commas. decomposition uses gold.clue_reasoning from the reference bank.")
     parser.add_argument("--random_knowledge", type=int,
                         default=0, help="Use random reference cases instead of similar-question retrieval.")
+    parser.add_argument("--start", type=int, default=0,
+                        help="Start index in the dataset (0-based). Applied before skipping already-processed questions.")
+    parser.add_argument("--limit", type=int, default=-1,
+                        help="Max number of questions to run. -1 means no limit.")
+    parser.add_argument("--question", type=str, default="",
+                        help="Run a single question by exact RawQuestion/question text. Overrides --start/--limit.")
+    parser.add_argument("--run_dir", type=str, default="",
+                        help="Resume an existing run under result/. Pass folder name (e.g. webqsp_..._n10_20250617_120000) or full path.")
     args = parser.parse_args()
     if args.openai_api_base:
         os.environ["OPENAI_API_BASE"] = args.openai_api_base
@@ -79,15 +105,31 @@ if __name__ == '__main__':
         try:
             processed_question = []
             datas, question_string = prepare_dataset(args.dataset)
-            output_file_tag = get_output_file_tag(args)
-            #datas = datas[args.a:args.b]
-            if os.path.exists(f"PoG_{output_file_tag}.jsonl"):
-                with open(f"PoG_{output_file_tag}.jsonl", "r") as f:
-                    for line in f:
-                        data = json.loads(line)
-                        processed_question.append(data[question_string])
+            total_in_dataset = len(datas)
+            datas = select_questions(
+                datas, question_string, args.start, args.limit, args.question.strip()
+            )
+            planned_question_count = len(datas)
+            if args.question.strip():
+                print(f"Selected 1 question by --question (dataset size={total_in_dataset}).")
+            elif args.start > 0 or args.limit >= 0:
+                end = args.start + args.limit if args.limit >= 0 else total_in_dataset
+                print(
+                    f"Selected questions [{args.start}:{end}) -> {planned_question_count} / {total_in_dataset} "
+                    f"(start={args.start}, limit={args.limit})."
+                )
+
+            run_output = init_run_output(
+                args,
+                planned_question_count=planned_question_count,
+                resume_dir=args.run_dir.strip() or None,
+            )
+
+            processed_question = load_processed_questions(question_string)
+            if processed_question:
                 print("data_processed", len(processed_question))
                 datas = [x for x in datas if x[question_string] not in processed_question]
+                print(f"Remaining after skipping processed: {len(datas)}")
                 if len(datas) == 0:
                     print("All questions have been processed.")
                     break
@@ -139,7 +181,7 @@ if __name__ == '__main__':
                 set_current_decomposition_reference_context(args, decomposition_reference_context)
                 if decomposition_reference_context:
                     print("PoG decomposition reference context:\n", decomposition_reference_context)
-                q_mem_f_path = '../mem_PoG/'+output_file_tag+'/'+question[:255]
+                q_mem_f_path = '../mem_PoG/'+run_output["run_folder_name"]+'/'+question[:255]
                 if not os.path.exists(q_mem_f_path):
                     os.makedirs(q_mem_f_path)
                 with open(q_mem_f_path+'/mem_PoG', 'w', encoding='utf-8') as f:
@@ -154,6 +196,7 @@ if __name__ == '__main__':
                 cluster_chain_of_entities = []
                 depth_ent_rel_ent_dict = {}
                 reverse_rec = {'time': 0, 'ent': []}
+                pog_trace = new_run_trace(sub_questions, topic_entity)
 
                 entid_name = {}
                 name_entid = {}
@@ -169,19 +212,26 @@ if __name__ == '__main__':
                     
                     new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                     reverse_rec['ent'] = new_e_rev_list
-                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, file_name=output_file_tag)
+                    pog_trace["final_stop_reason"] = "no_topic_entity_cot"
+                    pog_trace["final_answer_generation"] = {
+                        "method": "generate_without_explored_paths",
+                        "llm_response": results,
+                    }
+                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                     continue
 
                 pre_relations = []
                 pre_heads= [-1] * len(topic_entity)
                 flag_printed = False
                 for depth in range(1, args.depth+1):
+                    depth_record = new_depth_record(depth, topic_entity)
                     current_entity_relations_list = []
                     i=0
                     for entity in topic_entity:
                         if entity!="[FINISH_ID]":
                             call_num += 1
-                            retrieve_relations, token_num = relation_search_prune(entity, sub_questions, topic_entity[entity], pre_relations, pre_heads[i], question, args)
+                            retrieve_relations, token_num, rel_trace = relation_search_prune(entity, sub_questions, topic_entity[entity], pre_relations, pre_heads[i], question, args)
+                            depth_record["relation_prune"].append(rel_trace)
                             for kk in token_num.keys():
                                 all_t[kk] += token_num[kk]
                             if entity.startswith("m.") == False and entity.startswith("g.") == False:
@@ -229,17 +279,24 @@ if __name__ == '__main__':
                         total_candidates, total_relations, total_entities_id, total_topic_entities, total_head = update_history(entity_candidates, ent_rel, entity_candidates_id, total_candidates, total_relations, total_entities_id, total_topic_entities, total_head)
                     
                     depth_ent_rel_ent_dict[depth] = ent_rel_ent_dict
+                    depth_record["before_entity_prune"] = serialize_name_dict(convert_dict_name(ent_rel_ent_dict, entid_name))
                     
                     pprint.pprint(convert_dict_name(ent_rel_ent_dict, entid_name))
 
                     if len(total_candidates) == 0:
+                        depth_record["stop_reason"] = "no_candidates_after_relation_entity_search"
+                        pog_trace["depths"].append(depth_record)
                         new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                         reverse_rec['ent'] = new_e_rev_list
-                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args)
+                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                         flag_printed = True
                         break
                     
-                    flag, chain_of_entities, entities_id, pre_relations, pre_heads, new_ent_rel_ent_dict,  cur_call_time, cur_token = entity_condition_prune(question, total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, ent_rel_ent_dict, entid_name, name_entid, args, model)
+                    flag, chain_of_entities, entities_id, pre_relations, pre_heads, new_ent_rel_ent_dict, cur_call_time, cur_token, entity_prune_details = entity_condition_prune(question, total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, ent_rel_ent_dict, entid_name, name_entid, args, model)
+                    depth_record["after_entity_prune"] = serialize_name_dict(convert_dict_name(new_ent_rel_ent_dict, entid_name))
+                    depth_record["entity_prune_details"] = entity_prune_details
+                    depth_record["pruned_triples"] = flatten_chain_triples(chain_of_entities)
+                    depth_record["entity_prune_success"] = flag
                     cluster_chain_of_entities.append(chain_of_entities)
 
                     call_num += cur_call_time
@@ -249,7 +306,8 @@ if __name__ == '__main__':
                     pprint.pprint(convert_dict_name(new_ent_rel_ent_dict, entid_name))
                     if flag:
                         call_num += 1
-                        token_num = update_memory(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
+                        token_num, mem_trace = update_memory(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
+                        depth_record["memory_update"] = mem_trace
                         for kk in token_num.keys():
                             all_t[kk] += token_num[kk]
 
@@ -258,45 +316,60 @@ if __name__ == '__main__':
                         for kk in token_num.keys():
                             all_t[kk] += token_num[kk]
 
-
                         if str(answer).lower() == 'null' or str(answer).lower() == 'none'  or str(answer).startswith('m.') or str(answer).startswith('[\"m.') or str(answer).startswith("['m.") or 'yes' not in str(sufficient).lower():
                             stop = False
                         else:
                             stop = True
 
+                        depth_record["evaluation"] = {
+                            "llm_response": results,
+                            "answer": answer,
+                            "sufficient": sufficient,
+                            "stop": stop,
+                        }
+
                         if stop:
                             print("PoG stoped at depth %d." % depth)
+                            depth_record["stop_reason"] = "reasoning_sufficient"
+                            pog_trace["depths"].append(depth_record)
+                            pog_trace["final_stop_reason"] = "reasoning_sufficient"
+                            pog_trace["final_stop_depth"] = depth
                             new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                             reverse_rec['ent'] = new_e_rev_list
-                            save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time, file_name=output_file_tag)
+                            save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time, pog_trace=pog_trace)
                             flag_printed = True
                             break
                         else:
                             print("depth %d still not find the answer." % depth)
                             add_ent_list = []
+                            reverse_trace = {"triggered": False, "add_entities": [], "judge_response": None, "select_response": None}
                             if reverse_rec['time']<5:
                                 entities_id, add_ent_list, cur_call_time, cur_token = if_finish_list(question, entities_id, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path, results, cluster_chain_of_entities, args, model)
                                 call_num += cur_call_time
                                 for kk in cur_token.keys():
                                     all_t[kk] += cur_token[kk]
                                 add_ent_list = [ent for ent in add_ent_list if ent not in reverse_rec['ent']]
-
-                            # update: pre_relations, pre_heads, new_ent_rel_ent_dicts
                                 if add_ent_list:
-                                    reverse_rec['time'] += 1
-                                    reverse_rec['ent'] += add_ent_list
+                                    reverse_trace["triggered"] = True
+                                    reverse_trace["add_entities"] = [entid_name.get(e, e) for e in add_ent_list]
 
-                                    add_ent_list, add_pre_relations, add_pre_heads, new_ent_rel_ent_dict = add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, entid_name, name_entid, args) 
-                                    pre_relations += add_pre_relations
-                                    pprint.pprint(convert_dict_name(ent_rel_ent_dict, entid_name))
-                                    pre_heads += add_pre_heads
-                                    entities_id += add_ent_list
+                            depth_record["reverse_retrieval"] = reverse_trace
+                            pog_trace["depths"].append(depth_record)
 
+                            if add_ent_list:
+                                reverse_rec['time'] += 1
+                                reverse_rec['ent'] += add_ent_list
+
+                                add_ent_list, add_pre_relations, add_pre_heads, new_ent_rel_ent_dict = add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, entid_name, name_entid, args)
+                                pre_relations += add_pre_relations
+                                pprint.pprint(convert_dict_name(ent_rel_ent_dict, entid_name))
+                                pre_heads += add_pre_heads
+                                entities_id += add_ent_list
 
                             if not entities_id or depth>5:
                                 new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                                 reverse_rec['ent'] = new_e_rev_list
-                                half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args)
+                                half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                                 flag_printed = True
                                 break
                             else:
@@ -308,9 +381,11 @@ if __name__ == '__main__':
                                         topic_entity[entity] = entid_name[entity]
 
                     else:
+                        depth_record["stop_reason"] = "entity_prune_failed"
+                        pog_trace["depths"].append(depth_record)
                         new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                         reverse_rec['ent'] = new_e_rev_list
-                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args)
+                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                         flag_printed = True
                         break
                 
@@ -322,7 +397,12 @@ if __name__ == '__main__':
                     
                     new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                     reverse_rec['ent'] = new_e_rev_list
-                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, file_name=output_file_tag)
+                    pog_trace["final_stop_reason"] = "max_depth_cot_fallback"
+                    pog_trace["final_answer_generation"] = {
+                        "method": "generate_without_explored_paths",
+                        "llm_response": results,
+                    }
+                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                 '''except:
                     continue'''
         except:

@@ -198,9 +198,9 @@ def align_f1(dataset_name, question_string, data, ground_truth_datas, aname_dict
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str,
-                        default="cwq", help="choose the dataset.")
+                        default="webqsp", help="choose the dataset.")
     parser.add_argument("--output_file", type=str,
-                        default="../PoG/PoG_cwq_gpt-3.5-turbo", help="the output file name.") # gpt-3.5-turbo gpt-4.1-mini
+                        default="../PoG/PoG_webqsp_gpt-3.5-turbo-0125_cog_top2_limit100_stages-relation", help="the output file name.") # gpt-3.5-turbo gpt-4.1-mini
 
     args = parser.parse_args()
 

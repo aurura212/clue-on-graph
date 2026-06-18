@@ -22,6 +22,8 @@ _llm_api_spec.loader.exec_module(_llm_api)
 get_chat_completion_extra_kwargs = _llm_api.get_chat_completion_extra_kwargs
 is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
+from output_paths import get_current_run
+from jsonl_io import append_jsonl_record
 
 color_yellow = "\033[93m"
 color_green = "\033[92m"
@@ -88,12 +90,34 @@ def convert_dict_name(ent_rel_ent_dict, entid_name):
 
     
 
-def save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name):
+def save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=None, pog_trace=None):
     tt = time.time()-start_time
-    dict = {question_string:question, "results": answer, "reasoning_chains": cluster_chain_of_entities, "call_num": call_num, "total_token": all_t['total'], "input_token": all_t['input'], "output_token": all_t['output'], "time": tt}
-    with open("PoG_{}.jsonl".format(file_name), "a") as outfile:
-        json_str = json.dumps(dict)
-        outfile.write(json_str + "\n")
+    result_dict = {
+        question_string: question,
+        "results": answer,
+        "reasoning_chains": cluster_chain_of_entities,
+        "call_num": call_num,
+        "total_token": all_t['total'],
+        "input_token": all_t['input'],
+        "output_token": all_t['output'],
+        "time": tt,
+    }
+
+    run = get_current_run()
+    if run:
+        results_path = run["results_path"]
+        trace_path = run["trace_path"]
+    else:
+        tag = file_name or "default"
+        results_path = f"PoG_{tag}.jsonl"
+        trace_path = f"PoG_{tag}_trace.jsonl"
+
+    append_jsonl_record(results_path, result_dict)
+
+    if pog_trace is not None:
+        trace_dict = {question_string: question, "pog_trace": pog_trace}
+        append_jsonl_record(trace_path, trace_dict)
+
 
 def extract_add_ent(string):
     first_brace_p = string.find('[')
