@@ -338,11 +338,21 @@ def get_reference_stages_suffix(args):
 
 def get_output_file_tag(args):
     tag = f"{args.dataset}_{args.LLM_type}"
+    run_mode = getattr(args, "run_mode", "test")
+    if run_mode != "test":
+        tag += f"_{run_mode}"
     mode = getattr(args, "reference_mode", "none")
     if mode != "none":
         tag += (
             f"_{mode}_top{getattr(args, 'reference_top_k', 4)}_"
             f"{get_reference_limit_suffix(getattr(args, 'reference_limit', -1))}_"
             f"stages-{get_reference_stages_suffix(args)}"
+        )
+    relation_memory_mode = getattr(args, "relation_memory_mode", "none")
+    if relation_memory_mode != "none":
+        tag += (
+            f"_relmem-{relation_memory_mode}_"
+            f"{getattr(args, 'memory_retrieval_strategy', 'hybrid')}_"
+            f"stages-{getattr(args, 'relation_memory_stages', 'relation')}"
         )
     return tag

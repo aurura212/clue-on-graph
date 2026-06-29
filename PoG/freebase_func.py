@@ -10,6 +10,7 @@ import re
 from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
+from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
 
 # pre-defined sparqls
@@ -78,9 +79,24 @@ def select_relations(string, entity_id, head_relations, tail_relations):
 
 
 
-def construct_relation_prune_prompt(question, sub_questions, entity_name, total_relations, args):
+def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args):
     prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
-    return maybe_prepend_reference_context(prompt, args, stage="relation")
+    prompt = maybe_prepend_reference_context(prompt, args, stage="relation")
+    memory_context = ""
+    if should_use_relation_memory_at_stage(args, "relation"):
+        memory_context = relation_memory_context(
+            getattr(args, "relation_memory_bank", []),
+            question,
+            entity_id,
+            entity_name,
+            total_relations,
+            args,
+            getattr(args, "sentence_model", None),
+        )
+        if memory_context:
+            prompt = memory_context + "\n\n" + prompt
+    setattr(args, "current_relation_memory_context", memory_context)
+    return prompt
 
 
 def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, pre_head, question, args):
@@ -110,7 +126,7 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     total_relations.sort()  # make sure the order in prompt is always equal
     
 
-    prompt = construct_relation_prune_prompt(question, sub_questions, entity_name, total_relations, args)
+    prompt = construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args)
     result, token_num = run_llm(prompt, args.temperature_exploration, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     flag, retrieve_relations = select_relations(result, entity_id, head_relations, tail_relations)
 
@@ -125,6 +141,7 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
         ],
         "llm_raw_output": result,
         "selection_success": bool(flag),
+        "relation_memory_context": getattr(args, "current_relation_memory_context", ""),
     }
 
     if flag:
