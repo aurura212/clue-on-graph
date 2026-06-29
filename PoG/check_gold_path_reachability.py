@@ -17,15 +17,25 @@ except ImportError:
 SPARQLPATH = "http://localhost:8890/sparql"
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-RAW_TRAIN_DIR = os.path.join(PROJECT_ROOT, "data", "raw_train_set")
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+RAW_TRAIN_DIR = os.path.join(DATA_DIR, "raw_train_set")
 OUT_DIR = os.path.join(SCRIPT_DIR, "gold_path_check")
 
+DATASET_NAMES = ("webqsp", "cwq", "grailqa")
 
-DATASETS = {
+TRAIN_DATASETS = {
     "webqsp": os.path.join(RAW_TRAIN_DIR, "WebQSP.train.json"),
     "cwq": os.path.join(RAW_TRAIN_DIR, "ComplexWebQuestions_train.json"),
     "grailqa": os.path.join(RAW_TRAIN_DIR, "grailqa_v1.0_train.json"),
 }
+
+TEST_DATASETS = {
+    "webqsp": os.path.join(DATA_DIR, "WebQSP.json"),
+    "cwq": os.path.join(DATA_DIR, "cwq.json"),
+    "grailqa": os.path.join(DATA_DIR, "grailqa.json"),
+}
+
+DATASETS = TRAIN_DATASETS
 
 
 def discover_project_root(explicit_root=""):
@@ -42,11 +52,20 @@ def discover_project_root(explicit_root=""):
     for candidate in candidates:
         if os.path.exists(os.path.join(candidate, "data", "raw_train_set")):
             return candidate
+        if os.path.exists(os.path.join(candidate, "data", "WebQSP.json")):
+            return candidate
     return candidates[0]
 
 
-def dataset_paths(project_root):
-    raw_train_dir = os.path.join(project_root, "data", "raw_train_set")
+def dataset_paths(project_root, split="train"):
+    data_dir = os.path.join(project_root, "data")
+    raw_train_dir = os.path.join(data_dir, "raw_train_set")
+    if split == "test":
+        return {
+            "webqsp": os.path.join(data_dir, "WebQSP.json"),
+            "cwq": os.path.join(data_dir, "cwq.json"),
+            "grailqa": os.path.join(data_dir, "grailqa.json"),
+        }
     return {
         "webqsp": os.path.join(raw_train_dir, "WebQSP.train.json"),
         "cwq": os.path.join(raw_train_dir, "ComplexWebQuestions_train.json"),
@@ -153,13 +172,25 @@ def gold_sparql_hits_answers(sparql_result, answers):
     return sorted(answer_set & value_set)
 
 
+def load_webqsp_data(path):
+    data = load_json(path)
+    if isinstance(data, list):
+        return {"Questions": data}
+    return data
+
+
 def answer_values_from_answer_list(answer_list):
     values = []
     for answer in answer_list or []:
-        for key in ("answer_id", "AnswerArgument", "answer_argument"):
+        value = None
+        for key in ("answer_id", "AnswerArgument", "answer_argument", "uri"):
             if answer.get(key):
-                values.append(normalize_sparql_value(answer.get(key)))
+                value = normalize_sparql_value(answer.get(key))
                 break
+        if value is None and answer.get("answer"):
+            value = normalize_sparql_value(answer.get("answer"))
+        if value is not None:
+            values.append(value)
     return sorted(set(values))
 
 
@@ -214,16 +245,19 @@ def execute_path(start_entities, path_steps, max_frontier=100000):
 def answer_ids_from_answer_list(answer_list):
     ids = []
     for answer in answer_list or []:
-        for key in ("answer_id", "AnswerArgument", "answer_argument"):
+        for key in ("answer_id", "AnswerArgument", "answer_argument", "uri"):
             if answer.get(key) and is_mid(answer.get(key)):
                 ids.append(normalize_mid(answer.get(key)))
                 break
     return sorted(set(ids))
 
 
-def webqsp_records(data):
+def webqsp_records(data, primary_parse_only=True):
     for question in data.get("Questions", []):
-        for parse in question.get("Parses", []):
+        parses = question.get("Parses") or []
+        if primary_parse_only and parses:
+            parses = parses[:1]
+        for parse in parses:
             chain = parse.get("InferentialChain") or []
             topic_mid = normalize_mid(parse.get("TopicEntityMid"))
             answers = answer_ids_from_answer_list(parse.get("Answers"))
@@ -289,13 +323,43 @@ def mids_from_sparql(sparql):
     return sorted(set(normalize_mid(item) for item in re.findall(r"(?:ns:|:)m\.[A-Za-z0-9_]+", sparql or "")))
 
 
-def cwq_records(data):
-    for item in data:
+def load_cwq_entity_answer_map(project_root):
+    origin_path = os.path.join(
+        project_root, "data", "datasets", "cwq_test_origin_with_topic_alias.json"
+    )
+    if not os.path.exists(origin_path):
+        return {}
+    answer_map = {}
+    for item in load_json(origin_path):
         answers = answer_ids_from_answer_list(item.get("answers"))
-        answer_values = answer_values_from_answer_list(item.get("answers"))
+        if answers:
+            answer_map[item["ID"]] = answers
+    return answer_map
+
+
+def cwq_answer_fields(item, entity_answer_map=None):
+    entity_answer_map = entity_answer_map or {}
+    answers = answer_ids_from_answer_list(item.get("answers"))
+    answer_values = answer_values_from_answer_list(item.get("answers"))
+    if not answers:
+        answers = list(entity_answer_map.get(item.get("ID"), []))
+    if item.get("answer"):
+        answer_values = sorted(set(answer_values + [normalize_sparql_value(item.get("answer"))]))
+    if answers:
+        answer_values = sorted(set(answer_values + answers))
+    return answers, answer_values
+
+
+def cwq_records(data, entity_answer_map=None):
+    for item in data:
+        answers, answer_values = cwq_answer_fields(item, entity_answer_map=entity_answer_map)
         triples = parse_sparql_triples(item.get("sparql"))
         answer_set = set(answers)
-        topic_entities = [mid for mid in mids_from_sparql(item.get("sparql")) if mid not in answer_set]
+        topic_entities = sorted(
+            normalize_mid(mid) for mid in (item.get("topic_entity") or {}).keys() if is_mid(mid)
+        )
+        if not topic_entities:
+            topic_entities = [mid for mid in mids_from_sparql(item.get("sparql")) if mid not in answer_set]
         paths = build_paths_from_triples(triples, topic_entities, target_var="?x")
         yield {
             "dataset": "cwq",
@@ -349,26 +413,34 @@ def grailqa_records(data):
         }
 
 
-def iter_dataset_records(dataset_name, path):
-    data = load_json(path)
+def iter_dataset_records(dataset_name, path, split="train", entity_answer_map=None):
     if dataset_name == "webqsp":
-        yield from webqsp_records(data)
+        yield from webqsp_records(load_webqsp_data(path))
     elif dataset_name == "cwq":
-        yield from cwq_records(data)
+        yield from cwq_records(load_json(path), entity_answer_map=entity_answer_map)
     elif dataset_name == "grailqa":
-        yield from grailqa_records(data)
+        yield from grailqa_records(load_json(path))
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
 
 
 def check_record(record, max_paths_per_example):
-    answers = set(record["answers"])
     answer_values = set(record.get("answer_values") or record["answers"])
     checked_paths = []
     reachable_answers = set()
     best_reached_count = 0
     gold_sparql_result = execute_gold_sparql_query(record.get("gold_sparql"))
+    if not answer_values:
+        answer_values = {normalize_sparql_value(value) for value in gold_sparql_result.get("values", [])}
     gold_sparql_hit_answers = gold_sparql_hits_answers(gold_sparql_result, answer_values)
+
+    answers = set(record["answers"])
+    if not answers:
+        answers = {
+            normalize_mid(value)
+            for value in gold_sparql_result.get("values", [])
+            if is_mid(value)
+        }
 
     for path in record["paths"][:max_paths_per_example]:
         reached, trace, error = execute_path(record["topic_entities"], path)
@@ -388,7 +460,7 @@ def check_record(record, max_paths_per_example):
     status = "reachable" if reachable_answers else "unreachable"
     if not record["paths"]:
         status = "no_path_extracted"
-    elif not record["answers"]:
+    elif not answers:
         status = "no_entity_answer"
     elif not record["topic_entities"]:
         status = "no_topic_entity"
@@ -399,6 +471,7 @@ def check_record(record, max_paths_per_example):
         "num_paths_checked": len(checked_paths),
         "status": status,
         "reachable": status == "reachable",
+        "resolved_entity_answers": sorted(answers),
         "reachable_answers": sorted(reachable_answers),
         "gold_sparql_executed": gold_sparql_result["executed"],
         "gold_sparql_error": gold_sparql_result["error"],
@@ -414,10 +487,10 @@ def check_record(record, max_paths_per_example):
 def update_summary(summary, row):
     dataset_summary = summary[row["dataset"]]
     dataset_summary["total"] += 1
-    dataset_summary[row["status"]] += 1
+    dataset_summary[f"status_{row['status']}"] += 1
     if row["reachable"]:
         dataset_summary["reachable"] += 1
-    if row["answers"]:
+    if row.get("resolved_entity_answers"):
         dataset_summary["with_entity_answer"] += 1
     if row["topic_entities"]:
         dataset_summary["with_topic_entity"] += 1
@@ -434,23 +507,31 @@ def update_summary(summary, row):
 def main():
     global SPARQLPATH
     parser = argparse.ArgumentParser(
-        description="Check whether training gold relation paths can reach gold answer entities in the current Freebase SPARQL KG."
+        description="Check whether gold relation paths can reach gold answer entities in the current Freebase SPARQL KG."
     )
-    parser.add_argument("--datasets", nargs="+", default=["webqsp", "cwq", "grailqa"], choices=sorted(DATASETS))
+    parser.add_argument("--datasets", nargs="+", default=list(DATASET_NAMES), choices=list(DATASET_NAMES))
+    parser.add_argument(
+        "--split",
+        choices=["train", "test"],
+        default="test",
+        help="Dataset split to check. test uses WebQSP.json / cwq.json / grailqa.json.",
+    )
     parser.add_argument("--sparql", default=SPARQLPATH, help="SPARQL endpoint URL.")
     parser.add_argument("--project_root", default="", help="Path to clue_on_graph. Auto-detected by default.")
     parser.add_argument("--limit", type=int, default=-1, help="Limit examples per dataset for debugging.")
     parser.add_argument("--max_paths_per_example", type=int, default=20)
-    parser.add_argument("--output_dir", default=OUT_DIR)
+    parser.add_argument("--output_dir", default="", help="Output directory. Defaults to gold_path_check_{split}.")
     args = parser.parse_args()
 
     SPARQLPATH = args.sparql
     project_root = discover_project_root(args.project_root)
-    paths = dataset_paths(project_root)
+    paths = dataset_paths(project_root, split=args.split)
+    output_dir = args.output_dir or os.path.join(SCRIPT_DIR, f"gold_path_check_{args.split}")
+    cwq_entity_answer_map = load_cwq_entity_answer_map(project_root) if "cwq" in args.datasets else {}
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     summary = defaultdict(lambda: defaultdict(int))
-    all_summary_rows = {}
+    all_summary_rows = {"split": args.split, "datasets": {}}
 
     for dataset_name in args.datasets:
         dataset_path = paths[dataset_name]
@@ -458,7 +539,14 @@ def main():
             raise FileNotFoundError(dataset_path)
 
         rows = []
-        for index, record in enumerate(iter_dataset_records(dataset_name, dataset_path)):
+        for index, record in enumerate(
+            iter_dataset_records(
+                dataset_name,
+                dataset_path,
+                split=args.split,
+                entity_answer_map=cwq_entity_answer_map if dataset_name == "cwq" else None,
+            )
+        ):
             if args.limit >= 0 and index >= args.limit:
                 break
             row = check_record(record, args.max_paths_per_example)
@@ -467,14 +555,14 @@ def main():
             if (index + 1) % 100 == 0:
                 print(f"[{dataset_name}] checked {index + 1} examples", file=sys.stderr)
 
-        detail_path = os.path.join(args.output_dir, f"{dataset_name}_gold_path_reachability.jsonl")
+        detail_path = os.path.join(output_dir, f"{dataset_name}_gold_path_reachability.jsonl")
         write_jsonl(detail_path, rows)
         print(f"[{dataset_name}] wrote details: {detail_path}")
 
     for dataset_name in args.datasets:
         item = summary[dataset_name]
         total = item["total"]
-        all_summary_rows[dataset_name] = {
+        all_summary_rows["datasets"][dataset_name] = {
             "total": total,
             "reachable": item["reachable"],
             "reachable_rate": (item["reachable"] / total) if total else 0.0,
@@ -485,13 +573,13 @@ def main():
             "gold_sparql_hits_answer": item["gold_sparql_hits_answer"],
             "gold_sparql_hit_rate": (item["gold_sparql_hits_answer"] / total) if total else 0.0,
             "gold_sparql_error": item["gold_sparql_error"],
-            "no_entity_answer": item["no_entity_answer"],
-            "no_topic_entity": item["no_topic_entity"],
-            "no_path_extracted": item["no_path_extracted"],
-            "unreachable": item["unreachable"],
+            "no_entity_answer": item["status_no_entity_answer"],
+            "no_topic_entity": item["status_no_topic_entity"],
+            "no_path_extracted": item["status_no_path_extracted"],
+            "unreachable": item["status_unreachable"],
         }
 
-    summary_json = os.path.join(args.output_dir, "summary.json")
+    summary_json = os.path.join(output_dir, "summary.json")
     with open(summary_json, "w", encoding="utf-8") as f:
         json.dump(all_summary_rows, f, ensure_ascii=False, indent=4)
 

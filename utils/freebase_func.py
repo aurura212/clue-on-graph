@@ -13,11 +13,11 @@ def require_sparqlwrapper():
 SPARQLPATH = "http://127.0.0.1:8890/sparql"  # depend on your own internal address and port, shown in Freebase readme.md
 
 # pre-defined sparqls
-sparql_head_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  ns:%s ?relation ?x .\n}"""
-sparql_tail_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  ?x ?relation ns:%s .\n}"""
+sparql_head_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?relation\nWHERE {\n  ns:%s ?relation ?x .\n}"""
+sparql_tail_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?relation\nWHERE {\n  ?x ?relation ns:%s .\n}"""
 
-sparql_head_relations_literal = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  %s ?relation ?x .\n}"""
-sparql_tail_relations_literal = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  ?x ?relation %s .\n}"""
+sparql_head_relations_literal = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?relation\nWHERE {\n  %s ?relation ?x .\n}"""
+sparql_tail_relations_literal = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?relation\nWHERE {\n  ?x ?relation %s .\n}"""
 
 sparql_head_relations_values = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?tail\nWHERE {\n  %s %s ?tail .\n}"""
 sparql_tail_relations_values = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  ?x ?relation %s .\n}"""
@@ -41,10 +41,8 @@ def abandon_rels(relation):
 def type_search(mid):
     SPARQLWrapper, JSON = require_sparqlwrapper()
     sparql = SPARQLWrapper(SPARQLPATH)
-    query = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?relation\nWHERE {\n  ns:%s ?relation ?x .\n}"""
     type_list = []
-    #domain_list = []
-    sparql.setQuery(query%mid)
+    sparql.setQuery(sparql_head_relations % mid)
     sparql.setReturnFormat(JSON)
     results = sparql.queryAndConvert()
     #print(len(results["results"]["bindings"]))

@@ -18,7 +18,6 @@ from config import *
 from kg_instantiation import *
 import tiktoken
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 DEFAULT_OPENAI_API_BASE = "https://cn2us02.opapi.win/v1"
 PROMPT_PATH = "src/prompt_md"
 enc_model = SentenceTransformer("./all-MiniLM-L6-v2")

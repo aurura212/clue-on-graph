@@ -9,7 +9,7 @@ from sentence_transformers import util, SentenceTransformer
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from utils.freebase_func import *
-from utils.llm_api import get_chat_completion_extra_kwargs, is_openai_compatible_engine
+from utils.llm_api import is_openai_compatible_engine, chat_completion
 import time
 
 
@@ -50,42 +50,31 @@ def get_openai_embedding(input_message, openai_api_keys, model):
 
 
 def run_llm(prompt, temperature, max_tokens, llm_calls, openai_api_keys=None, llm_model=None, llm_tokenizer=None, pipe=None, engine="gpt-3.5-turbo"):
-    client = None
     print("engine:", engine)
     f = 0
     result = ''
-    if is_openai_compatible_engine(engine):
-        import openai
-
-        messages = []
-        message_prompt = {"role":"user","content":prompt}
-        messages.append(message_prompt)
-        api_key = os.getenv("OPENAI_KEY", default=openai_api_keys)
-        base_url = os.environ.get("OPENAI_API_BASE")
-        client = openai.OpenAI(api_key=api_key, base_url=base_url)
-    elif pipe == None:
-        model = llm_model
-        tokenizer = llm_tokenizer
-    else:
-        pipeline = pipe
+    messages = [{"role": "user", "content": prompt}]
+    api_key = os.getenv("OPENAI_KEY", default=openai_api_keys)
+    base_url = os.environ.get("OPENAI_API_BASE")
+    if not is_openai_compatible_engine(engine):
+        if pipe == None:
+            model = llm_model
+            tokenizer = llm_tokenizer
+        else:
+            pipeline = pipe
     while(f <= 5):
         try:
             if is_openai_compatible_engine(engine):
-                completion_kwargs = {
-                    "model": engine,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "frequency_penalty": 0,
-                    "presence_penalty": 0,
-                }
-                completion_kwargs.update(get_chat_completion_extra_kwargs(engine))
-                response = client.chat.completions.create(**completion_kwargs)
-                result = response.choices[0].message.content.strip()
+                result = chat_completion(
+                    api_key=api_key,
+                    base_url=base_url,
+                    engine=engine,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
                 llm_calls += 1
             elif pipe == None:
-                messages = [{"role": "user", "content": prompt}]
-                
                 text = tokenizer.apply_chat_template(
                     messages,
                     tokenize=False,
