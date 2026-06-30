@@ -11,6 +11,7 @@ from reference_utils import (
 )
 from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
 from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
+from eval_run import run_post_test_evaluation
 from relation_memory import (
     TrainRelationMemoryBuffer,
     append_train_relation_memories,
@@ -327,6 +328,7 @@ if __name__ == '__main__':
                 print(f"Remaining after skipping processed: {len(datas)}")
                 if len(datas) == 0:
                     print("All questions have been processed.")
+                    run_post_test_evaluation(args, run_output)
                     break
             #datas = datas[994:]
             #datas = repeat_unanswer(args.dataset, datas, question_string, args.LLM_type)
@@ -611,6 +613,8 @@ if __name__ == '__main__':
                     save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                 '''except:
                     continue'''
+            run_post_test_evaluation(args, run_output)
+            break
         except:
             print("Error occurred, retrying...")
             time.sleep(5)
