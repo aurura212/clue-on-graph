@@ -10,13 +10,13 @@ from reference_utils import (
     set_current_reference_context,
 )
 from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
-from output_paths import init_run_output, load_processed_questions, get_current_run
+from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
 from relation_memory import (
-    append_relation_memory,
+    TrainRelationMemoryBuffer,
+    append_train_relation_memories,
+    count_relation_memory_labels,
     load_relation_memory,
     load_webqsp_train_episodes,
-    make_memory_item,
-    normalize_entity_label,
 )
 import os
 import pprint
@@ -73,9 +73,9 @@ def add_relation_memory_args(parser):
     parser.add_argument("--relation_memory_stages", type=str,
                         default="relation", help="Stages for relation memory: relation,memory,reasoning,answer,all,none.")
     parser.add_argument("--relation_memory_path", type=str,
-                        default="", help="Path to relation memory JSONL for test mode.")
+                        default="", help="Path to relation memory JSONL for test mode (under PoG/relation_memory/ by default).")
     parser.add_argument("--relation_memory_output_path", type=str,
-                        default="", help="Path to write relation memory JSONL in train mode.")
+                        default="", help="Path to write relation memory JSONL in train mode (defaults to PoG/relation_memory/).")
     parser.add_argument("--relation_memory_top_k", type=int,
                         default=4, help="Top-k relation memories to inject.")
     parser.add_argument("--memory_retrieval_strategy", type=str, choices=["question", "state", "hybrid"],
@@ -92,16 +92,14 @@ def add_relation_memory_args(parser):
                         default=50, help="Max gold frontier entities retained during train traversal.")
     parser.add_argument("--write_missed_positive", type=int,
                         default=1, help="Write missed_positive memory items when gold relation is in candidates but not selected.")
+    parser.add_argument("--relation_semantic_top_k", type=int,
+                        default=20, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value.")
 
 
 def resolve_split(args):
     if args.split:
         return args.split
     return "train" if args.run_mode == "train" else "test"
-
-
-def default_relation_memory_output_path(run_output):
-    return os.path.join(run_output["run_dir"], "relation_memory.jsonl")
 
 
 def execute_gold_step(entity_ids, relation, frontier_limit):
@@ -124,7 +122,10 @@ def run_relation_memory_train(args, run_output, model):
     episodes = select_questions(episodes, "RawQuestion", args.start, args.limit, args.question.strip())
     print(f"Selected train episodes: {len(episodes)} / {total_in_dataset}")
 
-    memory_output_path = args.relation_memory_output_path.strip() or default_relation_memory_output_path(run_output)
+    memory_output_path = args.relation_memory_output_path.strip() or default_relation_memory_output_path(
+        args,
+        len(episodes),
+    )
     print(f"Writing relation memory to: {memory_output_path}")
 
     for episode in tqdm(episodes):
@@ -148,6 +149,7 @@ def run_relation_memory_train(args, run_output, model):
                 break
 
             next_frontier = execute_gold_step(current_frontier, gold_relation, args.gold_frontier_limit)
+            hop_buffer = TrainRelationMemoryBuffer()
             for entity_id in current_frontier:
                 entity_name = entid_name.get(entity_id)
                 if not entity_name:
@@ -172,48 +174,26 @@ def run_relation_memory_train(args, run_output, model):
                     print(f"relation_search_prune failed in train mode: {exc}")
                     continue
 
-                candidate_relations = rel_trace.get("candidate_relations_sent_to_llm", [])
+                candidate_relations = rel_trace.get("candidate_relations", [])
+                retrieved_relations = rel_trace.get("retrieved_relations", [])
                 selected_relations = rel_trace.get("selected_relations", [])
-                selected_relation_names = {item.get("relation") for item in selected_relations}
-                gold_in_candidates = gold_relation in candidate_relations
+                append_train_relation_memories(
+                    hop_buffer,
+                    episode=episode,
+                    depth=depth,
+                    entity_id=entity_id,
+                    entity_name=entity_name,
+                    incoming_relation=incoming_relation,
+                    previous_relations=previous_relations,
+                    gold_relation=gold_relation,
+                    candidate_relations=candidate_relations,
+                    retrieved_relations=retrieved_relations,
+                    selected_relations=selected_relations,
+                    llm_raw_output=rel_trace.get("llm_raw_output", ""),
+                    write_missed_positive=bool(args.write_missed_positive),
+                )
 
-                for selected in selected_relations:
-                    relation = selected.get("relation", "")
-                    label = "positive" if relation == gold_relation else "negative"
-                    item = make_memory_item(
-                        episode=episode,
-                        depth=depth,
-                        entity_id=entity_id,
-                        entity_name=entity_name,
-                        incoming_relation=incoming_relation,
-                        previous_relations=previous_relations,
-                        candidate_relation=relation,
-                        gold_relation=gold_relation,
-                        label=label,
-                        selected_by_model=True,
-                        gold_relation_in_candidates=gold_in_candidates,
-                        candidate_relations=candidate_relations,
-                        llm_raw_output=rel_trace.get("llm_raw_output", ""),
-                    )
-                    append_relation_memory(memory_output_path, item)
-
-                if args.write_missed_positive and gold_in_candidates and gold_relation not in selected_relation_names:
-                    item = make_memory_item(
-                        episode=episode,
-                        depth=depth,
-                        entity_id=entity_id,
-                        entity_name=entity_name,
-                        incoming_relation=incoming_relation,
-                        previous_relations=previous_relations,
-                        candidate_relation=gold_relation,
-                        gold_relation=gold_relation,
-                        label="missed_positive",
-                        selected_by_model=False,
-                        gold_relation_in_candidates=True,
-                        candidate_relations=candidate_relations,
-                        llm_raw_output=rel_trace.get("llm_raw_output", ""),
-                    )
-                    append_relation_memory(memory_output_path, item)
+            hop_buffer.flush(memory_output_path)
 
             for entity_id in next_frontier:
                 if entity_id not in entid_name:
@@ -222,6 +202,20 @@ def run_relation_memory_train(args, run_output, model):
             previous_relations.append(gold_relation)
             incoming_relation = gold_relation
 
+    label_counts = count_relation_memory_labels(memory_output_path)
+    update_run_meta(
+        {
+            "relation_memory_output_path": memory_output_path,
+            "relation_memory_label_counts": label_counts,
+        }
+    )
+    print(
+        "Relation memory label counts: "
+        f"positive={label_counts['positive']}, "
+        f"missed_positive={label_counts['missed_positive']}, "
+        f"negative={label_counts['negative']}, "
+        f"total={label_counts['total']}"
+    )
     print("Relation memory training finished.")
 
 if __name__ == '__main__':
@@ -295,7 +289,10 @@ if __name__ == '__main__':
                     resume_dir=args.run_dir.strip() or None,
                 )
                 if not args.relation_memory_output_path.strip():
-                    args.relation_memory_output_path = default_relation_memory_output_path(run_output)
+                    args.relation_memory_output_path = default_relation_memory_output_path(
+                        args,
+                        planned_question_count,
+                    )
                 if not os.path.exists(args.relation_memory_output_path):
                     os.makedirs(os.path.dirname(os.path.abspath(args.relation_memory_output_path)), exist_ok=True)
                 model = SentenceTransformer('../msmarco-distilbert-base-tas-b')

@@ -79,6 +79,18 @@ def select_relations(string, entity_id, head_relations, tail_relations):
 
 
 
+def semantic_filter_relations(question, total_relations, args, top_k=None):
+    """Rank relations by semantic similarity to the question and keep top-k."""
+    model = getattr(args, "sentence_model", None)
+    if model is None or not total_relations:
+        return list(total_relations)
+    if top_k is None:
+        top_k = int(getattr(args, "relation_semantic_top_k", 20))
+    limit = min(max(1, top_k), len(total_relations))
+    ranked, _ = retrieve_top_docs(question, total_relations, model, width=limit)
+    return ranked
+
+
 def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args):
     prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
     prompt = maybe_prepend_reference_context(prompt, args, stage="relation")
@@ -103,7 +115,7 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     sparql_relations_extract_head = sparql_head_relations % (entity_id)
     head_relations = execurte_sparql(sparql_relations_extract_head)
     head_relations = replace_relation_prefix(head_relations)
-    
+
     sparql_relations_extract_tail= sparql_tail_relations % (entity_id)
     tail_relations = execurte_sparql(sparql_relations_extract_tail)
     tail_relations = replace_relation_prefix(tail_relations)
@@ -114,7 +126,7 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     if args.remove_unnecessary_rel:
         head_relations = [relation for relation in head_relations if not abandon_rels(relation)]
         tail_relations = [relation for relation in tail_relations if not abandon_rels(relation)]
-    
+
     if pre_head:
         tail_relations = list(set(tail_relations) - set(pre_relations))
     else:
@@ -124,9 +136,13 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     tail_relations = list(set(tail_relations))
     total_relations = head_relations+tail_relations
     total_relations.sort()  # make sure the order in prompt is always equal
-    
 
-    prompt = construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args)
+    retrieved_relations = total_relations
+    semantic_top_k = int(getattr(args, "relation_semantic_top_k", 20))
+    if len(total_relations) > semantic_top_k:
+        retrieved_relations = semantic_filter_relations(question, total_relations, args, top_k=semantic_top_k)
+
+    prompt = construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, retrieved_relations, args)
     result, token_num = run_llm(prompt, args.temperature_exploration, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     flag, retrieve_relations = select_relations(result, entity_id, head_relations, tail_relations)
 
@@ -135,7 +151,9 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
         "entity_name": entity_name,
         "head_relations_before_filter": sorted(head_relations_raw),
         "tail_relations_before_filter": sorted(tail_relations_raw),
-        "candidate_relations_sent_to_llm": total_relations,
+        "candidate_relations": total_relations,
+        "retrieved_relations": retrieved_relations,
+        "candidate_relations_sent_to_llm": retrieved_relations,
         "selected_relations": [
             {"relation": r["relation"], "head": r["head"]} for r in (retrieve_relations if flag else [])
         ],

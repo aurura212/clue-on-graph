@@ -113,9 +113,27 @@ def load_relation_memory(path: str) -> list[dict[str, Any]]:
     return read_jsonl_file(path)
 
 
-def append_relation_memory(path: str, item: dict[str, Any]) -> None:
+def count_relation_memory_labels(path: str) -> dict[str, int]:
+    counts = {
+        "positive": 0,
+        "missed_positive": 0,
+        "negative": 0,
+        "total": 0,
+    }
+    if not path or not os.path.exists(path):
+        return counts
+    for item in load_relation_memory(path):
+        label = str(item.get("label", "")).strip()
+        if label in counts:
+            counts[label] += 1
+        counts["total"] += 1
+    return counts
+
+
+def append_relation_memory(path: str, item: dict[str, Any], *, for_test: bool = True) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    append_jsonl_record(path, item)
+    record = export_test_memory_item(item) if for_test else dict(item)
+    append_jsonl_record(path, record)
 
 
 def normalize_entity_label(entity_id: str, entity_name: str | None = None) -> tuple[str, str]:
@@ -125,54 +143,178 @@ def normalize_entity_label(entity_id: str, entity_name: str | None = None) -> tu
     return label, "named_entity"
 
 
+def entity_marker(entity_id: str, entity_name: str | None = None) -> str:
+    _, node_type = normalize_entity_label(entity_id, entity_name)
+    if node_type == "cvt_or_unnamed_mid":
+        return entity_id
+    label = str(entity_name or "").strip()
+    return label or entity_id
+
+
+def get_entity_labels(item: dict[str, Any]) -> list[str]:
+    if "entity_labels" in item:
+        labels = item.get("entity_labels") or []
+        return [str(label).strip() for label in labels if str(label).strip()]
+    legacy_label = str(item.get("entity_label", "")).strip()
+    legacy_id = str(item.get("entity_id", "")).strip()
+    if legacy_label == CVT_LABEL and legacy_id:
+        return [legacy_id]
+    if legacy_label:
+        return [legacy_label]
+    if legacy_id:
+        return [legacy_id]
+    return []
+
+
 def build_question_key(question: str, topic_entity: dict[str, str] | None = None) -> str:
     return mask_question_with_entities(question, topic_entity or {})
 
 
+def get_picked_relations(item: dict[str, Any]) -> list[str]:
+    value = item.get("picked_relations")
+    if value is None:
+        value = item.get("candidate_relation", [])
+    if isinstance(value, list):
+        return [str(relation).strip() for relation in value if str(relation).strip()]
+    relation = str(value or "").strip()
+    return [relation] if relation else []
+
+
+def format_picked_relations(picked_relations: str | list[str] | None) -> str:
+    relations = picked_relations if isinstance(picked_relations, list) else get_picked_relations({"picked_relations": picked_relations})
+    return "; ".join(relations) or "UNKNOWN"
+
+
+def memory_matches_candidate_set(picked_relations: Any, candidate_set: set[str]) -> bool:
+    relations = picked_relations if isinstance(picked_relations, list) else get_picked_relations({"picked_relations": picked_relations})
+    return any(relation in candidate_set for relation in relations)
+
+
 def build_state_key(
     depth: int,
-    node_type: str,
     incoming_relation: str,
     previous_relations: list[str],
-    candidate_relation: str = "",
+    picked_relations: list[str] | None = None,
     candidate_relations: list[str] | None = None,
+    entity_labels: list[str] | None = None,
+    include_candidate_relations: bool = True,
 ) -> str:
-    relation_sample = "; ".join((candidate_relations or [])[:20])
-    return (
-        f"Depth: {depth}; "
-        f"Node type: {node_type}; "
-        f"Incoming relation: {incoming_relation or 'NONE'}; "
-        f"Previous relations: {' -> '.join(previous_relations) if previous_relations else 'NONE'}; "
-        f"Candidate relation: {candidate_relation or 'UNKNOWN'}; "
-        f"Candidate relations: {relation_sample}"
+    entity_sample = "; ".join((entity_labels or [])[:20])
+    parts = [
+        f"Depth: {depth}",
+        f"Entities: {entity_sample or 'UNKNOWN'}",
+        f"Incoming relation: {incoming_relation or 'NONE'}",
+        f"Previous relations: {' -> '.join(previous_relations) if previous_relations else 'NONE'}",
+        f"Picked relations: {format_picked_relations(picked_relations or [])}",
+    ]
+    if include_candidate_relations:
+        relation_sample = "; ".join((candidate_relations or [])[:20])
+        parts.append(f"Candidate relations: {relation_sample}")
+    return "; ".join(parts) + ";"
+
+
+def export_test_memory_item(item: dict[str, Any]) -> dict[str, Any]:
+    exported = dict(item)
+    exported.pop("candidate_relations", None)
+    exported["state_key"] = build_state_key(
+        depth=int(exported.get("depth") or 0),
+        incoming_relation=str(exported.get("incoming_relation") or ""),
+        previous_relations=list(exported.get("previous_relations") or []),
+        picked_relations=get_picked_relations(exported),
+        entity_labels=get_entity_labels(exported),
+        include_candidate_relations=False,
     )
+    return exported
+
+
+def memory_merge_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        item.get("parse_id", ""),
+        item.get("depth"),
+        tuple(item.get("previous_relations") or []),
+        item.get("incoming_relation", ""),
+        tuple(get_picked_relations(item)),
+        item.get("label", ""),
+        item.get("gold_relation", ""),
+    )
+
+
+def merge_memory_items(base: dict[str, Any], other: dict[str, Any]) -> dict[str, Any]:
+    merged_labels = sorted(set(get_entity_labels(base) + get_entity_labels(other)))
+    merged_candidates = sorted(set(base.get("candidate_relations") or []) | set(other.get("candidate_relations") or []))
+    merged_retrieved = sorted(set(base.get("retrieved_relations") or []) | set(other.get("retrieved_relations") or []))
+    base["entity_labels"] = merged_labels
+    base["candidate_relations"] = merged_candidates
+    base["retrieved_relations"] = merged_retrieved
+    base["gold_relation_in_candidates"] = bool(base.get("gold_relation_in_candidates")) or bool(other.get("gold_relation_in_candidates"))
+    base["gold_relation_in_retrieved"] = bool(base.get("gold_relation_in_retrieved")) or bool(other.get("gold_relation_in_retrieved"))
+    base["state_key"] = build_state_key(
+        depth=int(base.get("depth") or 0),
+        incoming_relation=str(base.get("incoming_relation") or ""),
+        previous_relations=list(base.get("previous_relations") or []),
+        picked_relations=get_picked_relations(base),
+        candidate_relations=merged_candidates,
+        entity_labels=merged_labels,
+    )
+    return base
+
+
+class TrainRelationMemoryBuffer:
+    def __init__(self) -> None:
+        self._items: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+    def add(self, item: dict[str, Any]) -> None:
+        key = memory_merge_key(item)
+        if key in self._items:
+            self._items[key] = merge_memory_items(self._items[key], item)
+            return
+        self._items[key] = item
+
+    def flush(self, memory_output_path: str) -> None:
+        if not self._items:
+            return
+
+        items = list(self._items.values())
+        positive_items = [item for item in items if item.get("label") == "positive"]
+        if positive_items:
+            merged = positive_items[0]
+            for item in positive_items[1:]:
+                merged = merge_memory_items(merged, item)
+            append_relation_memory(memory_output_path, merged)
+            self._items.clear()
+            return
+
+        for item in items:
+            append_relation_memory(memory_output_path, item)
+        self._items.clear()
 
 
 def make_memory_item(
     episode: dict[str, Any],
     depth: int,
-    entity_id: str,
-    entity_name: str,
+    entity_labels: list[str],
     incoming_relation: str,
     previous_relations: list[str],
-    candidate_relation: str,
+    picked_relations: list[str],
     gold_relation: str,
     label: str,
     selected_by_model: bool,
     gold_relation_in_candidates: bool,
+    gold_relation_in_retrieved: bool,
     candidate_relations: list[str],
+    retrieved_relations: list[str],
     llm_raw_output: str,
 ) -> dict[str, Any]:
-    entity_label, node_type = normalize_entity_label(entity_id, entity_name)
+    entity_labels = sorted({str(label).strip() for label in entity_labels if str(label).strip()})
     question = episode["RawQuestion"]
     question_key = build_question_key(question, episode.get("topic_entity", {}))
     state_key = build_state_key(
         depth=depth,
-        node_type=node_type,
         incoming_relation=incoming_relation,
         previous_relations=previous_relations,
-        candidate_relation=candidate_relation,
+        picked_relations=picked_relations,
         candidate_relations=candidate_relations,
+        entity_labels=entity_labels,
     )
     return {
         "dataset": episode.get("dataset", "webqsp"),
@@ -182,32 +324,107 @@ def make_memory_item(
         "masked_question": question_key,
         "depth": depth,
         "hop_index": depth - 1,
-        "entity_id": entity_id,
-        "entity_label": entity_label,
-        "node_type": node_type,
+        "entity_labels": entity_labels,
         "incoming_relation": incoming_relation,
         "previous_relations": list(previous_relations),
-        "candidate_relation": candidate_relation,
+        "picked_relations": list(picked_relations),
         "gold_relation": gold_relation,
         "label": label,
         "selected_by_model": selected_by_model,
         "gold_relation_in_candidates": gold_relation_in_candidates,
+        "gold_relation_in_retrieved": gold_relation_in_retrieved,
         "candidate_relations": list(candidate_relations),
+        "retrieved_relations": list(retrieved_relations),
         "question_key": question_key,
         "state_key": state_key,
         "llm_raw_output": llm_raw_output,
     }
 
 
+def append_train_relation_memories(
+    buffer: TrainRelationMemoryBuffer,
+    episode: dict[str, Any],
+    depth: int,
+    entity_id: str,
+    entity_name: str,
+    incoming_relation: str,
+    previous_relations: list[str],
+    gold_relation: str,
+    candidate_relations: list[str],
+    retrieved_relations: list[str],
+    selected_relations: list[dict[str, Any]],
+    llm_raw_output: str,
+    write_missed_positive: bool,
+) -> None:
+    selected_relation_names = sorted(
+        {
+            str(item.get("relation", "")).strip()
+            for item in selected_relations
+            if str(item.get("relation", "")).strip()
+        }
+    )
+    gold_in_candidates = gold_relation in candidate_relations
+    gold_in_retrieved = gold_relation in retrieved_relations
+    gold_selected = gold_relation in selected_relation_names
+    entity_labels = [entity_marker(entity_id, entity_name)]
+
+    if gold_selected:
+        buffer.add(
+            make_memory_item(
+                episode=episode,
+                depth=depth,
+                entity_labels=entity_labels,
+                incoming_relation=incoming_relation,
+                previous_relations=previous_relations,
+                picked_relations=[gold_relation],
+                gold_relation=gold_relation,
+                label="positive",
+                selected_by_model=True,
+                gold_relation_in_candidates=gold_in_candidates,
+                gold_relation_in_retrieved=gold_in_retrieved,
+                candidate_relations=candidate_relations,
+                retrieved_relations=retrieved_relations,
+                llm_raw_output=llm_raw_output,
+            ),
+        )
+        return
+
+    if not selected_relation_names:
+        return
+
+    if gold_in_retrieved and write_missed_positive:
+        label = "missed_positive"
+    else:
+        label = "negative"
+
+    buffer.add(
+        make_memory_item(
+            episode=episode,
+            depth=depth,
+            entity_labels=entity_labels,
+            incoming_relation=incoming_relation,
+            previous_relations=previous_relations,
+            picked_relations=selected_relation_names,
+            gold_relation=gold_relation,
+            label=label,
+            selected_by_model=True,
+            gold_relation_in_candidates=gold_in_candidates,
+            gold_relation_in_retrieved=gold_in_retrieved,
+            candidate_relations=candidate_relations,
+            retrieved_relations=retrieved_relations,
+            llm_raw_output=llm_raw_output,
+        ),
+    )
+
+
 def current_state_key_from_args(args: Any, entity_id: str, entity_name: str, total_relations: list[str]) -> str:
-    _, node_type = normalize_entity_label(entity_id, entity_name)
     return build_state_key(
         depth=int(getattr(args, "current_relation_depth", 0) or 0),
-        node_type=node_type,
         incoming_relation=getattr(args, "current_incoming_relation", "") or "",
         previous_relations=list(getattr(args, "current_previous_relations", []) or []),
-        candidate_relation="",
+        picked_relations=[],
         candidate_relations=total_relations,
+        entity_labels=[entity_marker(entity_id, entity_name)],
     )
 
 
@@ -228,7 +445,7 @@ def relation_memory_context(
     filtered = [
         item for item in memory_bank
         if item.get("label") in labels
-        and item.get("candidate_relation") in candidate_set
+        and memory_matches_candidate_set(get_picked_relations(item), candidate_set)
     ]
     if not filtered:
         return ""
@@ -271,22 +488,22 @@ def relation_memory_context(
         "Use these retrieved training memories as weak relation-selection priors. Each memory keeps its label.",
     ]
     for score, item in selected:
-        shown_relations = (item.get("candidate_relations") or [])[:relation_limit]
+        shown_relations = (item.get("retrieved_relations") or item.get("candidate_relations") or [])[:relation_limit]
         candidate_text = "; ".join(shown_relations)
         block = [
             f"- Label: {item.get('label', '')}",
             f"  Training question: {item.get('question', '')}",
-            f"  Relation: {item.get('candidate_relation', '')}",
+            f"  Entities: {'; '.join(get_entity_labels(item))}",
+            f"  Picked relations: {format_picked_relations(get_picked_relations(item))}",
             (
                 "  State: "
                 f"depth={item.get('depth', '')}; "
-                f"node_type={item.get('node_type', '')}; "
                 f"incoming_relation={item.get('incoming_relation', '')}; "
                 f"previous_relations={item.get('previous_relations', [])}"
             ),
         ]
         if candidate_text:
-            block.append(f"  Candidate relations shown: {candidate_text}")
+            block.append(f"  Retrieved relations shown: {candidate_text}")
         block.append(f"  Retrieval score: {score:.4f}")
         candidate_lines = lines + block
         if estimate_token_count("\n".join(candidate_lines)) > token_budget:

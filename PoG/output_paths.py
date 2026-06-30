@@ -11,6 +11,7 @@ from reference_utils import get_output_file_tag
 from jsonl_io import iter_jsonl_records
 
 RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
+RELATION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relation_memory")
 
 _RUN_OUTPUT: dict[str, Any] | None = None
 
@@ -34,6 +35,22 @@ def _resolve_run_dir(run_dir: str) -> str:
 def build_run_folder_name(config_tag: str, question_count: int, timestamp: str | None = None) -> str:
     ts = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"{config_tag}_n{question_count}_{ts}"
+
+
+def build_relation_memory_filename(
+    config_tag: str,
+    question_count: int,
+    timestamp: str | None = None,
+) -> str:
+    return f"{build_run_folder_name(config_tag, question_count, timestamp)}.jsonl"
+
+
+def default_relation_memory_output_path(args, planned_question_count: int) -> str:
+    os.makedirs(RELATION_MEMORY_ROOT, exist_ok=True)
+    return os.path.join(
+        RELATION_MEMORY_ROOT,
+        build_relation_memory_filename(get_output_file_tag(args), planned_question_count),
+    )
 
 
 def init_run_output(
@@ -87,6 +104,7 @@ def init_run_output(
         "relation_memory_path": getattr(args, "relation_memory_path", ""),
         "relation_memory_output_path": getattr(args, "relation_memory_output_path", ""),
         "memory_retrieval_strategy": getattr(args, "memory_retrieval_strategy", "hybrid"),
+        "relation_semantic_top_k": getattr(args, "relation_semantic_top_k", 20),
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "results_file": "results.jsonl",
         "trace_file": "pog_trace.jsonl",
@@ -98,6 +116,21 @@ def init_run_output(
     _RUN_OUTPUT = run_output
     print(f"PoG run output dir: {run_dir}")
     return run_output
+
+
+def update_run_meta(updates: dict[str, Any]) -> None:
+    run = get_current_run()
+    if not run or not run.get("meta_path"):
+        return
+    meta_path = run["meta_path"]
+    meta: dict[str, Any] = {}
+    if os.path.exists(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+    meta.update(updates)
+    meta["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=4)
 
 
 def load_processed_questions(question_string: str) -> list[str]:
