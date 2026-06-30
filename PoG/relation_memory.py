@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 import re
 from typing import Any
 
@@ -13,6 +14,7 @@ from reference_utils import mask_question_with_entities, read_jsonl_file, resolv
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 WEBQSP_TRAIN_PATH = os.path.join(PROJECT_ROOT, "data", "raw_train_set", "WebQSP.train.json")
 CVT_LABEL = "[CVT_NODE]"
+MEMORY_PROMPT_RELATION_LIMIT = 10
 
 
 def normalize_mid(value: Any) -> str:
@@ -188,6 +190,11 @@ def format_picked_relations(picked_relations: str | list[str] | None) -> str:
 def memory_matches_candidate_set(picked_relations: Any, candidate_set: set[str]) -> bool:
     relations = picked_relations if isinstance(picked_relations, list) else get_picked_relations({"picked_relations": picked_relations})
     return any(relation in candidate_set for relation in relations)
+
+
+def memory_gold_matches_candidate_set(item: dict[str, Any], candidate_set: set[str]) -> bool:
+    gold_relation = str(item.get("gold_relation", "")).strip()
+    return bool(gold_relation and gold_relation in candidate_set)
 
 
 def build_state_key(
@@ -428,6 +435,76 @@ def current_state_key_from_args(args: Any, entity_id: str, entity_name: str, tot
     )
 
 
+def format_relation_output_for_prompt(relations: list[str]) -> str:
+    cleaned = [str(relation).strip() for relation in relations if str(relation).strip()]
+    if not cleaned:
+        return "[]"
+    return "[" + ",".join(repr(relation) for relation in cleaned) + "]"
+
+
+def candidate_relations_for_correct_memory_example(item: dict[str, Any], relation_limit: int) -> list[str]:
+    gold_relation = str(item.get("gold_relation", "")).strip()
+    if not gold_relation:
+        return []
+    relation_limit = MEMORY_PROMPT_RELATION_LIMIT if relation_limit <= 0 else min(relation_limit, MEMORY_PROMPT_RELATION_LIMIT)
+    relation_pool = [
+        str(relation).strip()
+        for relation in (item.get("retrieved_relations") or [])
+        if str(relation).strip()
+    ]
+    if gold_relation not in relation_pool:
+        relation_pool.append(gold_relation)
+
+    seen: set[str] = set()
+    relations: list[str] = []
+    for relation in relation_pool:
+        if relation in seen:
+            continue
+        seen.add(relation)
+        relations.append(relation)
+
+    if len(relations) <= relation_limit:
+        return shuffle_memory_candidate_relations(item, relations)
+
+    limited = relations[:relation_limit]
+    if gold_relation not in limited:
+        limited[-1] = gold_relation
+    return shuffle_memory_candidate_relations(item, limited)
+
+
+def shuffle_memory_candidate_relations(item: dict[str, Any], relations: list[str]) -> list[str]:
+    if len(relations) <= 1:
+        return relations
+    seed_text = "|".join(
+        [
+            str(item.get("question_id", "")),
+            str(item.get("parse_id", "")),
+            str(item.get("question", "")),
+            str(item.get("gold_relation", "")),
+            ";".join(relations),
+        ]
+    )
+    shuffled = list(relations)
+    random.Random(seed_text).shuffle(shuffled)
+    return shuffled
+
+
+def format_memory_example_for_prompt(item: dict[str, Any], relation_limit: int) -> list[str]:
+    gold_relation = str(item.get("gold_relation", "")).strip()
+    shown_relations = candidate_relations_for_correct_memory_example(item, relation_limit)
+    if not gold_relation or gold_relation not in shown_relations:
+        return []
+
+    block = [
+        f"Q: {item.get('question', '')}",
+        f"Topic Entity: {'; '.join(get_entity_labels(item)) or 'UNKNOWN'}",
+        f"Relations: {'; '.join(shown_relations)}",
+        "The output is:",
+        format_relation_output_for_prompt([gold_relation]),
+    ]
+    return block
+
+
 def relation_memory_context(
     memory_bank: list[dict[str, Any]],
     question: str,
@@ -445,7 +522,7 @@ def relation_memory_context(
     filtered = [
         item for item in memory_bank
         if item.get("label") in labels
-        and memory_matches_candidate_set(get_picked_relations(item), candidate_set)
+        and memory_gold_matches_candidate_set(item, candidate_set)
     ]
     if not filtered:
         return ""
@@ -484,32 +561,17 @@ def relation_memory_context(
     relation_limit = max(0, int(getattr(args, "memory_candidate_relation_limit", 8)))
     token_budget = max(1, int(getattr(args, "memory_prompt_token_budget", 600)))
     lines = [
-        "Relation Memory:",
-        "Use these retrieved training memories as weak relation-selection priors. Each memory keeps its label.",
+        "Use these previous relation-selection examples as weak guidance. Follow the current question and current Relations list.",
     ]
-    for score, item in selected:
-        shown_relations = (item.get("retrieved_relations") or item.get("candidate_relations") or [])[:relation_limit]
-        candidate_text = "; ".join(shown_relations)
-        block = [
-            f"- Label: {item.get('label', '')}",
-            f"  Training question: {item.get('question', '')}",
-            f"  Entities: {'; '.join(get_entity_labels(item))}",
-            f"  Picked relations: {format_picked_relations(get_picked_relations(item))}",
-            (
-                "  State: "
-                f"depth={item.get('depth', '')}; "
-                f"incoming_relation={item.get('incoming_relation', '')}; "
-                f"previous_relations={item.get('previous_relations', [])}"
-            ),
-        ]
-        if candidate_text:
-            block.append(f"  Retrieved relations shown: {candidate_text}")
-        block.append(f"  Retrieval score: {score:.4f}")
+    for _score, item in selected:
+        block = format_memory_example_for_prompt(item, relation_limit)
+        if not block:
+            continue
         candidate_lines = lines + block
         if estimate_token_count("\n".join(candidate_lines)) > token_budget:
             break
         lines.extend(block)
-    if len(lines) <= 2:
+    if len(lines) <= 1:
         return ""
     return "\n".join(lines)
 
