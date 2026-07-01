@@ -487,7 +487,7 @@ def append_train_relation_memories(
     write_missed_positive: bool,
     branch_policy: str = DEFAULT_TRAIN_FOLLOWUP_POLICY,
     rng: random.Random | None = None,
-) -> None:
+) -> list[dict[str, Any]]:
     selected_relation_names = sorted(
         {
             str(item.get("relation", "")).strip()
@@ -509,50 +509,15 @@ def append_train_relation_memories(
     )
 
     if gold_selected:
-        buffer.add(
-            make_memory_item(
-                episode=episode,
-                depth=depth,
-                entity_labels=entity_labels,
-                incoming_relation=incoming_relation,
-                previous_relations=previous_relations,
-                picked_relations=[gold_relation],
-                gold_relation=gold_relation,
-                label="positive",
-                selected_by_model=True,
-                gold_relation_in_candidates=gold_in_candidates,
-                gold_relation_in_retrieved=gold_in_retrieved,
-                candidate_relations=candidate_relations,
-                retrieved_relations=retrieved_relations,
-                llm_raw_output=llm_raw_output,
-                branch_policy=normalize_train_followup_policy(branch_policy),
-                branch_type=branch_type,
-                branch_relation=branch_relation,
-                branch_relation_source="gold" if branch_relation == gold_relation else ("sampled_wrong" if branch_relation else ""),
-                should_continue_followup=should_continue_followup,
-                relation_choice_correct=relation_choice_correct,
-            ),
-        )
-        return
-
-    if not selected_relation_names:
-        return
-
-    if gold_in_retrieved and write_missed_positive:
-        label = "missed_positive"
-    else:
-        label = "negative"
-
-    buffer.add(
-        make_memory_item(
+        item = make_memory_item(
             episode=episode,
             depth=depth,
             entity_labels=entity_labels,
             incoming_relation=incoming_relation,
             previous_relations=previous_relations,
-            picked_relations=selected_relation_names,
+            picked_relations=[gold_relation],
             gold_relation=gold_relation,
-            label=label,
+            label="positive",
             selected_by_model=True,
             gold_relation_in_candidates=gold_in_candidates,
             gold_relation_in_retrieved=gold_in_retrieved,
@@ -561,12 +526,46 @@ def append_train_relation_memories(
             llm_raw_output=llm_raw_output,
             branch_policy=normalize_train_followup_policy(branch_policy),
             branch_type=branch_type,
-            branch_relation=selected_relation_names[0] if selected_relation_names else "",
-            branch_relation_source="model_wrong",
+            branch_relation=branch_relation,
+            branch_relation_source="gold" if branch_relation == gold_relation else ("sampled_wrong" if branch_relation else ""),
             should_continue_followup=should_continue_followup,
             relation_choice_correct=relation_choice_correct,
-        ),
+        )
+        buffer.add(item)
+        return [item]
+
+    if not selected_relation_names:
+        return []
+
+    if gold_in_retrieved and write_missed_positive:
+        label = "missed_positive"
+    else:
+        label = "negative"
+
+    item = make_memory_item(
+        episode=episode,
+        depth=depth,
+        entity_labels=entity_labels,
+        incoming_relation=incoming_relation,
+        previous_relations=previous_relations,
+        picked_relations=selected_relation_names,
+        gold_relation=gold_relation,
+        label=label,
+        selected_by_model=True,
+        gold_relation_in_candidates=gold_in_candidates,
+        gold_relation_in_retrieved=gold_in_retrieved,
+        candidate_relations=candidate_relations,
+        retrieved_relations=retrieved_relations,
+        llm_raw_output=llm_raw_output,
+        branch_policy=normalize_train_followup_policy(branch_policy),
+        branch_type=branch_type,
+        branch_relation=selected_relation_names[0] if selected_relation_names else "",
+        branch_relation_source="model_wrong",
+        should_continue_followup=should_continue_followup,
+        relation_choice_correct=relation_choice_correct,
     )
+    buffer.add(item)
+    return [item]
 
 
 def current_state_key_from_args(args: Any, entity_id: str, entity_name: str, total_relations: list[str]) -> str:
