@@ -10,17 +10,31 @@ from reference_utils import (
     set_current_reference_context,
 )
 from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
-from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
+from output_paths import (
+    init_run_output,
+    load_processed_questions,
+    get_current_run,
+    build_memory_output_path,
+    default_relation_memory_output_path,
+    default_experience_memory_output_path,
+    update_run_meta,
+)
 from eval_run import run_post_test_evaluation
 from relation_memory import (
     TrainRelationMemoryBuffer,
     append_train_relation_memories,
     count_relation_memory_labels,
+    count_branch_types,
     load_relation_memory,
     load_webqsp_train_episodes,
+    normalize_train_followup_policy,
+    normalize_experience_memory_type,
+    make_experience_memory_item,
+    append_experience_memory,
 )
 import os
 import pprint
+import random
 
 # os.environ['OPENAI_API_BASE'] = "https://cn2us02.opapi.win/v1"
 
@@ -77,6 +91,25 @@ def add_relation_memory_args(parser):
                         default="", help="Path to relation memory JSONL for test mode (under PoG/relation_memory/ by default).")
     parser.add_argument("--relation_memory_output_path", type=str,
                         default="", help="Path to write relation memory JSONL in train mode (defaults to PoG/relation_memory/).")
+    parser.add_argument("--relation_memory_type", type=str,
+                        default="relation_choice",
+                        help="Subdirectory name under PoG/relation_memory/ for train memory output.")
+    parser.add_argument("--train_memory_family", type=str,
+                        choices=["relation_choice", "experience"],
+                        default="relation_choice",
+                        help="Which memory family to build in train mode.")
+    parser.add_argument("--evidence_state_memory_output_path", type=str,
+                        default="", help="Path to write evidence_state memory JSONL in train mode.")
+    parser.add_argument("--failure_reflection_memory_output_path", type=str,
+                        default="", help="Path to write failure_reflection memory JSONL in train mode.")
+    parser.add_argument("--correction_action_memory_output_path", type=str,
+                        default="", help="Path to write correction_action memory JSONL in train mode.")
+    parser.add_argument("--evidence_state_memory_path", type=str,
+                        default="", help="Path to evidence_state memory JSONL in test mode.")
+    parser.add_argument("--failure_reflection_memory_path", type=str,
+                        default="", help="Path to failure_reflection memory JSONL in test mode.")
+    parser.add_argument("--correction_action_memory_path", type=str,
+                        default="", help="Path to correction_action memory JSONL in test mode.")
     parser.add_argument("--relation_memory_top_k", type=int,
                         default=4, help="Top-k relation memories to inject.")
     parser.add_argument("--memory_retrieval_strategy", type=str, choices=["question", "state", "hybrid"],
@@ -95,6 +128,10 @@ def add_relation_memory_args(parser):
                         default=1, help="Write missed_positive memory items when gold relation is in candidates but not selected.")
     parser.add_argument("--relation_semantic_top_k", type=int,
                         default=20, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value.")
+    parser.add_argument("--train_followup_policy", type=str,
+                        default="stop_if_correct",
+                        choices=["stop_if_correct", "coin_flip_correct_or_wrong"],
+                        help="Training-time gate after relation_choice is correct.")
 
 
 def resolve_split(args):
@@ -118,14 +155,18 @@ def run_relation_memory_train(args, run_output, model):
     if args.dataset.lower() != "webqsp":
         raise ValueError("relation memory train mode currently supports only --dataset webqsp")
 
+    branch_policy = normalize_train_followup_policy(getattr(args, "train_followup_policy", "stop_if_correct"))
+
     episodes = load_webqsp_train_episodes()
     total_in_dataset = len(episodes)
     episodes = select_questions(episodes, "RawQuestion", args.start, args.limit, args.question.strip())
     print(f"Selected train episodes: {len(episodes)} / {total_in_dataset}")
 
-    memory_output_path = args.relation_memory_output_path.strip() or default_relation_memory_output_path(
+    memory_type = str(getattr(args, "relation_memory_type", "relation_choice") or "relation_choice").strip()
+    memory_output_path = args.relation_memory_output_path.strip() or build_memory_output_path(
         args,
         len(episodes),
+        memory_type=memory_type,
     )
     print(f"Writing relation memory to: {memory_output_path}")
 
@@ -192,6 +233,8 @@ def run_relation_memory_train(args, run_output, model):
                     selected_relations=selected_relations,
                     llm_raw_output=rel_trace.get("llm_raw_output", ""),
                     write_missed_positive=bool(args.write_missed_positive),
+                    branch_policy=branch_policy,
+                    rng=random,
                 )
 
             hop_buffer.flush(memory_output_path)
@@ -204,10 +247,14 @@ def run_relation_memory_train(args, run_output, model):
             incoming_relation = gold_relation
 
     label_counts = count_relation_memory_labels(memory_output_path)
+    branch_counts = count_branch_types(memory_output_path)
     update_run_meta(
         {
             "relation_memory_output_path": memory_output_path,
+            "relation_memory_type": memory_type,
             "relation_memory_label_counts": label_counts,
+            "train_followup_policy": branch_policy,
+            "relation_memory_branch_counts": branch_counts,
         }
     )
     print(
@@ -217,7 +264,225 @@ def run_relation_memory_train(args, run_output, model):
         f"negative={label_counts['negative']}, "
         f"total={label_counts['total']}"
     )
+    print(
+        "Relation memory branch counts: "
+        f"gold_branch={branch_counts.get('gold_branch', 0)}, "
+        f"synthetic_wrong_branch={branch_counts.get('synthetic_wrong_branch', 0)}, "
+        f"real_wrong_branch={branch_counts.get('real_wrong_branch', 0)}, "
+        f"fallback_gold_branch={branch_counts.get('fallback_gold_branch', 0)}, "
+        f"total={branch_counts.get('total', 0)}"
+    )
     print("Relation memory training finished.")
+
+
+def _resolve_memory_path(args, planned_question_count, memory_type):
+    return args.relation_memory_output_path.strip() or build_memory_output_path(
+        args,
+        planned_question_count,
+        memory_type=memory_type,
+    )
+
+
+def _serialize_work_memory(memory_items):
+    if not memory_items:
+        return "{}"
+    try:
+        import json
+
+        return json.dumps(memory_items, ensure_ascii=False, indent=4)
+    except Exception:
+        return str(memory_items)
+
+
+def _load_experience_memory_bank(args):
+    banks = {
+        "evidence_state": [],
+        "failure_reflection": [],
+        "correction_action": [],
+    }
+    if args.evidence_state_memory_path.strip():
+        banks["evidence_state"] = load_relation_memory(args.evidence_state_memory_path.strip())
+    if args.failure_reflection_memory_path.strip():
+        banks["failure_reflection"] = load_relation_memory(args.failure_reflection_memory_path.strip())
+    if args.correction_action_memory_path.strip():
+        banks["correction_action"] = load_relation_memory(args.correction_action_memory_path.strip())
+    return banks
+
+
+def run_experience_memory_train(args, run_output, model):
+    if args.dataset.lower() != "webqsp":
+        raise ValueError("experience memory train mode currently supports only --dataset webqsp")
+
+    episodes = load_webqsp_train_episodes()
+    total_in_dataset = len(episodes)
+    episodes = select_questions(episodes, "RawQuestion", args.start, args.limit, args.question.strip())
+    print(f"Selected train episodes: {len(episodes)} / {total_in_dataset}")
+
+    evidence_path = args.evidence_state_memory_output_path.strip() or default_experience_memory_output_path(
+        args,
+        len(episodes),
+        "evidence_state",
+    )
+    failure_path = args.failure_reflection_memory_output_path.strip() or default_experience_memory_output_path(
+        args,
+        len(episodes),
+        "failure_reflection",
+    )
+    correction_path = args.correction_action_memory_output_path.strip() or default_experience_memory_output_path(
+        args,
+        len(episodes),
+        "correction_action",
+    )
+    print(f"Writing evidence_state memory to: {evidence_path}")
+    print(f"Writing failure_reflection memory to: {failure_path}")
+    print(f"Writing correction_action memory to: {correction_path}")
+
+    for episode in tqdm(episodes):
+        question = episode["RawQuestion"]
+        topic_entity = dict(episode["topic_entity"])
+        gold_path = list(episode["gold_relation_path"])
+        sub_questions = "[]"
+        current_frontier = sorted(topic_entity.keys())
+        entid_name = dict(topic_entity)
+        previous_relations = []
+        incoming_relation = ""
+
+        setattr(args, "current_topic_entity", topic_entity)
+        setattr(args, "relation_memory_bank", [])
+        setattr(args, "sentence_model", model)
+
+        for hop_index, gold_relation in enumerate(gold_path):
+            depth = hop_index + 1
+            if not current_frontier:
+                break
+
+            next_frontier = execute_gold_step(current_frontier, gold_relation, args.gold_frontier_limit)
+            hop_buffer = []
+            for entity_id in current_frontier:
+                entity_name = entid_name.get(entity_id) or id2entity_name_or_type(entity_id)
+                entid_name[entity_id] = entity_name
+                setattr(args, "current_relation_depth", depth)
+                setattr(args, "current_incoming_relation", incoming_relation)
+                setattr(args, "current_previous_relations", list(previous_relations))
+
+                try:
+                    retrieve_relations, _token_num, rel_trace = relation_search_prune(
+                        entity_id,
+                        sub_questions,
+                        entity_name,
+                        [],
+                        -1,
+                        question,
+                        args,
+                    )
+                except Exception as exc:
+                    print(f"relation_search_prune failed in experience memory train mode: {exc}")
+                    continue
+
+                if not retrieve_relations:
+                    continue
+
+                candidate_relations = rel_trace.get("candidate_relations", [])
+                retrieved_relations = rel_trace.get("retrieved_relations", [])
+                selected_relations = rel_trace.get("selected_relations", [])
+                selected_relation_names = [
+                    str(item.get("relation", "")).strip()
+                    for item in selected_relations
+                    if str(item.get("relation", "")).strip()
+                ]
+                if not selected_relation_names:
+                    continue
+
+                work_memory = _serialize_work_memory(
+                    [
+                        {
+                            "depth": depth,
+                            "incoming_relation": incoming_relation,
+                            "previous_relations": list(previous_relations),
+                            "retrieved_relations": retrieved_relations,
+                            "selected_relations": selected_relation_names,
+                        }
+                    ]
+                )
+                knowledge_triplets = "; ".join(candidate_relations[:20])
+                entity_labels = [entity_name]
+
+                evidence_item = make_experience_memory_item(
+                    episode=episode,
+                    depth=depth,
+                    memory_type="evidence_state",
+                    entity_labels=entity_labels,
+                    incoming_relation=incoming_relation,
+                    previous_relations=previous_relations,
+                    memory_text=(
+                        f"Selected relations support the current path: {', '.join(selected_relation_names)}"
+                    ),
+                    work_memory=work_memory,
+                    knowledge_triplets=knowledge_triplets,
+                )
+                append_experience_memory(evidence_path, evidence_item)
+                hop_buffer.append(evidence_item)
+
+                if gold_relation in selected_relation_names:
+                    previous_relations.append(gold_relation)
+                    incoming_relation = gold_relation
+                    continue
+
+                failure_item = make_experience_memory_item(
+                    episode=episode,
+                    depth=depth,
+                    memory_type="failure_reflection",
+                    entity_labels=entity_labels,
+                    incoming_relation=incoming_relation,
+                    previous_relations=previous_relations,
+                    memory_text=(
+                        f"The selected relation missed the gold relation {gold_relation}."
+                    ),
+                    work_memory=work_memory,
+                    knowledge_triplets=knowledge_triplets,
+                    extra_fields={
+                        "failure_cause": "gold_relation_not_selected",
+                        "gold_relation": gold_relation,
+                    },
+                )
+                append_experience_memory(failure_path, failure_item)
+
+                correction_item = make_experience_memory_item(
+                    episode=episode,
+                    depth=depth,
+                    memory_type="correction_action",
+                    entity_labels=entity_labels,
+                    incoming_relation=incoming_relation,
+                    previous_relations=previous_relations,
+                    memory_text=(
+                        f"Correct the relation choice to include {gold_relation} and continue retrieval."
+                    ),
+                    work_memory=work_memory,
+                    knowledge_triplets=knowledge_triplets,
+                    extra_fields={
+                        "correction_trigger": "relation_choice_failure",
+                        "gold_relation": gold_relation,
+                        "selected_relations": selected_relation_names,
+                    },
+                )
+                append_experience_memory(correction_path, correction_item)
+
+            for entity_id in next_frontier:
+                if entity_id not in entid_name:
+                    entid_name[entity_id] = id2entity_name_or_type(entity_id)
+            current_frontier = next_frontier
+            previous_relations.append(gold_relation)
+            incoming_relation = gold_relation
+
+    update_run_meta(
+        {
+            "evidence_state_memory_output_path": evidence_path,
+            "failure_reflection_memory_output_path": failure_path,
+            "correction_action_memory_output_path": correction_path,
+            "experience_memory_types": ["evidence_state", "failure_reflection", "correction_action"],
+        }
+    )
+    print("Experience memory training finished.")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -275,7 +540,6 @@ if __name__ == '__main__':
             args.split = split
             if args.run_mode == "train":
                 train_episodes = load_webqsp_train_episodes()
-                total_in_dataset = len(train_episodes)
                 selected_train_episodes = select_questions(
                     train_episodes,
                     "RawQuestion",
@@ -289,15 +553,37 @@ if __name__ == '__main__':
                     planned_question_count=planned_question_count,
                     resume_dir=args.run_dir.strip() or None,
                 )
-                if not args.relation_memory_output_path.strip():
-                    args.relation_memory_output_path = default_relation_memory_output_path(
-                        args,
-                        planned_question_count,
-                    )
-                if not os.path.exists(args.relation_memory_output_path):
-                    os.makedirs(os.path.dirname(os.path.abspath(args.relation_memory_output_path)), exist_ok=True)
                 model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
-                run_relation_memory_train(args, run_output, model)
+                if getattr(args, "train_memory_family", "relation_choice") == "experience":
+                    if not args.evidence_state_memory_output_path.strip():
+                        args.evidence_state_memory_output_path = default_experience_memory_output_path(
+                            args, planned_question_count, "evidence_state"
+                        )
+                    if not args.failure_reflection_memory_output_path.strip():
+                        args.failure_reflection_memory_output_path = default_experience_memory_output_path(
+                            args, planned_question_count, "failure_reflection"
+                        )
+                    if not args.correction_action_memory_output_path.strip():
+                        args.correction_action_memory_output_path = default_experience_memory_output_path(
+                            args, planned_question_count, "correction_action"
+                        )
+                    for path in [
+                        args.evidence_state_memory_output_path,
+                        args.failure_reflection_memory_output_path,
+                        args.correction_action_memory_output_path,
+                    ]:
+                        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+                    run_experience_memory_train(args, run_output, model)
+                else:
+                    if not args.relation_memory_output_path.strip():
+                        args.relation_memory_output_path = build_memory_output_path(
+                            args,
+                            planned_question_count,
+                            memory_type=str(getattr(args, "relation_memory_type", "relation_choice") or "relation_choice").strip(),
+                        )
+                    if not os.path.exists(args.relation_memory_output_path):
+                        os.makedirs(os.path.dirname(os.path.abspath(args.relation_memory_output_path)), exist_ok=True)
+                    run_relation_memory_train(args, run_output, model)
                 break
 
             datas, question_string = prepare_dataset(args.dataset)
@@ -342,6 +628,10 @@ if __name__ == '__main__':
                 relation_memory_bank = load_relation_memory(args.relation_memory_path.strip())
                 print(f"Loaded {len(relation_memory_bank)} relation memory items.")
             setattr(args, "relation_memory_bank", relation_memory_bank)
+            experience_banks = _load_experience_memory_bank(args)
+            setattr(args, "evidence_state_memory_bank", experience_banks["evidence_state"])
+            setattr(args, "failure_reflection_memory_bank", experience_banks["failure_reflection"])
+            setattr(args, "correction_action_memory_bank", experience_banks["correction_action"])
             reference_bank = load_reference_bank(args)
             if args.reference_mode != "none":
                 print(f"Loaded {len(reference_bank)} reference cases for PoG reference_mode={args.reference_mode}.")
