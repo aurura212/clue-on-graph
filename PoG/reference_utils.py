@@ -2,6 +2,7 @@ import glob
 import json
 import os
 import random
+from typing import Any
 
 from sentence_transformers import util
 
@@ -319,8 +320,7 @@ def maybe_prepend_reference_context(prompt, args, stage="relation"):
     return context + "\n\nCurrent task:\n" + prompt
 
 
-def get_reference_stages_suffix(args):
-    stages = getattr(args, "reference_stages", "relation")
+def get_stages_suffix(stages: Any) -> str:
     if stages is None:
         stages = "relation"
     if isinstance(stages, str):
@@ -336,23 +336,41 @@ def get_reference_stages_suffix(args):
     return "-".join(selected_stages)
 
 
+def get_reference_stages_suffix(args):
+    return get_stages_suffix(getattr(args, "reference_stages", "relation"))
+
+
+def format_reference_tag(args) -> str:
+    mode = getattr(args, "reference_mode", "none")
+    if mode == "none":
+        return ""
+    return (
+        f"ref-{mode}_top{getattr(args, 'reference_top_k', 4)}_"
+        f"{get_reference_limit_suffix(getattr(args, 'reference_limit', -1))}_"
+        f"stages-{get_stages_suffix(getattr(args, 'reference_stages', 'relation'))}"
+    )
+
+
+def format_relation_memory_tag(args) -> str:
+    mode = getattr(args, "relation_memory_mode", "none")
+    if mode == "none":
+        return ""
+    return (
+        f"mem-{mode}_top{getattr(args, 'relation_memory_top_k', 4)}_"
+        f"{getattr(args, 'memory_retrieval_strategy', 'hybrid')}_"
+        f"stages-{get_stages_suffix(getattr(args, 'relation_memory_stages', 'relation'))}"
+    )
+
+
 def get_output_file_tag(args):
     tag = f"{args.dataset}_{args.LLM_type}"
     run_mode = getattr(args, "run_mode", "test")
     if run_mode != "test":
         tag += f"_{run_mode}"
-    mode = getattr(args, "reference_mode", "none")
-    if mode != "none":
-        tag += (
-            f"_{mode}_top{getattr(args, 'reference_top_k', 4)}_"
-            f"{get_reference_limit_suffix(getattr(args, 'reference_limit', -1))}_"
-            f"stages-{get_reference_stages_suffix(args)}"
-        )
-    relation_memory_mode = getattr(args, "relation_memory_mode", "none")
-    if relation_memory_mode != "none":
-        tag += (
-            f"_relmem-{relation_memory_mode}_"
-            f"{getattr(args, 'memory_retrieval_strategy', 'hybrid')}_"
-            f"stages-{getattr(args, 'relation_memory_stages', 'relation')}"
-        )
+    reference_tag = format_reference_tag(args)
+    if reference_tag:
+        tag += f"_{reference_tag}"
+    relation_memory_tag = format_relation_memory_tag(args)
+    if relation_memory_tag:
+        tag += f"_{relation_memory_tag}"
     return tag

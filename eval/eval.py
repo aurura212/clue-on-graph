@@ -11,10 +11,22 @@ if __name__ == '__main__':
                         default="grailqa", help="choose the dataset.")
     parser.add_argument("--output_file", type=str,
                         default="PoG_grailqa_gpt-3.5-turbo-0125", help="the output file name.")
+    parser.add_argument("--start", type=int,
+                        default=0, help="评估数据的起始索引（从0开始）。")
+    parser.add_argument("--limit", type=int,
+                        default=-1, help="评估数据的条数，-1表示到末尾。")
 
     args = parser.parse_args()
 
     ground_truth_datas, question_string, output_datas = prepare_dataset_for_eval(args.dataset, args.output_file)
+
+    # 控制评估数据范围
+    start = max(0, args.start)
+    if args.limit < 0:
+        output_datas = output_datas[start:]
+    else:
+        output_datas = output_datas[start:start + args.limit]
+    print(f"Evaluating {len(output_datas)} samples (start={start}, limit={args.limit}).")
 
     count_q = {}
     right_q = {}
@@ -203,8 +215,10 @@ if __name__ == '__main__':
             num_questions_f1 += 1
         # ===========================
 
-    print("All: ", len(output_datas))
-    print("Exact Match: {}".format(float(num_right/len(output_datas)))) 
+    total_evaluated = len(output_datas)
+    print("All: ", total_evaluated)
+    if total_evaluated > 0:
+        print("Exact Match: {}".format(float(num_right/total_evaluated)))
 
     # === 打印 F1 结果 ===
     if num_questions_f1 > 0:

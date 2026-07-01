@@ -13,6 +13,79 @@ from jsonl_io import iter_jsonl_records
 RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
 RELATION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relation_memory")
 
+_META_PRESERVE_KEYS = ("evaluation", "relation_memory_label_counts")
+
+
+def build_run_meta_from_args(
+    args,
+    config_tag: str,
+    run_folder_name: str,
+    planned_question_count: int,
+) -> dict[str, Any]:
+    openai_api_base = getattr(args, "openai_api_base", "") or os.environ.get("OPENAI_API_BASE", "")
+    return {
+        "config_tag": config_tag,
+        "run_folder_name": run_folder_name,
+        "planned_question_count": planned_question_count,
+        "dataset": getattr(args, "dataset", ""),
+        "run_mode": getattr(args, "run_mode", "test"),
+        "split": getattr(args, "split", ""),
+        "start": getattr(args, "start", 0),
+        "limit": getattr(args, "limit", -1),
+        "question": getattr(args, "question", ""),
+        "max_length": getattr(args, "max_length", 4096),
+        "temperature_exploration": getattr(args, "temperature_exploration", 0.3),
+        "temperature_reasoning": getattr(args, "temperature_reasoning", 0.3),
+        "depth": getattr(args, "depth", 4),
+        "remove_unnecessary_rel": getattr(args, "remove_unnecessary_rel", True),
+        "LLM_type": getattr(args, "LLM_type", ""),
+        "openai_api_base": openai_api_base,
+        "reference_mode": getattr(args, "reference_mode", "none"),
+        "reference_base_path": getattr(args, "reference_base_path", ""),
+        "reference_limit": getattr(args, "reference_limit", -1),
+        "reference_top_k": getattr(args, "reference_top_k", 4),
+        "reference_stages": getattr(args, "reference_stages", "relation"),
+        "random_knowledge": getattr(args, "random_knowledge", 0),
+        "relation_memory_mode": getattr(args, "relation_memory_mode", "none"),
+        "relation_memory_stages": getattr(args, "relation_memory_stages", "relation"),
+        "relation_memory_path": getattr(args, "relation_memory_path", ""),
+        "relation_memory_output_path": getattr(args, "relation_memory_output_path", ""),
+        "relation_memory_top_k": getattr(args, "relation_memory_top_k", 4),
+        "memory_retrieval_strategy": getattr(args, "memory_retrieval_strategy", "hybrid"),
+        "memory_state_weight": getattr(args, "memory_state_weight", 0.5),
+        "memory_labels": getattr(args, "memory_labels", "positive,missed_positive,negative"),
+        "memory_prompt_token_budget": getattr(args, "memory_prompt_token_budget", 600),
+        "memory_candidate_relation_limit": getattr(args, "memory_candidate_relation_limit", 8),
+        "relation_semantic_top_k": getattr(args, "relation_semantic_top_k", 20),
+        "gold_frontier_limit": getattr(args, "gold_frontier_limit", 50),
+        "write_missed_positive": getattr(args, "write_missed_positive", 1),
+        "run_dir": getattr(args, "run_dir", ""),
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "results_file": "results.jsonl",
+        "trace_file": "pog_trace.jsonl",
+    }
+
+
+def write_run_meta(args, run_output: dict[str, Any], planned_question_count: int) -> None:
+    meta_path = run_output["meta_path"]
+    existing: dict[str, Any] = {}
+    if os.path.exists(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+    meta = build_run_meta_from_args(
+        args,
+        config_tag=run_output["config_tag"],
+        run_folder_name=run_output["run_folder_name"],
+        planned_question_count=planned_question_count,
+    )
+    if "created_at" in existing:
+        meta["created_at"] = existing["created_at"]
+    for key in _META_PRESERVE_KEYS:
+        if key in existing:
+            meta[key] = existing[key]
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=4)
+
 _RUN_OUTPUT: dict[str, Any] | None = None
 
 
@@ -86,32 +159,7 @@ def init_run_output(
         "meta_path": os.path.join(run_dir, "run_meta.json"),
     }
 
-    meta = {
-        "config_tag": config_tag,
-        "run_folder_name": run_folder_name,
-        "planned_question_count": planned_question_count,
-        "dataset": getattr(args, "dataset", ""),
-        "LLM_type": getattr(args, "LLM_type", ""),
-        "start": getattr(args, "start", 0),
-        "limit": getattr(args, "limit", -1),
-        "question": getattr(args, "question", ""),
-        "depth": getattr(args, "depth", 4),
-        "run_mode": getattr(args, "run_mode", "test"),
-        "split": getattr(args, "split", ""),
-        "reference_mode": getattr(args, "reference_mode", "none"),
-        "relation_memory_mode": getattr(args, "relation_memory_mode", "none"),
-        "relation_memory_stages": getattr(args, "relation_memory_stages", "relation"),
-        "relation_memory_path": getattr(args, "relation_memory_path", ""),
-        "relation_memory_output_path": getattr(args, "relation_memory_output_path", ""),
-        "memory_retrieval_strategy": getattr(args, "memory_retrieval_strategy", "hybrid"),
-        "relation_semantic_top_k": getattr(args, "relation_semantic_top_k", 20),
-        "created_at": datetime.now().isoformat(timespec="seconds"),
-        "results_file": "results.jsonl",
-        "trace_file": "pog_trace.jsonl",
-    }
-    if not os.path.exists(run_output["meta_path"]):
-        with open(run_output["meta_path"], "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=4)
+    write_run_meta(args, run_output, planned_question_count)
 
     _RUN_OUTPUT = run_output
     print(f"PoG run output dir: {run_dir}")
