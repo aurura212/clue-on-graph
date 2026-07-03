@@ -116,7 +116,14 @@ PoG 推理时的顺序是：先做问题分解（decomposition / planning），�
 - `gold_relation_path` 是训练的监督信号，逐跳驱动 relation memory 生成。
 - 训练模式目前只支持 `webqsp`，不要默认假设支持其它数据集（相关函数会显式 `raise ValueError`）。
 
-## 12. 改动前先看
+## 12. Git 提交约定
+
+- **commit message 一律用中文**，不要用英文。
+- 第一行简短概述改动（祈使语气也可，但用中文），空一行后写正文说明"为什么改 / 改了什么"。
+- 不要把 gitignore 掉的文件（`run_*.sh`、`PoG*.jsonl`、各 memory 输出目录等）加进提交。
+- 推送前确认 `git status` 干净、`git diff` 复核无误；直接推 `main` 前留意是否需要审批。
+
+## 13. 改动前先看
 
 - 改 memory 相关逻辑前，先读 `decomposition_memory.py`、`relation_memory.py`、`output_paths.py`、`main_freebase.py` 的 `run_combined_memory_train`。
 - 改路径/文件名前，先看 `output_paths.py` 里的 `build_run_folder_name` / `get_output_file_tag` / `default_*_output_path`，不要自己另造一套命名。

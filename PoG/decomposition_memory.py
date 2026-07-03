@@ -65,6 +65,20 @@ def get_episode_question(episode: dict[str, Any]) -> str:
     return str(episode.get("RawQuestion") or episode.get("question") or "")
 
 
+def format_gold_answers_for_prompt(answers: list[Any], max_shown: int = 10) -> str:
+    """Render gold answers for the planning prompt, truncating huge answer sets.
+
+    Some webqsp episodes have tens of thousands of gold answers (e.g. all songs
+    by Mozart), which would blow the LLM context window. We only need the LLM to
+    see what the answers look like, so we show a small sample plus the total.
+    """
+    answers = list(answers or [])
+    if len(answers) <= max_shown:
+        return json.dumps(answers, ensure_ascii=False)
+    shown = json.dumps(answers[:max_shown], ensure_ascii=False)
+    return f"{shown}\n... (total {len(answers)} answers, only first {max_shown} shown)"
+
+
 def optional_prompt_section(title: str, value: Any) -> str:
     if value is None or value == "" or value == [] or value == {}:
         return ""
@@ -102,7 +116,7 @@ Gold SPARQL:
 {episode.get("sparql", "")}
 
 Answers:
-{json.dumps(episode.get("gold_answers", []) or [], ensure_ascii=False)}
+{format_gold_answers_for_prompt(episode.get("gold_answers") or [])}
 {optional_sections}"""
 
 
