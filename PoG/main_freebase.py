@@ -486,8 +486,6 @@ if __name__ == '__main__':
                 q_mem_f_path = '../mem_PoG/'+run_output["run_folder_name"]+'/'+question[:255]
                 if not os.path.exists(q_mem_f_path):
                     os.makedirs(q_mem_f_path)
-                with open(q_mem_f_path+'/mem_PoG', 'w', encoding='utf-8') as f:
-                    pass
 
                 call_num += 1
                 sub_questions, token_num = get_subquestions(q_mem_f_path, question, args)

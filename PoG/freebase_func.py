@@ -1,5 +1,6 @@
 from SPARQLWrapper import SPARQLWrapper, JSON
 from utils import *
+import os
 import random
 from freebase_func import *
 from prompt_list import *
@@ -398,9 +399,16 @@ def add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, ent
 
     return add_entities_id, add_relations, add_head, new_ent_rel_ent_dict
 
+def read_question_memory(q_mem_f_path):
+    mem_path = os.path.join(q_mem_f_path, 'mem')
+    if os.path.isfile(mem_path):
+        with open(mem_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    return ""
+
+
 def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args):
-    with open(q_mem_f_path+'/mem_PoG', 'r', encoding='utf-8') as f:
-        his_mem = f.read()
+    his_mem = read_question_memory(q_mem_f_path)
     prompt = update_mem_prompt + question + '\nSubobjectives: '+str(subquestions)+'\nMemory: ' + his_mem
 
     chain_prompt = ''
