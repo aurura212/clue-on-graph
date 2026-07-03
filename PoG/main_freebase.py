@@ -10,13 +10,15 @@ from reference_utils import (
     set_current_reference_context,
 )
 from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
-from output_paths import (
-    init_run_output,
-    load_processed_questions,
-)
+from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
 from eval_run import run_post_test_evaluation
-from relation_memory import load_relation_memory
-from train_freebase import add_train_memory_args, run_train
+from relation_memory import (
+    TrainRelationMemoryBuffer,
+    append_train_relation_memories,
+    count_relation_memory_labels,
+    load_relation_memory,
+    load_webqsp_train_episodes,
+)
 import os
 import pprint
 
@@ -64,7 +66,7 @@ def select_questions(datas, question_string, start, limit, question):
 
 def add_relation_memory_args(parser):
     parser.add_argument("--run_mode", type=str, choices=["test", "train"],
-                        default="test", help="Run PoG in test mode or build train memories.")
+                        default="test", help="Run PoG in test mode or build relation memory in train mode.")
     parser.add_argument("--split", type=str, choices=["test", "train"],
                         default="", help="Dataset split. Defaults to train for run_mode=train and test otherwise.")
     parser.add_argument("--relation_memory_mode", type=str, choices=["none", "prompt"],
@@ -73,12 +75,8 @@ def add_relation_memory_args(parser):
                         default="relation", help="Stages for relation memory: relation,memory,reasoning,answer,all,none.")
     parser.add_argument("--relation_memory_path", type=str,
                         default="", help="Path to relation memory JSONL for test mode (under PoG/relation_memory/ by default).")
-    parser.add_argument("--evidence_state_memory_path", type=str,
-                        default="", help="Path to evidence_state memory JSONL in test mode.")
-    parser.add_argument("--failure_reflection_memory_path", type=str,
-                        default="", help="Path to failure_reflection memory JSONL in test mode.")
-    parser.add_argument("--correction_action_memory_path", type=str,
-                        default="", help="Path to correction_action memory JSONL in test mode.")
+    parser.add_argument("--relation_memory_output_path", type=str,
+                        default="", help="Path to write relation memory JSONL in train mode (defaults to PoG/relation_memory/).")
     parser.add_argument("--relation_memory_top_k", type=int,
                         default=4, help="Top-k relation memories to inject.")
     parser.add_argument("--memory_retrieval_strategy", type=str, choices=["question", "state", "hybrid"],
@@ -91,9 +89,12 @@ def add_relation_memory_args(parser):
                         default=600, help="Approximate token budget for relation memory prompt context.")
     parser.add_argument("--memory_candidate_relation_limit", type=int,
                         default=8, help="Max candidate relations shown per memory item.")
+    parser.add_argument("--gold_frontier_limit", type=int,
+                        default=50, help="Max gold frontier entities retained during train traversal.")
+    parser.add_argument("--write_missed_positive", type=int,
+                        default=1, help="Write missed_positive memory items when gold relation is in candidates but not selected.")
     parser.add_argument("--relation_semantic_top_k", type=int,
                         default=20, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value.")
-    add_train_memory_args(parser)
 
 
 def resolve_split(args):
@@ -102,20 +103,121 @@ def resolve_split(args):
     return "train" if args.run_mode == "train" else "test"
 
 
-def _load_experience_memory_bank(args):
-    banks = {
-        "evidence_state": [],
-        "failure_reflection": [],
-        "correction_action": [],
-    }
-    if args.evidence_state_memory_path.strip():
-        banks["evidence_state"] = load_relation_memory(args.evidence_state_memory_path.strip())
-    if args.failure_reflection_memory_path.strip():
-        banks["failure_reflection"] = load_relation_memory(args.failure_reflection_memory_path.strip())
-    if args.correction_action_memory_path.strip():
-        banks["correction_action"] = load_relation_memory(args.correction_action_memory_path.strip())
-    return banks
+def execute_gold_step(entity_ids, relation, frontier_limit):
+    next_entities = set()
+    for entity_id in sorted(entity_ids):
+        if not (str(entity_id).startswith("m.") or str(entity_id).startswith("g.")):
+            continue
+        for entity in entity_search(entity_id, relation, True):
+            if str(entity).startswith("m.") or str(entity).startswith("g."):
+                next_entities.add(entity)
+    return sorted(next_entities)[:frontier_limit]
 
+
+def run_relation_memory_train(args, run_output, model):
+    if args.dataset.lower() != "webqsp":
+        raise ValueError("relation memory train mode currently supports only --dataset webqsp")
+
+    episodes = load_webqsp_train_episodes()
+    total_in_dataset = len(episodes)
+    episodes = select_questions(episodes, "RawQuestion", args.start, args.limit, args.question.strip())
+    print(f"Selected train episodes: {len(episodes)} / {total_in_dataset}")
+
+    memory_output_path = args.relation_memory_output_path.strip() or default_relation_memory_output_path(
+        args,
+        len(episodes),
+    )
+    print(f"Writing relation memory to: {memory_output_path}")
+
+    for episode in tqdm(episodes):
+        question = episode["RawQuestion"]
+        topic_entity = dict(episode["topic_entity"])
+        gold_path = list(episode["gold_relation_path"])
+        sub_questions = "[]"
+        current_frontier = sorted(topic_entity.keys())
+        entid_name = dict(topic_entity)
+        previous_relations = []
+        incoming_relation = ""
+
+        setattr(args, "current_topic_entity", topic_entity)
+        setattr(args, "relation_memory_bank", [])
+        setattr(args, "sentence_model", model)
+
+        for hop_index, gold_relation in enumerate(gold_path):
+            depth = hop_index + 1
+            if not current_frontier:
+                print(f"Stop train episode {episode.get('parse_id')}: empty gold frontier at depth {depth}")
+                break
+
+            next_frontier = execute_gold_step(current_frontier, gold_relation, args.gold_frontier_limit)
+            hop_buffer = TrainRelationMemoryBuffer()
+            for entity_id in current_frontier:
+                entity_name = entid_name.get(entity_id)
+                if not entity_name:
+                    entity_name = id2entity_name_or_type(entity_id)
+                    entid_name[entity_id] = entity_name
+
+                setattr(args, "current_relation_depth", depth)
+                setattr(args, "current_incoming_relation", incoming_relation)
+                setattr(args, "current_previous_relations", list(previous_relations))
+
+                try:
+                    retrieve_relations, token_num, rel_trace = relation_search_prune(
+                        entity_id,
+                        sub_questions,
+                        entity_name,
+                        [],
+                        -1,
+                        question,
+                        args,
+                    )
+                except Exception as exc:
+                    print(f"relation_search_prune failed in train mode: {exc}")
+                    continue
+
+                candidate_relations = rel_trace.get("candidate_relations", [])
+                retrieved_relations = rel_trace.get("retrieved_relations", [])
+                selected_relations = rel_trace.get("selected_relations", [])
+                append_train_relation_memories(
+                    hop_buffer,
+                    episode=episode,
+                    depth=depth,
+                    entity_id=entity_id,
+                    entity_name=entity_name,
+                    incoming_relation=incoming_relation,
+                    previous_relations=previous_relations,
+                    gold_relation=gold_relation,
+                    candidate_relations=candidate_relations,
+                    retrieved_relations=retrieved_relations,
+                    selected_relations=selected_relations,
+                    llm_raw_output=rel_trace.get("llm_raw_output", ""),
+                    write_missed_positive=bool(args.write_missed_positive),
+                )
+
+            hop_buffer.flush(memory_output_path)
+
+            for entity_id in next_frontier:
+                if entity_id not in entid_name:
+                    entid_name[entity_id] = id2entity_name_or_type(entity_id)
+            current_frontier = next_frontier
+            previous_relations.append(gold_relation)
+            incoming_relation = gold_relation
+
+    label_counts = count_relation_memory_labels(memory_output_path)
+    update_run_meta(
+        {
+            "relation_memory_output_path": memory_output_path,
+            "relation_memory_label_counts": label_counts,
+        }
+    )
+    print(
+        "Relation memory label counts: "
+        f"positive={label_counts['positive']}, "
+        f"missed_positive={label_counts['missed_positive']}, "
+        f"negative={label_counts['negative']}, "
+        f"total={label_counts['total']}"
+    )
+    print("Relation memory training finished.")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -172,7 +274,30 @@ if __name__ == '__main__':
             split = resolve_split(args)
             args.split = split
             if args.run_mode == "train":
-                run_train(args)
+                train_episodes = load_webqsp_train_episodes()
+                total_in_dataset = len(train_episodes)
+                selected_train_episodes = select_questions(
+                    train_episodes,
+                    "RawQuestion",
+                    args.start,
+                    args.limit,
+                    args.question.strip(),
+                )
+                planned_question_count = len(selected_train_episodes)
+                run_output = init_run_output(
+                    args,
+                    planned_question_count=planned_question_count,
+                    resume_dir=args.run_dir.strip() or None,
+                )
+                if not args.relation_memory_output_path.strip():
+                    args.relation_memory_output_path = default_relation_memory_output_path(
+                        args,
+                        planned_question_count,
+                    )
+                if not os.path.exists(args.relation_memory_output_path):
+                    os.makedirs(os.path.dirname(os.path.abspath(args.relation_memory_output_path)), exist_ok=True)
+                model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
+                run_relation_memory_train(args, run_output, model)
                 break
 
             datas, question_string = prepare_dataset(args.dataset)
@@ -217,10 +342,6 @@ if __name__ == '__main__':
                 relation_memory_bank = load_relation_memory(args.relation_memory_path.strip())
                 print(f"Loaded {len(relation_memory_bank)} relation memory items.")
             setattr(args, "relation_memory_bank", relation_memory_bank)
-            experience_banks = _load_experience_memory_bank(args)
-            setattr(args, "evidence_state_memory_bank", experience_banks["evidence_state"])
-            setattr(args, "failure_reflection_memory_bank", experience_banks["failure_reflection"])
-            setattr(args, "correction_action_memory_bank", experience_banks["correction_action"])
             reference_bank = load_reference_bank(args)
             if args.reference_mode != "none":
                 print(f"Loaded {len(reference_bank)} reference cases for PoG reference_mode={args.reference_mode}.")

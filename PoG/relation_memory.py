@@ -15,9 +15,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 WEBQSP_TRAIN_PATH = os.path.join(PROJECT_ROOT, "data", "raw_train_set", "WebQSP.train.json")
 CVT_LABEL = "[CVT_NODE]"
 MEMORY_PROMPT_RELATION_LIMIT = 10
-DEFAULT_TRAIN_FOLLOWUP_POLICY = "stop_if_correct"
-TRAIN_FOLLOWUP_POLICIES = {"stop_if_correct", "coin_flip_correct_or_wrong"}
-EXPERIENCE_MEMORY_TYPES = {"evidence_state", "failure_reflection", "correction_action"}
 
 
 def normalize_mid(value: Any) -> str:
@@ -55,12 +52,8 @@ def should_use_relation_memory_at_stage(args: Any, stage: str) -> bool:
     if not stages or "none" in stages:
         return False
     if "all" in stages:
-        return True
+        return stage == "relation"
     return stage in stages
-
-
-def should_use_experience_memory_at_stage(args: Any, stage: str) -> bool:
-    return should_use_relation_memory_at_stage(args, stage)
 
 
 def load_webqsp_train_episodes(path: str = WEBQSP_TRAIN_PATH) -> list[dict[str, Any]]:
@@ -139,38 +132,10 @@ def count_relation_memory_labels(path: str) -> dict[str, int]:
     return counts
 
 
-def count_branch_types(path: str) -> dict[str, int]:
-    counts = {
-        "gold_branch": 0,
-        "synthetic_wrong_branch": 0,
-        "real_wrong_branch": 0,
-        "fallback_gold_branch": 0,
-        "unknown": 0,
-        "total": 0,
-    }
-    if not path or not os.path.exists(path):
-        return counts
-    for item in load_relation_memory(path):
-        branch_type = str(item.get("branch_type", "")).strip() or "unknown"
-        counts[branch_type] = counts.get(branch_type, 0) + 1
-        counts["total"] += 1
-    return counts
-
-
 def append_relation_memory(path: str, item: dict[str, Any], *, for_test: bool = True) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     record = export_test_memory_item(item) if for_test else dict(item)
     append_jsonl_record(path, record)
-
-
-def normalize_experience_memory_type(value: Any) -> str:
-    memory_type = str(value or "").strip()
-    if memory_type not in EXPERIENCE_MEMORY_TYPES:
-        raise ValueError(
-            f"Unknown experience memory type: {memory_type}. "
-            f"Expected one of {sorted(EXPERIENCE_MEMORY_TYPES)}"
-        )
-    return memory_type
 
 
 def normalize_entity_label(entity_id: str, entity_name: str | None = None) -> tuple[str, str]:
@@ -215,23 +180,6 @@ def get_picked_relations(item: dict[str, Any]) -> list[str]:
         return [str(relation).strip() for relation in value if str(relation).strip()]
     relation = str(value or "").strip()
     return [relation] if relation else []
-
-
-def get_branch_relation(item: dict[str, Any]) -> str:
-    value = item.get("branch_relation")
-    if value is None:
-        value = item.get("followup_relation")
-    return str(value or "").strip()
-
-
-def normalize_train_followup_policy(value: Any) -> str:
-    policy = str(value or DEFAULT_TRAIN_FOLLOWUP_POLICY).strip()
-    if policy not in TRAIN_FOLLOWUP_POLICIES:
-        raise ValueError(
-            f"Unknown train_followup_policy: {policy}. "
-            f"Expected one of {sorted(TRAIN_FOLLOWUP_POLICIES)}"
-        )
-    return policy
 
 
 def format_picked_relations(picked_relations: str | list[str] | None) -> str:
@@ -363,12 +311,6 @@ def make_memory_item(
     candidate_relations: list[str],
     retrieved_relations: list[str],
     llm_raw_output: str,
-    branch_policy: str = DEFAULT_TRAIN_FOLLOWUP_POLICY,
-    branch_type: str = "",
-    branch_relation: str = "",
-    branch_relation_source: str = "",
-    should_continue_followup: bool = False,
-    relation_choice_correct: bool = False,
 ) -> dict[str, Any]:
     entity_labels = sorted({str(label).strip() for label in entity_labels if str(label).strip()})
     question = episode["RawQuestion"]
@@ -403,72 +345,7 @@ def make_memory_item(
         "question_key": question_key,
         "state_key": state_key,
         "llm_raw_output": llm_raw_output,
-        "branch_policy": branch_policy,
-        "branch_type": branch_type,
-        "branch_relation": branch_relation,
-        "branch_relation_source": branch_relation_source,
-        "should_continue_followup": should_continue_followup,
-        "relation_choice_correct": relation_choice_correct,
     }
-
-
-def sample_followup_branch_relation(
-    candidate_relations: list[str],
-    gold_relation: str,
-    *,
-    rng: random.Random | None = None,
-) -> tuple[str, str]:
-    """
-    Return (branch_relation, branch_relation_source).
-
-    The caller decides whether to use the gold branch or a synthetic wrong branch.
-    This helper only samples a concrete relation for the wrong branch.
-    """
-    rng = rng or random
-    clean_candidates = [str(relation).strip() for relation in candidate_relations if str(relation).strip()]
-    wrong_candidates = [relation for relation in clean_candidates if relation != gold_relation]
-    if not wrong_candidates:
-        return gold_relation, "gold_fallback"
-    return rng.choice(wrong_candidates), "sampled_wrong"
-
-
-def choose_followup_branch(
-    *,
-    gold_selected: bool,
-    candidate_relations: list[str],
-    gold_relation: str,
-    branch_policy: str,
-    rng: random.Random | None = None,
-) -> tuple[str, str, bool, bool]:
-    """
-    Decide the branch used for downstream reflection/correction extraction.
-
-    Returns:
-        branch_relation, branch_type, should_continue_followup, relation_choice_correct
-    """
-    branch_policy = normalize_train_followup_policy(branch_policy)
-    rng = rng or random
-
-    if not gold_selected:
-        branch_relation = ""
-        branch_type = "real_wrong_branch"
-        return branch_relation, branch_type, True, False
-
-    if branch_policy == "stop_if_correct":
-        return "", "gold_branch", False, True
-
-    # coin_flip_correct_or_wrong
-    if rng.random() < 0.5:
-        return gold_relation, "gold_branch", True, True
-    branch_relation, branch_relation_source = sample_followup_branch_relation(
-        candidate_relations,
-        gold_relation,
-        rng=rng,
-    )
-    branch_type = "synthetic_wrong_branch"
-    if branch_relation_source == "gold_fallback":
-        branch_type = "fallback_gold_branch"
-    return branch_relation, branch_type, True, True
 
 
 def append_train_relation_memories(
@@ -485,9 +362,7 @@ def append_train_relation_memories(
     selected_relations: list[dict[str, Any]],
     llm_raw_output: str,
     write_missed_positive: bool,
-    branch_policy: str = DEFAULT_TRAIN_FOLLOWUP_POLICY,
-    rng: random.Random | None = None,
-) -> list[dict[str, Any]]:
+) -> None:
     selected_relation_names = sorted(
         {
             str(item.get("relation", "")).strip()
@@ -500,72 +375,53 @@ def append_train_relation_memories(
     gold_selected = gold_relation in selected_relation_names
     entity_labels = [entity_marker(entity_id, entity_name)]
 
-    branch_relation, branch_type, should_continue_followup, relation_choice_correct = choose_followup_branch(
-        gold_selected=gold_selected,
-        candidate_relations=candidate_relations,
-        gold_relation=gold_relation,
-        branch_policy=branch_policy,
-        rng=rng,
-    )
-
     if gold_selected:
-        item = make_memory_item(
-            episode=episode,
-            depth=depth,
-            entity_labels=entity_labels,
-            incoming_relation=incoming_relation,
-            previous_relations=previous_relations,
-            picked_relations=[gold_relation],
-            gold_relation=gold_relation,
-            label="positive",
-            selected_by_model=True,
-            gold_relation_in_candidates=gold_in_candidates,
-            gold_relation_in_retrieved=gold_in_retrieved,
-            candidate_relations=candidate_relations,
-            retrieved_relations=retrieved_relations,
-            llm_raw_output=llm_raw_output,
-            branch_policy=normalize_train_followup_policy(branch_policy),
-            branch_type=branch_type,
-            branch_relation=branch_relation,
-            branch_relation_source="gold" if branch_relation == gold_relation else ("sampled_wrong" if branch_relation else ""),
-            should_continue_followup=should_continue_followup,
-            relation_choice_correct=relation_choice_correct,
+        buffer.add(
+            make_memory_item(
+                episode=episode,
+                depth=depth,
+                entity_labels=entity_labels,
+                incoming_relation=incoming_relation,
+                previous_relations=previous_relations,
+                picked_relations=[gold_relation],
+                gold_relation=gold_relation,
+                label="positive",
+                selected_by_model=True,
+                gold_relation_in_candidates=gold_in_candidates,
+                gold_relation_in_retrieved=gold_in_retrieved,
+                candidate_relations=candidate_relations,
+                retrieved_relations=retrieved_relations,
+                llm_raw_output=llm_raw_output,
+            ),
         )
-        buffer.add(item)
-        return [item]
+        return
 
     if not selected_relation_names:
-        return []
+        return
 
     if gold_in_retrieved and write_missed_positive:
         label = "missed_positive"
     else:
         label = "negative"
 
-    item = make_memory_item(
-        episode=episode,
-        depth=depth,
-        entity_labels=entity_labels,
-        incoming_relation=incoming_relation,
-        previous_relations=previous_relations,
-        picked_relations=selected_relation_names,
-        gold_relation=gold_relation,
-        label=label,
-        selected_by_model=True,
-        gold_relation_in_candidates=gold_in_candidates,
-        gold_relation_in_retrieved=gold_in_retrieved,
-        candidate_relations=candidate_relations,
-        retrieved_relations=retrieved_relations,
-        llm_raw_output=llm_raw_output,
-        branch_policy=normalize_train_followup_policy(branch_policy),
-        branch_type=branch_type,
-        branch_relation=selected_relation_names[0] if selected_relation_names else "",
-        branch_relation_source="model_wrong",
-        should_continue_followup=should_continue_followup,
-        relation_choice_correct=relation_choice_correct,
+    buffer.add(
+        make_memory_item(
+            episode=episode,
+            depth=depth,
+            entity_labels=entity_labels,
+            incoming_relation=incoming_relation,
+            previous_relations=previous_relations,
+            picked_relations=selected_relation_names,
+            gold_relation=gold_relation,
+            label=label,
+            selected_by_model=True,
+            gold_relation_in_candidates=gold_in_candidates,
+            gold_relation_in_retrieved=gold_in_retrieved,
+            candidate_relations=candidate_relations,
+            retrieved_relations=retrieved_relations,
+            llm_raw_output=llm_raw_output,
+        ),
     )
-    buffer.add(item)
-    return [item]
 
 
 def current_state_key_from_args(args: Any, entity_id: str, entity_name: str, total_relations: list[str]) -> str:
@@ -718,216 +574,6 @@ def relation_memory_context(
     if len(lines) <= 1:
         return ""
     return "\n".join(lines)
-
-
-def make_experience_memory_item(
-    episode: dict[str, Any],
-    depth: int,
-    memory_type: str,
-    entity_labels: list[str],
-    incoming_relation: str,
-    previous_relations: list[str],
-    memory_text: str,
-    work_memory: str,
-    knowledge_triplets: str,
-    branch_policy: str = DEFAULT_TRAIN_FOLLOWUP_POLICY,
-    branch_type: str = "",
-    branch_relation: str = "",
-    branch_relation_source: str = "",
-    should_continue_followup: bool = False,
-    relation_choice_correct: bool = False,
-    extra_fields: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    memory_type = normalize_experience_memory_type(memory_type)
-    entity_labels = sorted({str(label).strip() for label in entity_labels if str(label).strip()})
-    question = episode["RawQuestion"]
-    question_key = build_question_key(question, episode.get("topic_entity", {}))
-    state_key = build_state_key(
-        depth=depth,
-        incoming_relation=incoming_relation,
-        previous_relations=previous_relations,
-        picked_relations=[],
-        candidate_relations=[],
-        entity_labels=entity_labels,
-        include_candidate_relations=False,
-    )
-    item = {
-        "memory_type": memory_type,
-        "dataset": episode.get("dataset", "webqsp"),
-        "question_id": episode.get("question_id", ""),
-        "parse_id": episode.get("parse_id", ""),
-        "question": question,
-        "masked_question": question_key,
-        "question_key": question_key,
-        "state_key": state_key,
-        "depth": depth,
-        "hop_index": depth - 1,
-        "entity_labels": entity_labels,
-        "incoming_relation": incoming_relation,
-        "previous_relations": list(previous_relations),
-        "memory_text": memory_text,
-        "work_memory": work_memory,
-        "knowledge_triplets": knowledge_triplets,
-        "branch_policy": branch_policy,
-        "branch_type": branch_type,
-        "branch_relation": branch_relation,
-        "branch_relation_source": branch_relation_source,
-        "should_continue_followup": should_continue_followup,
-        "relation_choice_correct": relation_choice_correct,
-    }
-    if extra_fields:
-        item.update(extra_fields)
-    return item
-
-
-def append_experience_memory(path: str, item: dict[str, Any]) -> None:
-    append_relation_memory(path, item, for_test=False)
-
-
-def _score_memory_items(
-    memory_bank: list[dict[str, Any]],
-    question_key: str,
-    state_key: str,
-    model: Any,
-    strategy: str,
-    state_weight: float,
-) -> list[tuple[float, dict[str, Any]]]:
-    if not memory_bank or model is None:
-        return []
-
-    question_emb = model.encode(question_key)
-    state_emb = model.encode(state_key)
-    memory_question_emb = model.encode(
-        [item.get("question_key") or item.get("masked_question") or item.get("question", "") for item in memory_bank]
-    )
-    memory_state_emb = model.encode([item.get("state_key", "") for item in memory_bank])
-    question_scores = util.dot_score(question_emb, memory_question_emb)[0].cpu().tolist()
-    state_scores = util.dot_score(state_emb, memory_state_emb)[0].cpu().tolist()
-
-    scored: list[tuple[float, dict[str, Any]]] = []
-    for index, item in enumerate(memory_bank):
-        if strategy == "question":
-            score = question_scores[index]
-        elif strategy == "state":
-            score = state_scores[index]
-        else:
-            score = (1 - state_weight) * question_scores[index] + state_weight * state_scores[index]
-        scored.append((score, item))
-    scored.sort(key=lambda pair: pair[0], reverse=True)
-    return scored
-
-
-def _build_simple_memory_context(
-    memory_bank: list[dict[str, Any]],
-    question: str,
-    entity_id: str,
-    entity_name: str,
-    total_relations: list[str],
-    args: Any,
-    model: Any,
-    *,
-    title: str,
-    output_key: str,
-) -> str:
-    if not memory_bank or model is None:
-        return ""
-
-    topic_entity = getattr(args, "current_topic_entity", {}) or {}
-    question_key = build_question_key(question, topic_entity)
-    state_key = current_state_key_from_args(args, entity_id, entity_name, total_relations)
-    strategy = getattr(args, "memory_retrieval_strategy", "hybrid")
-    state_weight = float(getattr(args, "memory_state_weight", 0.5))
-    scored = _score_memory_items(memory_bank, question_key, state_key, model, strategy, state_weight)
-    if not scored:
-        return ""
-
-    top_k = max(0, int(getattr(args, "relation_memory_top_k", 4)))
-    selected = scored[:top_k] if top_k else []
-    if not selected:
-        return ""
-
-    token_budget = max(1, int(getattr(args, "memory_prompt_token_budget", 600)))
-    lines = [title]
-    for _score, item in selected:
-        block = [
-            f"Q: {item.get('question', '')}",
-            f"Work Memory: {item.get('work_memory', '')}",
-            f"Knowledge Triplets: {item.get('knowledge_triplets', '')}",
-            f"{output_key}: {item.get('memory_text', '')}",
-        ]
-        candidate_lines = lines + block
-        if estimate_token_count("\n".join(candidate_lines)) > token_budget:
-            break
-        lines.extend(block)
-    if len(lines) <= 1:
-        return ""
-    return "\n".join(lines)
-
-
-def evidence_state_memory_context(
-    memory_bank: list[dict[str, Any]],
-    question: str,
-    entity_id: str,
-    entity_name: str,
-    total_relations: list[str],
-    args: Any,
-    model: Any,
-) -> str:
-    return _build_simple_memory_context(
-        memory_bank,
-        question,
-        entity_id,
-        entity_name,
-        total_relations,
-        args,
-        model,
-        title="Use the following evidence-state examples as guidance.",
-        output_key="Evidence-State",
-    )
-
-
-def failure_reflection_memory_context(
-    memory_bank: list[dict[str, Any]],
-    question: str,
-    entity_id: str,
-    entity_name: str,
-    total_relations: list[str],
-    args: Any,
-    model: Any,
-) -> str:
-    return _build_simple_memory_context(
-        memory_bank,
-        question,
-        entity_id,
-        entity_name,
-        total_relations,
-        args,
-        model,
-        title="Use the following failure-reflection examples as guidance.",
-        output_key="Failure-Reflection",
-    )
-
-
-def correction_action_memory_context(
-    memory_bank: list[dict[str, Any]],
-    question: str,
-    entity_id: str,
-    entity_name: str,
-    total_relations: list[str],
-    args: Any,
-    model: Any,
-) -> str:
-    return _build_simple_memory_context(
-        memory_bank,
-        question,
-        entity_id,
-        entity_name,
-        total_relations,
-        args,
-        model,
-        title="Use the following correction-action examples as guidance.",
-        output_key="Correction-Action",
-    )
 
 
 def estimate_token_count(text: str) -> int:

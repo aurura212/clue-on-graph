@@ -10,14 +10,7 @@ import re
 from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
-from relation_memory import (
-    relation_memory_context,
-    should_use_relation_memory_at_stage,
-    should_use_experience_memory_at_stage,
-    evidence_state_memory_context,
-    failure_reflection_memory_context,
-    correction_action_memory_context,
-)
+from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
 
 # pre-defined sparqls
@@ -116,33 +109,6 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
             prompt = memory_context + "\n\n" + prompt
     setattr(args, "current_relation_memory_context", memory_context)
     return prompt
-
-
-def _maybe_prepend_experience_memory(
-    args,
-    prompt,
-    stage,
-    builder,
-    bank_attr,
-    question,
-    entity_id,
-    entity_name,
-    total_relations,
-):
-    if not builder or not should_use_experience_memory_at_stage(args, stage):
-        return prompt
-    memory_context = builder(
-        getattr(args, bank_attr, []),
-        question,
-        entity_id,
-        entity_name,
-        total_relations,
-        args,
-        getattr(args, "sentence_model", None),
-    )
-    if not memory_context:
-        return prompt
-    return memory_context + "\n\n" + prompt
 
 
 def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, pre_head, question, args):
@@ -446,17 +412,6 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
 
     prompt += "\nKnowledge Triplets:\n" + chain_prompt
     prompt = maybe_prepend_reference_context(prompt, args, stage="memory")
-    prompt = _maybe_prepend_experience_memory(
-        args,
-        prompt,
-        "memory",
-        evidence_state_memory_context,
-        "evidence_state_memory_bank",
-        question,
-        "",
-        "",
-        [],
-    )
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     
@@ -489,17 +444,6 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
 
     prompt += "\nKnowledge Triplets:\n" + chain_prompt
     prompt = maybe_prepend_reference_context(prompt, args, stage="reasoning")
-    prompt = _maybe_prepend_experience_memory(
-        args,
-        prompt,
-        "reasoning",
-        failure_reflection_memory_context,
-        "failure_reflection_memory_bank",
-        question,
-        "",
-        "",
-        [],
-    )
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     print("Response from reasoning:", response)

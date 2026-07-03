@@ -24,11 +24,6 @@ is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
 from output_paths import get_current_run
 from jsonl_io import append_jsonl_record
-from relation_memory import (
-    should_use_experience_memory_at_stage,
-    failure_reflection_memory_context,
-    correction_action_memory_context,
-)
 
 color_yellow = "\033[93m"
 color_green = "\033[92m"
@@ -236,16 +231,6 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
     
     prompt = judge_reverse+question+'\nEntities set to be retrieved: ' + str(list(set(sorted([entid_name[ent_i] for ent_i in new_lst])))) +'\nMemory: '+his_mem+'\nKnowledge Triplets:'+chain_prompt
     prompt = maybe_prepend_reference_context(prompt, args, stage="reverse")
-    if should_use_experience_memory_at_stage(args, "reverse"):
-        prompt = failure_reflection_memory_context(
-            getattr(args, "failure_reflection_memory_bank", []),
-            question,
-            "",
-            "",
-            [],
-            args,
-            model,
-        ) + "\n\n" + prompt if getattr(args, "failure_reflection_memory_bank", []) else prompt
 
     cur_call_time += 1
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
@@ -262,16 +247,6 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
 
         prompt = add_ent_prompt+question+'\nReason: '+reason+'\nCandidate Entities: ' + str(sorted(other_entities_name))+'\nMemory: '+his_mem
         prompt = maybe_prepend_reference_context(prompt, args, stage="add_entity")
-        if should_use_experience_memory_at_stage(args, "add_entity"):
-            prompt = correction_action_memory_context(
-                getattr(args, "correction_action_memory_bank", []),
-                question,
-                "",
-                "",
-                [],
-                args,
-                model,
-            ) + "\n\n" + prompt if getattr(args, "correction_action_memory_bank", []) else prompt
 
         cur_call_time += 1
         response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)

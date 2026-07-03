@@ -12,8 +12,6 @@ from jsonl_io import iter_jsonl_records
 
 RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
 RELATION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relation_memory")
-DEFAULT_RELATION_MEMORY_TYPE = "relation_choice"
-DEFAULT_EXPERIENCE_MEMORY_TYPES = {"evidence_state", "failure_reflection", "correction_action"}
 
 _META_PRESERVE_KEYS = ("evaluation", "relation_memory_label_counts")
 
@@ -52,13 +50,6 @@ def build_run_meta_from_args(
         "relation_memory_stages": getattr(args, "relation_memory_stages", "relation"),
         "relation_memory_path": getattr(args, "relation_memory_path", ""),
         "relation_memory_output_path": getattr(args, "relation_memory_output_path", ""),
-        "evidence_state_memory_path": getattr(args, "evidence_state_memory_path", ""),
-        "failure_reflection_memory_path": getattr(args, "failure_reflection_memory_path", ""),
-        "correction_action_memory_path": getattr(args, "correction_action_memory_path", ""),
-        "evidence_state_memory_output_path": getattr(args, "evidence_state_memory_output_path", ""),
-        "failure_reflection_memory_output_path": getattr(args, "failure_reflection_memory_output_path", ""),
-        "correction_action_memory_output_path": getattr(args, "correction_action_memory_output_path", ""),
-        "train_memory_family": getattr(args, "train_memory_family", "relation_choice"),
         "relation_memory_top_k": getattr(args, "relation_memory_top_k", 4),
         "memory_retrieval_strategy": getattr(args, "memory_retrieval_strategy", "hybrid"),
         "memory_state_weight": getattr(args, "memory_state_weight", 0.5),
@@ -127,35 +118,12 @@ def build_relation_memory_filename(
     return f"{build_run_folder_name(config_tag, question_count, timestamp)}.jsonl"
 
 
-def build_memory_output_dir(memory_type: str = DEFAULT_RELATION_MEMORY_TYPE) -> str:
-    memory_type = (memory_type or DEFAULT_RELATION_MEMORY_TYPE).strip() or DEFAULT_RELATION_MEMORY_TYPE
-    return os.path.join(RELATION_MEMORY_ROOT, memory_type)
-
-
-def build_memory_output_path(
-    args,
-    planned_question_count: int,
-    memory_type: str = DEFAULT_RELATION_MEMORY_TYPE,
-) -> str:
-    memory_dir = build_memory_output_dir(memory_type)
-    os.makedirs(memory_dir, exist_ok=True)
+def default_relation_memory_output_path(args, planned_question_count: int) -> str:
+    os.makedirs(RELATION_MEMORY_ROOT, exist_ok=True)
     return os.path.join(
-        memory_dir,
+        RELATION_MEMORY_ROOT,
         build_relation_memory_filename(get_output_file_tag(args), planned_question_count),
     )
-
-
-def default_relation_memory_output_path(args, planned_question_count: int) -> str:
-    return build_memory_output_path(args, planned_question_count, DEFAULT_RELATION_MEMORY_TYPE)
-
-
-def default_experience_memory_output_path(args, planned_question_count: int, memory_type: str) -> str:
-    if memory_type not in DEFAULT_EXPERIENCE_MEMORY_TYPES:
-        raise ValueError(
-            f"Unknown experience memory type: {memory_type}. "
-            f"Expected one of {sorted(DEFAULT_EXPERIENCE_MEMORY_TYPES)}"
-        )
-    return build_memory_output_path(args, planned_question_count, memory_type)
 
 
 def init_run_output(
