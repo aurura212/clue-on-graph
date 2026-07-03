@@ -11,7 +11,9 @@ from reference_utils import (
 )
 from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
 from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
-from output_paths import default_decomposition_memory_output_path
+from output_paths import default_decomposition_memory_output_path, default_memory_output_dir
+from output_paths import load_parse_ids_from_jsonl, filter_jsonl_by_parse_id, load_progress, append_progress
+from output_paths import DECOMPOSITION_MEMORY_FILENAME, RELATION_MEMORY_FILENAME
 from eval_run import run_post_test_evaluation
 from relation_memory import (
     TrainRelationMemoryBuffer,
@@ -30,6 +32,7 @@ from decomposition_memory import (
 )
 import os
 import pprint
+import traceback
 
 # os.environ['OPENAI_API_BASE'] = "https://cn2us02.opapi.win/v1"
 
@@ -117,6 +120,8 @@ def add_relation_memory_args(parser):
                         default="", help="Path to decomposition memory JSONL for test mode.")
     parser.add_argument("--decomposition_memory_output_path", type=str,
                         default="", help="Path to write decomposition memory JSONL in train mode.")
+    parser.add_argument("--memory_output_dir", type=str,
+                        default="", help="Per-run memory folder created under PoG/memory/. Holds decomposition_memory.jsonl, relation_memory.jsonl, progress.jsonl. Defaults to a timestamped folder.")
     parser.add_argument("--decomposition_memory_top_k", type=int,
                         default=4, help="Top-k decomposition memories to inject.")
     parser.add_argument("--decomposition_memory_prompt_token_budget", type=int,
@@ -148,157 +153,179 @@ def execute_gold_step(entity_ids, relation, frontier_limit):
     return sorted(next_entities)[:frontier_limit]
 
 
-def run_relation_memory_train(args, run_output, model):
+def run_combined_memory_train(args, run_output, episodes, model):
     if args.dataset.lower() != "webqsp":
-        raise ValueError("relation memory train mode currently supports only --dataset webqsp")
+        raise ValueError("train mode currently supports only --dataset webqsp")
 
-    episodes = load_webqsp_train_episodes()
-    total_in_dataset = len(episodes)
-    episodes = select_questions(episodes, "RawQuestion", args.start, args.limit, args.question.strip())
-    print(f"Selected train episodes: {len(episodes)} / {total_in_dataset}")
+    train_decomp = should_train_decomposition_memory(args)
+    train_relation = should_train_relation_memory(args)
+    if not (train_decomp or train_relation):
+        raise ValueError(f"Unsupported train_memory_family: {args.train_memory_family}")
 
-    memory_output_path = args.relation_memory_output_path.strip() or default_relation_memory_output_path(
-        args,
-        len(episodes),
+    memory_dir = args.memory_output_dir.strip() or default_memory_output_dir(args, len(episodes))
+    args.memory_output_dir = memory_dir
+    os.makedirs(memory_dir, exist_ok=True)
+
+    decomposition_memory_path = (
+        args.decomposition_memory_output_path.strip()
+        or os.path.join(memory_dir, DECOMPOSITION_MEMORY_FILENAME)
     )
-    print(f"Writing relation memory to: {memory_output_path}")
-
-    for episode in tqdm(episodes):
-        question = episode["RawQuestion"]
-        topic_entity = dict(episode["topic_entity"])
-        gold_path = list(episode["gold_relation_path"])
-        sub_questions = "[]"
-        current_frontier = sorted(topic_entity.keys())
-        entid_name = dict(topic_entity)
-        previous_relations = []
-        incoming_relation = ""
-
-        setattr(args, "current_topic_entity", topic_entity)
-        setattr(args, "relation_memory_bank", [])
-        setattr(args, "sentence_model", model)
-
-        for hop_index, gold_relation in enumerate(gold_path):
-            depth = hop_index + 1
-            if not current_frontier:
-                print(f"Stop train episode {episode.get('parse_id')}: empty gold frontier at depth {depth}")
-                break
-
-            next_frontier = execute_gold_step(current_frontier, gold_relation, args.gold_frontier_limit)
-            hop_buffer = TrainRelationMemoryBuffer()
-            for entity_id in current_frontier:
-                entity_name = entid_name.get(entity_id)
-                if not entity_name:
-                    entity_name = id2entity_name_or_type(entity_id)
-                    entid_name[entity_id] = entity_name
-
-                setattr(args, "current_relation_depth", depth)
-                setattr(args, "current_incoming_relation", incoming_relation)
-                setattr(args, "current_previous_relations", list(previous_relations))
-
-                try:
-                    retrieve_relations, token_num, rel_trace = relation_search_prune(
-                        entity_id,
-                        sub_questions,
-                        entity_name,
-                        [],
-                        -1,
-                        question,
-                        args,
-                    )
-                except Exception as exc:
-                    print(f"relation_search_prune failed in train mode: {exc}")
-                    continue
-
-                candidate_relations = rel_trace.get("candidate_relations", [])
-                retrieved_relations = rel_trace.get("retrieved_relations", [])
-                selected_relations = rel_trace.get("selected_relations", [])
-                append_train_relation_memories(
-                    hop_buffer,
-                    episode=episode,
-                    depth=depth,
-                    entity_id=entity_id,
-                    entity_name=entity_name,
-                    incoming_relation=incoming_relation,
-                    previous_relations=previous_relations,
-                    gold_relation=gold_relation,
-                    candidate_relations=candidate_relations,
-                    retrieved_relations=retrieved_relations,
-                    selected_relations=selected_relations,
-                    llm_raw_output=rel_trace.get("llm_raw_output", ""),
-                    write_missed_positive=bool(args.write_missed_positive),
-                )
-
-            hop_buffer.flush(memory_output_path)
-
-            for entity_id in next_frontier:
-                if entity_id not in entid_name:
-                    entid_name[entity_id] = id2entity_name_or_type(entity_id)
-            current_frontier = next_frontier
-            previous_relations.append(gold_relation)
-            incoming_relation = gold_relation
-
-    label_counts = count_relation_memory_labels(memory_output_path)
-    update_run_meta(
-        {
-            "relation_memory_output_path": memory_output_path,
-            "relation_memory_label_counts": label_counts,
-        }
+    relation_memory_path = (
+        args.relation_memory_output_path.strip()
+        or os.path.join(memory_dir, RELATION_MEMORY_FILENAME)
     )
-    print(
-        "Relation memory label counts: "
-        f"positive={label_counts['positive']}, "
-        f"missed_positive={label_counts['missed_positive']}, "
-        f"negative={label_counts['negative']}, "
-        f"total={label_counts['total']}"
-    )
-    print("Relation memory training finished.")
+    os.makedirs(os.path.dirname(os.path.abspath(decomposition_memory_path)), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(relation_memory_path)), exist_ok=True)
 
+    print(f"Memory output dir: {memory_dir}")
+    if train_decomp:
+        print(f"Writing decomposition memory to: {decomposition_memory_path}")
+    if train_relation:
+        print(f"Writing relation memory to: {relation_memory_path}")
 
-def run_decomposition_memory_train(args, run_output, episodes):
-    if args.dataset.lower() != "webqsp":
-        raise ValueError("decomposition memory train mode currently supports only --dataset webqsp")
+    done = load_progress(memory_dir)
+    if done:
+        print(f"Resuming: {len(done)} episode(s) already completed according to progress.jsonl")
+    decomp_existing = load_parse_ids_from_jsonl(decomposition_memory_path) if train_decomp else set()
+    rel_existing = load_parse_ids_from_jsonl(relation_memory_path) if train_relation else set()
 
-    memory_output_path = args.decomposition_memory_output_path.strip() or default_decomposition_memory_output_path(
-        args,
-        len(episodes),
-    )
-    print(f"Writing decomposition memory to: {memory_output_path}")
+    setattr(args, "relation_memory_bank", [])
+    setattr(args, "sentence_model", model)
 
-    written = 0
-    for episode in tqdm(episodes):
-        prompt = build_gold_planning_prompt(episode)
-        response, _token_num = run_llm(
-            prompt,
-            args.temperature_reasoning,
-            args.max_length,
-            args.opeani_api_keys,
-            args.LLM_type,
-            False,
-            False,
-        )
-        gold_subobjectives = parse_planning_steps(response)
-        if not gold_subobjectives:
-            print(f"Skip decomposition memory with empty plan: {episode.get('parse_id')}")
+    decomp_written = 0
+    for episode in tqdm(episodes, desc="train memory"):
+        parse_id = str(episode.get("parse_id", ""))
+        if parse_id and parse_id in done:
             continue
 
-        append_decomposition_memory(
-            memory_output_path,
-            make_decomposition_memory_item(
-                episode,
-                gold_subobjectives=gold_subobjectives,
-                llm_raw_output=response,
-            ),
-        )
-        written += 1
+        if parse_id:
+            if parse_id in decomp_existing:
+                filter_jsonl_by_parse_id(decomposition_memory_path, parse_id)
+                decomp_existing.discard(parse_id)
+            if parse_id in rel_existing:
+                filter_jsonl_by_parse_id(relation_memory_path, parse_id)
+                rel_existing.discard(parse_id)
 
-    memory_count = count_decomposition_memory(memory_output_path)
-    update_run_meta(
-        {
-            "decomposition_memory_output_path": memory_output_path,
-            "decomposition_memory_count": memory_count,
-        }
-    )
-    print(f"Decomposition memory training finished. written={written}, total={memory_count}")
+        question = episode["RawQuestion"]
+        topic_entity = dict(episode.get("topic_entity", {}))
+
+        if train_decomp:
+            prompt = build_gold_planning_prompt(episode)
+            response, _token_num = run_llm(
+                prompt,
+                args.temperature_reasoning,
+                args.max_length,
+                args.opeani_api_keys,
+                args.LLM_type,
+                False,
+                False,
+            )
+            gold_subobjectives = parse_planning_steps(response)
+            if gold_subobjectives:
+                append_decomposition_memory(
+                    decomposition_memory_path,
+                    make_decomposition_memory_item(
+                        episode,
+                        gold_subobjectives=gold_subobjectives,
+                        llm_raw_output=response,
+                    ),
+                )
+                decomp_written += 1
+            else:
+                print(f"Skip decomposition memory with empty plan: {parse_id}")
+
+        if train_relation:
+            gold_path = list(episode.get("gold_relation_path") or [])
+            sub_questions = "[]"
+            current_frontier = sorted(topic_entity.keys())
+            entid_name = dict(topic_entity)
+            previous_relations = []
+            incoming_relation = ""
+
+            setattr(args, "current_topic_entity", topic_entity)
+
+            for hop_index, gold_relation in enumerate(gold_path):
+                depth = hop_index + 1
+                if not current_frontier:
+                    print(f"Stop train episode {parse_id}: empty gold frontier at depth {depth}")
+                    break
+
+                next_frontier = execute_gold_step(current_frontier, gold_relation, args.gold_frontier_limit)
+                hop_buffer = TrainRelationMemoryBuffer()
+                for entity_id in current_frontier:
+                    entity_name = entid_name.get(entity_id)
+                    if not entity_name:
+                        entity_name = id2entity_name_or_type(entity_id)
+                        entid_name[entity_id] = entity_name
+
+                    setattr(args, "current_relation_depth", depth)
+                    setattr(args, "current_incoming_relation", incoming_relation)
+                    setattr(args, "current_previous_relations", list(previous_relations))
+
+                    try:
+                        retrieve_relations, token_num, rel_trace = relation_search_prune(
+                            entity_id,
+                            sub_questions,
+                            entity_name,
+                            [],
+                            -1,
+                            question,
+                            args,
+                        )
+                    except Exception as exc:
+                        print(f"relation_search_prune failed in train mode: {exc}")
+                        continue
+
+                    candidate_relations = rel_trace.get("candidate_relations", [])
+                    retrieved_relations = rel_trace.get("retrieved_relations", [])
+                    selected_relations = rel_trace.get("selected_relations", [])
+                    append_train_relation_memories(
+                        hop_buffer,
+                        episode=episode,
+                        depth=depth,
+                        entity_id=entity_id,
+                        entity_name=entity_name,
+                        incoming_relation=incoming_relation,
+                        previous_relations=previous_relations,
+                        gold_relation=gold_relation,
+                        candidate_relations=candidate_relations,
+                        retrieved_relations=retrieved_relations,
+                        selected_relations=selected_relations,
+                        llm_raw_output=rel_trace.get("llm_raw_output", ""),
+                        write_missed_positive=bool(args.write_missed_positive),
+                    )
+
+                hop_buffer.flush(relation_memory_path)
+
+                for entity_id in next_frontier:
+                    if entity_id not in entid_name:
+                        entid_name[entity_id] = id2entity_name_or_type(entity_id)
+                current_frontier = next_frontier
+                previous_relations.append(gold_relation)
+                incoming_relation = gold_relation
+
+        if parse_id:
+            append_progress(memory_dir, parse_id)
+
+    meta_updates = {"memory_output_dir": memory_dir}
+    if train_decomp:
+        decomp_count = count_decomposition_memory(decomposition_memory_path)
+        meta_updates["decomposition_memory_output_path"] = decomposition_memory_path
+        meta_updates["decomposition_memory_count"] = decomp_count
+        print(f"Decomposition memory training finished. written={decomp_written}, total={decomp_count}")
+    if train_relation:
+        label_counts = count_relation_memory_labels(relation_memory_path)
+        meta_updates["relation_memory_output_path"] = relation_memory_path
+        meta_updates["relation_memory_label_counts"] = label_counts
+        print(
+            "Relation memory label counts: "
+            f"positive={label_counts['positive']}, "
+            f"missed_positive={label_counts['missed_positive']}, "
+            f"negative={label_counts['negative']}, "
+            f"total={label_counts['total']}"
+        )
+        print("Relation memory training finished.")
+    update_run_meta(meta_updates)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -370,26 +397,10 @@ if __name__ == '__main__':
                     planned_question_count=planned_question_count,
                     resume_dir=args.run_dir.strip() or None,
                 )
-                if should_train_decomposition_memory(args):
-                    if not args.decomposition_memory_output_path.strip():
-                        args.decomposition_memory_output_path = default_decomposition_memory_output_path(
-                            args,
-                            planned_question_count,
-                        )
-                    os.makedirs(os.path.dirname(os.path.abspath(args.decomposition_memory_output_path)), exist_ok=True)
-                    run_decomposition_memory_train(args, run_output, selected_train_episodes)
-
-                if should_train_relation_memory(args) and not args.relation_memory_output_path.strip():
-                    args.relation_memory_output_path = default_relation_memory_output_path(
-                        args,
-                        planned_question_count,
-                    )
-                if should_train_relation_memory(args) and not os.path.exists(args.relation_memory_output_path):
-                    os.makedirs(os.path.dirname(os.path.abspath(args.relation_memory_output_path)), exist_ok=True)
-                if should_train_relation_memory(args):
-                    model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
-                    run_relation_memory_train(args, run_output, model)
-                if not should_train_decomposition_memory(args) and not should_train_relation_memory(args):
+                if should_train_decomposition_memory(args) or should_train_relation_memory(args):
+                    model = SentenceTransformer('../msmarco-distilbert-base-tas-b') if should_train_relation_memory(args) else None
+                    run_combined_memory_train(args, run_output, selected_train_episodes, model)
+                else:
                     raise ValueError(f"Unsupported train_memory_family: {args.train_memory_family}")
                 break
 
@@ -717,7 +728,8 @@ if __name__ == '__main__':
                     continue'''
             run_post_test_evaluation(args, run_output)
             break
-        except:
+        except Exception:
             print("Error occurred, retrying...")
+            traceback.print_exc()
             time.sleep(5)
             continue

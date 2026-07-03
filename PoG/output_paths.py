@@ -8,11 +8,15 @@ from datetime import datetime
 from typing import Any
 
 from reference_utils import get_output_file_tag
-from jsonl_io import iter_jsonl_records
+from jsonl_io import iter_jsonl_records, append_jsonl_record, format_jsonl_record
 
 RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
 RELATION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relation_memory")
 DECOMPOSITION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decomposition_memory")
+MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
+DECOMPOSITION_MEMORY_FILENAME = "decomposition_memory.jsonl"
+RELATION_MEMORY_FILENAME = "relation_memory.jsonl"
+PROGRESS_FILENAME = "progress.jsonl"
 
 _META_PRESERVE_KEYS = ("evaluation", "relation_memory_label_counts", "decomposition_memory_count")
 
@@ -138,6 +142,58 @@ def default_decomposition_memory_output_path(args, planned_question_count: int) 
     return os.path.join(
         DECOMPOSITION_MEMORY_ROOT,
         build_relation_memory_filename(get_output_file_tag(args), planned_question_count),
+    )
+
+
+def default_memory_output_dir(args, planned_question_count: int) -> str:
+    """Per-run memory folder, e.g. PoG/memory/<config_tag>_n<count>_<timestamp>/."""
+    os.makedirs(MEMORY_ROOT, exist_ok=True)
+    return os.path.join(
+        MEMORY_ROOT,
+        build_run_folder_name(get_output_file_tag(args), planned_question_count),
+    )
+
+
+def load_parse_ids_from_jsonl(path: str) -> set[str]:
+    if not path or not os.path.exists(path):
+        return set()
+    ids: set[str] = set()
+    try:
+        for record in iter_jsonl_records(path):
+            pid = record.get("parse_id")
+            if pid:
+                ids.add(str(pid))
+    except Exception:
+        pass
+    return ids
+
+
+def filter_jsonl_by_parse_id(path: str, parse_id: str) -> None:
+    """Rewrite a JSONL file in place, dropping every record whose parse_id matches."""
+    if not path or not os.path.exists(path):
+        return
+    kept = []
+    for record in iter_jsonl_records(path):
+        if str(record.get("parse_id", "")) == str(parse_id):
+            continue
+        kept.append(record)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for record in kept:
+            f.write(format_jsonl_record(record))
+    os.replace(tmp, path)
+
+
+def load_progress(memory_dir: str) -> set[str]:
+    return load_parse_ids_from_jsonl(os.path.join(memory_dir, PROGRESS_FILENAME))
+
+
+def append_progress(memory_dir: str, parse_id: str) -> None:
+    os.makedirs(memory_dir, exist_ok=True)
+    append_jsonl_record(
+        os.path.join(memory_dir, PROGRESS_FILENAME),
+        {"parse_id": str(parse_id)},
+        indent=0,
     )
 
 

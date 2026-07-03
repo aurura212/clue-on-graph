@@ -21,6 +21,8 @@ PoG*.jsonl
 /PoG/__pycache__/
 /PoG/result/
 /PoG/relation_memory/
+/PoG/decomposition_memory/
+/PoG/memory/
 /mem_PoG
 /eval/__pycache__/
 /pog_diagnosis
