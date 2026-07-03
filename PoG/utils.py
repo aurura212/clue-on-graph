@@ -22,6 +22,7 @@ _llm_api_spec.loader.exec_module(_llm_api)
 get_chat_completion_extra_kwargs = _llm_api.get_chat_completion_extra_kwargs
 is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
+from decomposition_memory import decomposition_memory_context
 from output_paths import get_current_run
 from jsonl_io import append_jsonl_record
 
@@ -182,13 +183,32 @@ def generate_without_explored_paths(question, subquestions, args):
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     return response, token_num
 
+
+def extract_list_output(text):
+    first_brace_p = text.find('[')
+    last_brace_p = text.rfind(']')
+    if first_brace_p >= 0 and last_brace_p > first_brace_p:
+        return text[first_brace_p:last_brace_p+1]
+    return str(text).strip()
+
+
 def break_question(question, args): 
     prompt = subobjective_prompt + question
+    memory_context = decomposition_memory_context(
+        getattr(args, "decomposition_memory_bank", []),
+        question,
+        getattr(args, "current_topic_entity", {}) or {},
+        args,
+        getattr(args, "sentence_model", None),
+    )
+    if memory_context:
+        prompt = memory_context + "\n\nCurrent task:\n" + prompt
     prompt = maybe_prepend_reference_context(prompt, args, stage="decomposition")
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
-    first_brace_p = response.find('[')
-    last_brace_p = response.rfind(']')
-    response = response[first_brace_p:last_brace_p+1]
+    setattr(args, "current_decomposition_memory_context", memory_context)
+    setattr(args, "current_decomposition_prompt", prompt)
+    setattr(args, "current_decomposition_raw_output", response)
+    response = extract_list_output(response)
     return response, token_num
 
 def get_subquestions(q_mem_f_path, question, args):

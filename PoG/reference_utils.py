@@ -362,6 +362,15 @@ def format_relation_memory_tag(args) -> str:
     )
 
 
+def format_decomposition_memory_tag(args) -> str:
+    mode = getattr(args, "decomposition_memory_mode", "none")
+    if mode == "none":
+        return ""
+    return (
+        f"decompmem-{mode}_top{getattr(args, 'decomposition_memory_top_k', 4)}"
+    )
+
+
 def get_output_file_tag(args):
     tag = f"{args.dataset}_{args.LLM_type}"
     run_mode = getattr(args, "run_mode", "test")
@@ -373,4 +382,7 @@ def get_output_file_tag(args):
     relation_memory_tag = format_relation_memory_tag(args)
     if relation_memory_tag:
         tag += f"_{relation_memory_tag}"
+    decomposition_memory_tag = format_decomposition_memory_tag(args)
+    if decomposition_memory_tag:
+        tag += f"_{decomposition_memory_tag}"
     return tag

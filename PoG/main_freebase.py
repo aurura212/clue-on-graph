@@ -11,6 +11,7 @@ from reference_utils import (
 )
 from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
 from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
+from output_paths import default_decomposition_memory_output_path
 from eval_run import run_post_test_evaluation
 from relation_memory import (
     TrainRelationMemoryBuffer,
@@ -18,6 +19,14 @@ from relation_memory import (
     count_relation_memory_labels,
     load_relation_memory,
     load_webqsp_train_episodes,
+)
+from decomposition_memory import (
+    append_decomposition_memory,
+    build_gold_planning_prompt,
+    count_decomposition_memory,
+    load_decomposition_memory,
+    make_decomposition_memory_item,
+    parse_planning_steps,
 )
 import os
 import pprint
@@ -95,6 +104,31 @@ def add_relation_memory_args(parser):
                         default=1, help="Write missed_positive memory items when gold relation is in candidates but not selected.")
     parser.add_argument("--relation_semantic_top_k", type=int,
                         default=20, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value.")
+    parser.add_argument("--train_memory_family", type=str,
+                        choices=["relation_choice", "decomposition", "all"],
+                        default="relation_choice", help="Which memory family to build in train mode.")
+    parser.add_argument("--relation_memory_type", type=str,
+                        default="relation_choice", help="Compatibility tag for train scripts.")
+    parser.add_argument("--train_followup_policy", type=str,
+                        default="stop_if_correct", help="Compatibility tag for train scripts.")
+    parser.add_argument("--decomposition_memory_mode", type=str, choices=["none", "prompt"],
+                        default="none", help="How decomposition memory is used in test mode.")
+    parser.add_argument("--decomposition_memory_path", type=str,
+                        default="", help="Path to decomposition memory JSONL for test mode.")
+    parser.add_argument("--decomposition_memory_output_path", type=str,
+                        default="", help="Path to write decomposition memory JSONL in train mode.")
+    parser.add_argument("--decomposition_memory_top_k", type=int,
+                        default=4, help="Top-k decomposition memories to inject.")
+    parser.add_argument("--decomposition_memory_prompt_token_budget", type=int,
+                        default=800, help="Approximate token budget for decomposition memory prompt context.")
+
+
+def should_train_relation_memory(args):
+    return getattr(args, "train_memory_family", "relation_choice") in {"relation_choice", "all"}
+
+
+def should_train_decomposition_memory(args):
+    return getattr(args, "train_memory_family", "relation_choice") in {"decomposition", "all"}
 
 
 def resolve_split(args):
@@ -219,6 +253,53 @@ def run_relation_memory_train(args, run_output, model):
     )
     print("Relation memory training finished.")
 
+
+def run_decomposition_memory_train(args, run_output, episodes):
+    if args.dataset.lower() != "webqsp":
+        raise ValueError("decomposition memory train mode currently supports only --dataset webqsp")
+
+    memory_output_path = args.decomposition_memory_output_path.strip() or default_decomposition_memory_output_path(
+        args,
+        len(episodes),
+    )
+    print(f"Writing decomposition memory to: {memory_output_path}")
+
+    written = 0
+    for episode in tqdm(episodes):
+        prompt = build_gold_planning_prompt(episode)
+        response, _token_num = run_llm(
+            prompt,
+            args.temperature_reasoning,
+            args.max_length,
+            args.opeani_api_keys,
+            args.LLM_type,
+            False,
+            False,
+        )
+        gold_subobjectives = parse_planning_steps(response)
+        if not gold_subobjectives:
+            print(f"Skip decomposition memory with empty plan: {episode.get('parse_id')}")
+            continue
+
+        append_decomposition_memory(
+            memory_output_path,
+            make_decomposition_memory_item(
+                episode,
+                gold_subobjectives=gold_subobjectives,
+                llm_raw_output=response,
+            ),
+        )
+        written += 1
+
+    memory_count = count_decomposition_memory(memory_output_path)
+    update_run_meta(
+        {
+            "decomposition_memory_output_path": memory_output_path,
+            "decomposition_memory_count": memory_count,
+        }
+    )
+    print(f"Decomposition memory training finished. written={written}, total={memory_count}")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str,
@@ -289,15 +370,27 @@ if __name__ == '__main__':
                     planned_question_count=planned_question_count,
                     resume_dir=args.run_dir.strip() or None,
                 )
-                if not args.relation_memory_output_path.strip():
+                if should_train_decomposition_memory(args):
+                    if not args.decomposition_memory_output_path.strip():
+                        args.decomposition_memory_output_path = default_decomposition_memory_output_path(
+                            args,
+                            planned_question_count,
+                        )
+                    os.makedirs(os.path.dirname(os.path.abspath(args.decomposition_memory_output_path)), exist_ok=True)
+                    run_decomposition_memory_train(args, run_output, selected_train_episodes)
+
+                if should_train_relation_memory(args) and not args.relation_memory_output_path.strip():
                     args.relation_memory_output_path = default_relation_memory_output_path(
                         args,
                         planned_question_count,
                     )
-                if not os.path.exists(args.relation_memory_output_path):
+                if should_train_relation_memory(args) and not os.path.exists(args.relation_memory_output_path):
                     os.makedirs(os.path.dirname(os.path.abspath(args.relation_memory_output_path)), exist_ok=True)
-                model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
-                run_relation_memory_train(args, run_output, model)
+                if should_train_relation_memory(args):
+                    model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
+                    run_relation_memory_train(args, run_output, model)
+                if not should_train_decomposition_memory(args) and not should_train_relation_memory(args):
+                    raise ValueError(f"Unsupported train_memory_family: {args.train_memory_family}")
                 break
 
             datas, question_string = prepare_dataset(args.dataset)
@@ -342,6 +435,11 @@ if __name__ == '__main__':
                 relation_memory_bank = load_relation_memory(args.relation_memory_path.strip())
                 print(f"Loaded {len(relation_memory_bank)} relation memory items.")
             setattr(args, "relation_memory_bank", relation_memory_bank)
+            decomposition_memory_bank = []
+            if args.decomposition_memory_mode != "none" and args.decomposition_memory_path.strip():
+                decomposition_memory_bank = load_decomposition_memory(args.decomposition_memory_path.strip())
+                print(f"Loaded {len(decomposition_memory_bank)} decomposition memory items.")
+            setattr(args, "decomposition_memory_bank", decomposition_memory_bank)
             reference_bank = load_reference_bank(args)
             if args.reference_mode != "none":
                 print(f"Loaded {len(reference_bank)} reference cases for PoG reference_mode={args.reference_mode}.")
@@ -401,6 +499,12 @@ if __name__ == '__main__':
                 depth_ent_rel_ent_dict = {}
                 reverse_rec = {'time': 0, 'ent': []}
                 pog_trace = new_run_trace(sub_questions, topic_entity)
+                pog_trace["decomposition"] = {
+                    "subquestions": sub_questions,
+                    "memory_context": getattr(args, "current_decomposition_memory_context", ""),
+                    "reference_context": getattr(args, "current_decomposition_reference_context", ""),
+                    "llm_raw_output": getattr(args, "current_decomposition_raw_output", ""),
+                }
 
                 entid_name = {}
                 name_entid = {}

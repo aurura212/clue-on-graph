@@ -100,6 +100,10 @@ def load_webqsp_train_episodes(path: str = WEBQSP_TRAIN_PATH) -> list[dict[str, 
                     "RawQuestion": raw_question,
                     "topic_entity": {topic_mid: topic_name},
                     "gold_relation_path": chain,
+                    "constraints": list(parse.get("Constraints") or []),
+                    "time": parse.get("Time"),
+                    "order": parse.get("Order"),
+                    "sparql": parse.get("Sparql", ""),
                     "gold_answers": answers,
                 }
             )

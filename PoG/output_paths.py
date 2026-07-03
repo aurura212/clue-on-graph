@@ -12,8 +12,9 @@ from jsonl_io import iter_jsonl_records
 
 RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
 RELATION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relation_memory")
+DECOMPOSITION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decomposition_memory")
 
-_META_PRESERVE_KEYS = ("evaluation", "relation_memory_label_counts")
+_META_PRESERVE_KEYS = ("evaluation", "relation_memory_label_counts", "decomposition_memory_count")
 
 
 def build_run_meta_from_args(
@@ -51,6 +52,12 @@ def build_run_meta_from_args(
         "relation_memory_path": getattr(args, "relation_memory_path", ""),
         "relation_memory_output_path": getattr(args, "relation_memory_output_path", ""),
         "relation_memory_top_k": getattr(args, "relation_memory_top_k", 4),
+        "train_memory_family": getattr(args, "train_memory_family", "relation_choice"),
+        "decomposition_memory_mode": getattr(args, "decomposition_memory_mode", "none"),
+        "decomposition_memory_path": getattr(args, "decomposition_memory_path", ""),
+        "decomposition_memory_output_path": getattr(args, "decomposition_memory_output_path", ""),
+        "decomposition_memory_top_k": getattr(args, "decomposition_memory_top_k", 4),
+        "decomposition_memory_prompt_token_budget": getattr(args, "decomposition_memory_prompt_token_budget", 800),
         "memory_retrieval_strategy": getattr(args, "memory_retrieval_strategy", "hybrid"),
         "memory_state_weight": getattr(args, "memory_state_weight", 0.5),
         "memory_labels": getattr(args, "memory_labels", "positive,missed_positive,negative"),
@@ -122,6 +129,14 @@ def default_relation_memory_output_path(args, planned_question_count: int) -> st
     os.makedirs(RELATION_MEMORY_ROOT, exist_ok=True)
     return os.path.join(
         RELATION_MEMORY_ROOT,
+        build_relation_memory_filename(get_output_file_tag(args), planned_question_count),
+    )
+
+
+def default_decomposition_memory_output_path(args, planned_question_count: int) -> str:
+    os.makedirs(DECOMPOSITION_MEMORY_ROOT, exist_ok=True)
+    return os.path.join(
+        DECOMPOSITION_MEMORY_ROOT,
         build_relation_memory_filename(get_output_file_tag(args), planned_question_count),
     )
 
