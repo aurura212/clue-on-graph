@@ -103,6 +103,20 @@ Output: ['So Undercover']
 Now you need to directly output the entities from [] in Triplets for the following question in list format without other information or notes.
 Q: """
 
+cvt_relation_prune_prompt = """
+The candidate entities are unnamed Freebase CVT/intermediate nodes. To decide which CVT nodes are useful, first choose the neighboring relations that provide the strongest evidence for answering the question.
+Use the current incoming triple and the candidate neighboring relations. Prefer relations that can verify constraints in the question or reveal the next answer-bearing entity.
+
+Now directly output relation names from Candidate Neighbor Relations in list format. Select at most 5 relations and do not output explanations.
+Q: """
+
+cvt_entity_prune_prompt = """
+The candidate entities are unnamed Freebase CVT/intermediate nodes. Each candidate is shown with readable neighboring evidence.
+Choose the CVT entity ids whose evidence can be used to answer the question or continue the reasoning path. Prefer candidates that satisfy the question constraints and expose answer-bearing neighbors.
+
+Now directly output CVT entity ids from Candidate CVT Evidence in list format without other information or notes.
+Q: """
+
 update_mem_prompt = """Based on the provided information (which may have missing parts and require further retrieval) and your own knowledge, output the currently known information required to achieve the subobjectives.
 Here is an example:
 Q: Find the person who said "Taste cannot be controlled by law", what did this person die from?

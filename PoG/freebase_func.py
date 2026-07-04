@@ -12,6 +12,8 @@ from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
 from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+import traceback
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
 
 # pre-defined sparqls
@@ -19,6 +21,36 @@ sparql_head_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DI
 sparql_tail_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?relation\nWHERE {\n  ?x ?relation ns:%s .\n}"""
 sparql_tail_entities_extract = """PREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?tailEntity\nWHERE {\nns:%s ns:%s ?tailEntity .\n}""" 
 sparql_head_entities_extract = """PREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT ?tailEntity\nWHERE {\n?tailEntity ns:%s ns:%s  .\n}"""
+sparql_one_hop_head_triples = """PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?relation ?entity
+WHERE {
+  ns:%s ?relation ?entity .
+}"""
+sparql_one_hop_tail_triples = """PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?relation ?entity
+WHERE {
+  ?entity ?relation ns:%s .
+}"""
+sparql_one_hop_head_relations_for_entity = """PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?relation
+WHERE {
+  ns:%s ?relation ?entity .
+}"""
+sparql_one_hop_tail_relations_for_entity = """PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?relation
+WHERE {
+  ?entity ?relation ns:%s .
+}"""
+sparql_one_hop_head_entities_for_relation = """PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?entity
+WHERE {
+  ns:%s ns:%s ?entity .
+}"""
+sparql_one_hop_tail_entities_for_relation = """PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?entity
+WHERE {
+  ?entity ns:%s ns:%s .
+}"""
 sparql_id = """PREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?tailEntity\nWHERE {\n  {\n    ?entity ns:type.object.name ?tailEntity .\n    FILTER(?entity = ns:%s)\n  }\n  UNION\n  {\n    ?entity <http://www.w3.org/2002/07/owl#sameAs> ?tailEntity .\n    FILTER(?entity = ns:%s)\n  }\n}"""
 
 # def check_end_word(s):
@@ -56,6 +88,251 @@ def id2entity_name_or_type(entity_id):
         return entity_id
     else:
         return results["results"]["bindings"][0]['tailEntity']['value']
+
+
+TokenUsage = Dict[str, int]
+NeighborTriple = Tuple[str, str, str]
+
+
+def parse_list_output(result: str) -> List[str]:
+    last_brace_l = result.rfind('[')
+    last_brace_r = result.rfind(']')
+
+    if last_brace_l < last_brace_r:
+        result = result[last_brace_l:last_brace_r+1]
+
+    try:
+        parsed = eval(result.strip())
+    except:
+        parsed = result.strip().strip("[").strip("]").split(', ')
+        parsed = [x.strip("'").strip('"') for x in parsed]
+
+    if isinstance(parsed, str):
+        parsed = [parsed]
+    return [str(x).strip() for x in parsed if str(x).strip()]
+
+
+def relation_from_binding(value: str) -> str:
+    return value.replace("http://rdf.freebase.com/ns/", "")
+
+
+def entity_from_binding(value: str) -> str:
+    return value.replace("http://rdf.freebase.com/ns/", "")
+
+
+def get_cvt_one_hop_triples(entity_id: str) -> List[NeighborTriple]:
+    triples = []
+    bindings = execurte_sparql(sparql_one_hop_head_triples % (entity_id))
+    for item in bindings:
+        relation = relation_from_binding(item["relation"]["value"])
+        if not abandon_rels(relation):
+            triples.append(("head", relation, entity_from_binding(item["entity"]["value"])))
+
+    bindings = execurte_sparql(sparql_one_hop_tail_triples % (entity_id))
+    for item in bindings:
+        relation = relation_from_binding(item["relation"]["value"])
+        if not abandon_rels(relation):
+            triples.append(("tail", relation, entity_from_binding(item["entity"]["value"])))
+
+    triples.sort()
+    return triples
+
+
+def get_cvt_one_hop_relations(entity_id: str) -> List[str]:
+    relations = []
+    bindings = execurte_sparql(sparql_one_hop_head_relations_for_entity % (entity_id))
+    for item in bindings:
+        relation = relation_from_binding(item["relation"]["value"])
+        if not abandon_rels(relation):
+            relations.append(relation)
+
+    bindings = execurte_sparql(sparql_one_hop_tail_relations_for_entity % (entity_id))
+    for item in bindings:
+        relation = relation_from_binding(item["relation"]["value"])
+        if not abandon_rels(relation):
+            relations.append(relation)
+
+    return sorted(set(relations))
+
+
+def get_cvt_selected_relation_triples(entity_id: str, selected_relations: Sequence[str]) -> List[NeighborTriple]:
+    triples = []
+    for relation in selected_relations:
+        bindings = execurte_sparql(sparql_one_hop_head_entities_for_relation % (entity_id, relation))
+        for item in bindings:
+            triples.append(("head", relation, entity_from_binding(item["entity"]["value"])))
+
+        bindings = execurte_sparql(sparql_one_hop_tail_entities_for_relation % (relation, entity_id))
+        for item in bindings:
+            triples.append(("tail", relation, entity_from_binding(item["entity"]["value"])))
+
+    triples.sort()
+    return triples
+
+
+def ensure_entity_name(entity_id: str, entid_name: Dict[str, str], name_entid: Dict[str, str]) -> str:
+    if entity_id not in entid_name:
+        if entity_id.startswith("m.") or entity_id.startswith("g."):
+            entid_name[entity_id] = id2entity_name_or_type(entity_id)
+        else:
+            entid_name[entity_id] = entity_id
+        name_entid[entid_name[entity_id]] = entity_id
+    return entid_name[entity_id]
+
+
+def run_llm_with_retry(prompt: str, args: Any, temperature: float, retries: int = 3) -> Tuple[str, TokenUsage, Optional[str]]:
+    last_error = None
+    for attempt in range(max(1, retries)):
+        try:
+            result, token_num = run_llm(prompt, temperature, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
+            return result, token_num, None
+        except Exception as exc:
+            last_error = repr(exc)
+            traceback.print_exc()
+            if attempt + 1 < retries:
+                time.sleep(min(2 ** attempt, 8))
+
+    return "", {'total': 0, 'input': 0, 'output': 0}, last_error
+
+
+def make_cvt_evidence_text(
+    cvt_id: str,
+    topic_name: str,
+    incoming_relation: str,
+    selected_relations: Sequence[str],
+    neighbor_triples: Sequence[NeighborTriple],
+    entid_name: Dict[str, str],
+    name_entid: Dict[str, str],
+) -> Tuple[str, Dict[str, List[str]]]:
+    pieces = [cvt_id, "incoming: " + topic_name + " " + incoming_relation]
+    relation_values = {}
+    for direction, relation, neighbor_id in neighbor_triples:
+        if relation not in selected_relations:
+            continue
+        neighbor_name = ensure_entity_name(neighbor_id, entid_name, name_entid)
+        if relation not in relation_values:
+            relation_values[relation] = []
+        if neighbor_name not in relation_values[relation]:
+            relation_values[relation].append(neighbor_name)
+
+    for relation in selected_relations:
+        if relation in relation_values:
+            pieces.append(relation + ": " + ", ".join(sorted(relation_values[relation])))
+    return " | ".join(pieces), relation_values
+
+
+def cvt_neighbor_prune(
+    question: str,
+    topic_e: str,
+    rela: str,
+    e_list: Sequence[str],
+    entid_name: Dict[str, str],
+    name_entid: Dict[str, str],
+    args: Any,
+) -> Tuple[List[str], Optional[str], str, int, TokenUsage, Dict[str, Any]]:
+    cur_call_time = 0
+    cur_token = {'total': 0, 'input': 0, 'output': 0}
+    topic_name = entid_name[topic_e]
+    max_fallback = int(getattr(args, "cvt_neighbor_fallback_top_k", 10))
+    llm_retries = int(getattr(args, "cvt_neighbor_llm_retries", 3))
+
+    cvt_neighbor_relations = {}
+    relation_counts = {}
+    cvt_relation_llm_error = None
+    cvt_entity_llm_error = None
+    for cvt_id in sorted(e_list):
+        relations = get_cvt_one_hop_relations(cvt_id)
+        cvt_neighbor_relations[cvt_id] = relations
+        for relation in relations:
+            relation_counts[relation] = relation_counts.get(relation, 0) + 1
+
+    cvt_selected_relations = []
+    cvt_relation_llm_raw_output = None
+    if relation_counts:
+        relation_summary = [
+            relation + " (covers " + str(count) + " candidates)"
+            for relation, count in sorted(relation_counts.items(), key=lambda x: (-x[1], x[0]))
+        ]
+        prompt = cvt_relation_prune_prompt + question
+        prompt += "\nCurrent Incoming Triple: " + topic_name + " " + rela + " " + str(sorted(e_list))
+        prompt += "\nCandidate Neighbor Relations: " + str(relation_summary)
+
+        cur_call_time += 1
+        result, token_num, cvt_relation_llm_error = run_llm_with_retry(prompt, args, args.temperature_reasoning, llm_retries)
+        for kk in token_num.keys():
+            cur_token[kk] += token_num[kk]
+        cvt_relation_llm_raw_output = result
+        parsed_relations = parse_list_output(result) if result else []
+        relation_set = set(relation_counts.keys())
+        normalized_relations = [rel.split(" (covers ")[0] for rel in parsed_relations]
+        cvt_selected_relations = [rel for rel in normalized_relations if rel in relation_set]
+        if not cvt_selected_relations:
+            cvt_selected_relations = [
+                relation for relation, _ in sorted(relation_counts.items(), key=lambda x: (-x[1], x[0]))[:5]
+            ]
+
+    cvt_neighbor_evidence = {}
+    candidate_evidence = []
+    evidence_name_to_id = {}
+    for cvt_id in sorted(e_list):
+        neighbor_triples = get_cvt_selected_relation_triples(cvt_id, cvt_selected_relations)
+        evidence_text, relation_values = make_cvt_evidence_text(
+            cvt_id,
+            topic_name,
+            rela,
+            cvt_selected_relations,
+            neighbor_triples,
+            entid_name,
+            name_entid,
+        )
+        cvt_neighbor_evidence[cvt_id] = {
+            "evidence_text": evidence_text,
+            "selected_relation_neighbors": relation_values,
+            "available_relations": cvt_neighbor_relations.get(cvt_id, []),
+        }
+        if relation_values:
+            candidate_evidence.append(evidence_text)
+            evidence_name_to_id[evidence_text] = cvt_id
+
+    llm_raw = None
+    if candidate_evidence:
+        prompt = cvt_entity_prune_prompt + question
+        prompt += "\nCandidate CVT Evidence: " + str(candidate_evidence)
+
+        cur_call_time += 1
+        result, token_num, cvt_entity_llm_error = run_llm_with_retry(prompt, args, args.temperature_reasoning, llm_retries)
+        for kk in token_num.keys():
+            cur_token[kk] += token_num[kk]
+        llm_raw = result
+        parsed_entities = parse_list_output(result) if result else []
+        select_ids = []
+        for item in parsed_entities:
+            if item in e_list:
+                select_ids.append(item)
+            elif item in evidence_name_to_id:
+                select_ids.append(evidence_name_to_id[item])
+        select_ids = sorted(set(select_ids))
+        if cvt_entity_llm_error:
+            select_ids = sorted(evidence_name_to_id.values())
+            prune_method = "cvt_neighbor_relation_prune_fallback_llm_error"
+        elif not select_ids:
+            select_ids = sorted(evidence_name_to_id.values())
+            prune_method = "cvt_neighbor_relation_prune_fallback_all_evidence"
+        else:
+            prune_method = "cvt_neighbor_relation_prune"
+    else:
+        select_ids = sorted(e_list)[:max_fallback]
+        prune_method = "cvt_neighbor_relation_prune_fallback_no_evidence"
+
+    select_ent = [entid_name[ent_id] for ent_id in select_ids]
+    cvt_trace = {
+        "cvt_selected_relations": cvt_selected_relations,
+        "cvt_neighbor_evidence": cvt_neighbor_evidence,
+        "cvt_relation_llm_raw_output": cvt_relation_llm_raw_output,
+        "cvt_relation_llm_error": cvt_relation_llm_error,
+        "cvt_entity_llm_error": cvt_entity_llm_error,
+    }
+    return select_ent, llm_raw, prune_method, cur_call_time, cur_token, cvt_trace
     
 
 
@@ -272,6 +549,13 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
             for rela, e_list in sorted(r_e_dict.items()):
                 prune_method = "llm"
                 llm_raw = None
+                cvt_trace = {
+                    "cvt_selected_relations": [],
+                    "cvt_neighbor_evidence": {},
+                    "cvt_relation_llm_raw_output": None,
+                    "cvt_relation_llm_error": None,
+                    "cvt_entity_llm_error": None,
+                }
                 candidates_before = [entid_name[e_id] for e_id in sorted(e_list)]
 
                 if is_all_digits(e_list) or rela in no_prune or len(e_list) <= 1:
@@ -280,40 +564,41 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                     prune_method = "skip_auto_keep"
                 else:
                     if all(entid_name[item].startswith('m.') for item in e_list) and len(e_list) > 10:
-                        e_list = random.sample(e_list, 10)
-                        prune_method = "llm_after_random10"
+                        sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
+                        select_ent, llm_raw, prune_method, cvt_call_time, cvt_token, cvt_trace = cvt_neighbor_prune(
+                            question,
+                            topic_e,
+                            rela,
+                            e_list,
+                            entid_name,
+                            name_entid,
+                            args,
+                        )
+                        cur_call_time += cvt_call_time
+                        for kk in cvt_token.keys():
+                            cur_token[kk] += cvt_token[kk]
+                    else:
+                        if len(e_list) > 70:
+                            sorted_e_list = [entid_name[e_id] for e_id in e_list]
+                            topn_entities, topn_scores = retrieve_top_docs(question, sorted_e_list, model, 70)
+                            e_list = [name_entid[e_n] for e_n in topn_entities]
+                            print('sentence:', topn_entities)
+                            prune_method = "llm_after_embedding_top70"
 
-                    if len(e_list) > 70:
-                        sorted_e_list = [entid_name[e_id] for e_id in e_list]
-                        topn_entities, topn_scores = retrieve_top_docs(question, sorted_e_list, model, 70)
-                        e_list = [name_entid[e_n] for e_n in topn_entities]
-                        print('sentence:', topn_entities)
-                        prune_method = "llm_after_embedding_top70"
+                        prompt = prune_entity_prompt + question +'\nTriples: '
+                        sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
+                        prompt += entid_name[topic_e] + ' ' + rela + ' ' + str(sorted_e_list)
 
-                    prompt = prune_entity_prompt + question +'\nTriples: '
-                    sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
-                    prompt += entid_name[topic_e] + ' ' + rela + ' ' + str(sorted_e_list)
+                        cur_call_time += 1
+                        result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
+                        for kk in token_num.keys():
+                            cur_token[kk] += token_num[kk]
 
-                    cur_call_time += 1
-                    result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
-                    for kk in token_num.keys():
-                        cur_token[kk] += token_num[kk]
+                        llm_raw = result
+                        result = parse_list_output(result)
 
-                    llm_raw = result
-                    last_brace_l = result.rfind('[')
-                    last_brace_r = result.rfind(']')
-                    
-                    if last_brace_l < last_brace_r:
-                        result = result[last_brace_l:last_brace_r+1]
-                    
-                    try:
-                        result = eval(result.strip())
-                    except:
-                        result = result.strip().strip("[").strip("]").split(', ')
-                        result = [x.strip("'") for x in result]
-
-                    select_ent = sorted(result)
-                    select_ent = [x for x in select_ent if x in sorted_e_list]
+                        select_ent = sorted(result)
+                        select_ent = [x for x in select_ent if x in sorted_e_list]
 
                 dropped = sorted(set(candidates_before) - set(select_ent))
                 entity_prune_details.append({
@@ -326,6 +611,11 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                     "dropped_candidates": dropped,
                     "prune_method": prune_method,
                     "llm_raw_output": llm_raw,
+                    "cvt_selected_relations": cvt_trace["cvt_selected_relations"],
+                    "cvt_neighbor_evidence": cvt_trace["cvt_neighbor_evidence"],
+                    "cvt_relation_llm_raw_output": cvt_trace["cvt_relation_llm_raw_output"],
+                    "cvt_relation_llm_error": cvt_trace["cvt_relation_llm_error"],
+                    "cvt_entity_llm_error": cvt_trace["cvt_entity_llm_error"],
                 })
 
                 if len(select_ent) == 0 or all(x == '' for x in select_ent):
