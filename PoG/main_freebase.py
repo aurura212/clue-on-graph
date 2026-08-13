@@ -22,6 +22,7 @@ from relation_memory import (
     load_relation_memory,
     load_webqsp_train_episodes,
 )
+from constraint_compiler import compile_question_constraints
 from decomposition_memory import (
     append_decomposition_memory,
     build_gold_planning_prompt,
@@ -128,6 +129,18 @@ def add_relation_memory_args(parser):
                         default=800, help="Approximate token budget for decomposition memory prompt context.")
     parser.add_argument("--cvt_entity_top_k", type=int,
                         default=30, help="Max CVT candidates sent to the Step-2 entity LLM after intersection-priority filtering.")
+    parser.add_argument("--constraint_pushdown", type=str, choices=["off", "on"],
+                        default="off", help="Enable question constraint compilation and SPARQL pushdown in test mode.")
+    parser.add_argument("--constraint_asof_date", type=str,
+                        default="2015-08-10", help="Snapshot date used for current/present time constraints.")
+    parser.add_argument("--constraint_link_top_k", type=int,
+                        default=8, help="Max Freebase name/alias candidates per constraint mention.")
+    parser.add_argument("--constraint_link_min_confidence", type=float,
+                        default=0.65, help="Minimum confidence for using a linked mention as a hard entity constraint.")
+    parser.add_argument("--constraint_max_entity_constraints", type=int,
+                        default=2, help="Max linked non-topic entity constraints used by pushdown.")
+    parser.add_argument("--constraint_auto_keep_top_k", type=int,
+                        default=50, help="Auto-keep already pushdown-filtered buckets up to this size before LLM pruning.")
 
 
 def should_train_relation_memory(args):
@@ -144,12 +157,16 @@ def resolve_split(args):
     return "train" if args.run_mode == "train" else "test"
 
 
-def execute_gold_step(entity_ids, relation, frontier_limit):
+def execute_gold_step(entity_ids, relation, frontier_limit, args=None, question=""):
     next_entities = set()
     for entity_id in sorted(entity_ids):
         if not (str(entity_id).startswith("m.") or str(entity_id).startswith("g.")):
             continue
-        for entity in entity_search(entity_id, relation, True):
+        if args is not None and getattr(args, "constraint_pushdown", "off") == "on":
+            entities = entity_search_with_constraints(entity_id, relation, True, question, args)
+        else:
+            entities = entity_search(entity_id, relation, True)
+        for entity in entities:
             if str(entity).startswith("m.") or str(entity).startswith("g."):
                 next_entities.add(entity)
     return sorted(next_entities)[:frontier_limit]
@@ -184,6 +201,8 @@ def run_combined_memory_train(args, run_output, episodes, model):
         print(f"Writing decomposition memory to: {decomposition_memory_path}")
     if train_relation:
         print(f"Writing relation memory to: {relation_memory_path}")
+    if getattr(args, "constraint_pushdown", "off") == "on":
+        print(f"Constraint pushdown enabled in train mode, as_of={args.constraint_asof_date}")
 
     done = load_progress(memory_dir)
     if done:
@@ -210,6 +229,18 @@ def run_combined_memory_train(args, run_output, episodes, model):
 
         question = episode["RawQuestion"]
         topic_entity = dict(episode.get("topic_entity", {}))
+        setattr(args, "current_constraint_search_traces", {})
+        if args.constraint_pushdown == "on":
+            constraints = compile_question_constraints(
+                question,
+                topic_entity,
+                args,
+                model,
+                sparql_executor=execurte_sparql,
+            )
+            setattr(args, "current_constraints", constraints)
+        else:
+            setattr(args, "current_constraints", {})
 
         if train_decomp:
             prompt = build_gold_planning_prompt(episode)
@@ -252,7 +283,14 @@ def run_combined_memory_train(args, run_output, episodes, model):
                     print(f"Stop train episode {parse_id}: empty gold frontier at depth {depth}")
                     break
 
-                next_frontier = execute_gold_step(current_frontier, gold_relation, args.gold_frontier_limit)
+                setattr(args, "current_constraint_search_traces", {})
+                next_frontier = execute_gold_step(
+                    current_frontier,
+                    gold_relation,
+                    args.gold_frontier_limit,
+                    args=args,
+                    question=question,
+                )
                 hop_buffer = TrainRelationMemoryBuffer()
                 for entity_id in current_frontier:
                     entity_name = entid_name.get(entity_id)
@@ -309,7 +347,11 @@ def run_combined_memory_train(args, run_output, episodes, model):
         if parse_id:
             append_progress(memory_dir, parse_id)
 
-    meta_updates = {"memory_output_dir": memory_dir}
+    meta_updates = {
+        "memory_output_dir": memory_dir,
+        "constraint_pushdown": getattr(args, "constraint_pushdown", "off"),
+        "constraint_asof_date": getattr(args, "constraint_asof_date", ""),
+    }
     if train_decomp:
         decomp_count = count_decomposition_memory(decomposition_memory_path)
         meta_updates["decomposition_memory_output_path"] = decomposition_memory_path
@@ -510,6 +552,19 @@ if __name__ == '__main__':
                 depth_ent_rel_ent_dict = {}
                 reverse_rec = {'time': 0, 'ent': []}
                 pog_trace = new_run_trace(sub_questions, topic_entity)
+                setattr(args, "current_constraint_search_traces", {})
+                if args.constraint_pushdown == "on":
+                    constraints = compile_question_constraints(
+                        question,
+                        topic_entity,
+                        args,
+                        model,
+                        sparql_executor=execurte_sparql,
+                    )
+                    setattr(args, "current_constraints", constraints)
+                    pog_trace["constraints"] = constraints
+                else:
+                    setattr(args, "current_constraints", {})
                 pog_trace["decomposition"] = {
                     "subquestions": sub_questions,
                     "memory_context": getattr(args, "current_decomposition_memory_context", ""),
@@ -574,10 +629,14 @@ if __name__ == '__main__':
 
                         if ent_rel['head']:
                             head_or_tail = 'head'
-                            entity_candidates_id = entity_search(ent_rel['entity'], ent_rel['relation'], True)
+                            entity_candidates_id = entity_search_with_constraints(
+                                ent_rel['entity'], ent_rel['relation'], True, question, args
+                            )
                         else:
                             head_or_tail = 'tail'
-                            entity_candidates_id = entity_search(ent_rel['entity'], ent_rel['relation'], False)
+                            entity_candidates_id = entity_search_with_constraints(
+                                ent_rel['entity'], ent_rel['relation'], False, question, args
+                            )
                         
                         if len(entity_candidates_id) == 0:
                             print('the relations without tail entity:', ent_rel)

@@ -12,6 +12,7 @@ from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
 from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
+from constraint_compiler import format_constraints_for_prompt, is_constraint_pushdown_enabled
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import traceback
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
@@ -52,6 +53,10 @@ WHERE {
   ?entity ns:%s ns:%s .
 }"""
 sparql_id = """PREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?tailEntity\nWHERE {\n  {\n    ?entity ns:type.object.name ?tailEntity .\n    FILTER(?entity = ns:%s)\n  }\n  UNION\n  {\n    ?entity <http://www.w3.org/2002/07/owl#sameAs> ?tailEntity .\n    FILTER(?entity = ns:%s)\n  }\n}"""
+
+DATE_RELATION_REGEX = r"([.]from$|[.]to$|[.]start_date$|[.]end_date$|[.]start$|[.]end$)"
+START_RELATION_REGEX = r"([.]from$|[.]start_date$|[.]start$)"
+END_RELATION_REGEX = r"([.]to$|[.]end_date$|[.]end$)"
 
 # def check_end_word(s):
 #     words = [" ID", " code", " number", "instance of", "website", "URL", "inception", "image", " rate", " count"]
@@ -118,6 +123,213 @@ def relation_from_binding(value: str) -> str:
 
 def entity_from_binding(value: str) -> str:
     return value.replace("http://rdf.freebase.com/ns/", "")
+
+
+def is_mid(value: Any) -> bool:
+    value = str(value or "")
+    return value.startswith("m.") or value.startswith("g.")
+
+
+def normalize_literal_date(value: str) -> str:
+    value = str(value or "")
+    match = re.search(r"\d{4}(?:-\d{2})?(?:-\d{2})?", value)
+    if not match:
+        return value
+    date_value = match.group(0)
+    if re.fullmatch(r"\d{4}", date_value):
+        return date_value + "-01-01"
+    if re.fullmatch(r"\d{4}-\d{2}", date_value):
+        return date_value + "-01"
+    return date_value
+
+
+def build_one_hop_base_pattern(entity: str, relation: str, head: bool) -> str:
+    if head:
+        return f"ns:{entity} ns:{relation} ?tailEntity ."
+    return f"?tailEntity ns:{relation} ns:{entity} ."
+
+
+def execute_entity_search_query(sparql_query: str) -> List[str]:
+    bindings = execurte_sparql(sparql_query)
+    return replace_entities_prefix(bindings)
+
+
+def build_constraint_query(
+    entity: str,
+    relation: str,
+    head: bool,
+    entity_constraints: Sequence[dict],
+    time_constraints: Sequence[dict],
+    order_constraints: Sequence[dict],
+    limit: Optional[int] = None,
+) -> str:
+    where_lines = [build_one_hop_base_pattern(entity, relation, head)]
+
+    for constraint in entity_constraints:
+        mid = str(constraint.get("mid", "")).strip()
+        if not is_mid(mid):
+            continue
+        where_lines.append(
+            f"""{{
+  {{ ?tailEntity ?constraintRelation ns:{mid} . }}
+  UNION
+  {{ ns:{mid} ?constraintRelation ?tailEntity . }}
+}}"""
+        )
+        where_lines.append(
+            "FILTER("
+            "!STRSTARTS(STR(?constraintRelation), STR(ns:type.object.name)) && "
+            "!STRSTARTS(STR(?constraintRelation), STR(ns:common.)) && "
+            "!STRSTARTS(STR(?constraintRelation), STR(ns:freebase.))"
+            ")"
+        )
+
+    for time_constraint in time_constraints:
+        start = normalize_literal_date(time_constraint.get("start", ""))
+        end = normalize_literal_date(time_constraint.get("end", "")) or start
+        if not start:
+            continue
+        where_lines.append(
+            f"""OPTIONAL {{ ?tailEntity ?constraintStartRelation ?constraintStartRaw .
+  FILTER(REGEX(STR(?constraintStartRelation), "{START_RELATION_REGEX}"))
+  BIND(SUBSTR(STR(?constraintStartRaw), 1, 10) AS ?constraintStart)
+}}"""
+        )
+        where_lines.append(
+            f"""OPTIONAL {{ ?tailEntity ?constraintEndRelation ?constraintEndRaw .
+  FILTER(REGEX(STR(?constraintEndRelation), "{END_RELATION_REGEX}"))
+  BIND(SUBSTR(STR(?constraintEndRaw), 1, 10) AS ?constraintEnd)
+}}"""
+        )
+        where_lines.append(
+            f"""FILTER(
+  (!BOUND(?constraintStart) || ?constraintStart <= "{end}") &&
+  (!BOUND(?constraintEnd) || ?constraintEnd >= "{start}")
+)"""
+        )
+        where_lines.append("FILTER(BOUND(?constraintStart) || BOUND(?constraintEnd))")
+
+    order_clause = ""
+    if order_constraints:
+        direction = "ASC"
+        if order_constraints[0].get("kind") == "max":
+            direction = "DESC"
+        where_lines.append(
+            f"""OPTIONAL {{ ?tailEntity ?constraintOrderRelation ?constraintOrderValue .
+  FILTER(REGEX(STR(?constraintOrderRelation), "{DATE_RELATION_REGEX}"))
+}}"""
+        )
+        where_lines.append("FILTER(BOUND(?constraintOrderValue))")
+        order_clause = f"ORDER BY {direction}(?constraintOrderValue)"
+        limit = int(order_constraints[0].get("limit", 1) or 1)
+
+    limit_clause = f"LIMIT {int(limit)}" if limit else ""
+    where_body = "\n  ".join(where_lines)
+    return f"""PREFIX ns: <http://rdf.freebase.com/ns/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT DISTINCT ?tailEntity
+WHERE {{
+  {where_body}
+}}
+{order_clause}
+{limit_clause}"""
+
+
+def get_constraint_trace_cache(args: Any) -> Dict[Tuple[str, str, bool], dict]:
+    cache = getattr(args, "current_constraint_search_traces", None)
+    if cache is None:
+        cache = {}
+        setattr(args, "current_constraint_search_traces", cache)
+    return cache
+
+
+def pushdown_result(
+    entity_ids: Sequence[str],
+    applied_constraints: Sequence[dict],
+    before_count: int,
+    after_count: int,
+    sparql_query: str,
+    applied: bool,
+    fallback_reason: str = "",
+) -> dict:
+    return {
+        "entity_ids": list(entity_ids),
+        "applied_constraints": list(applied_constraints),
+        "before_count": before_count,
+        "after_count": after_count,
+        "sparql": sparql_query,
+        "fallback_reason": fallback_reason,
+        "applied": applied,
+        "pushdown_applied": applied,
+    }
+
+
+def entity_search_with_constraints(entity, relation, head=True, question=None, args=None):
+    del question
+    if args is None or not is_constraint_pushdown_enabled(args):
+        return entity_search(entity, relation, head)
+
+    compiled = getattr(args, "current_constraints", {}) or {}
+    cache = get_constraint_trace_cache(args)
+    cache_key = (entity, relation, bool(head))
+    unconstrained = entity_search(entity, relation, head)
+    entity_constraints = list(compiled.get("entity_constraints", []))
+    time_constraints = list(compiled.get("time_constraints", []))
+    order_constraints = list(compiled.get("order_constraints", []))
+
+    applied_constraints = entity_constraints + time_constraints + order_constraints
+    if not applied_constraints:
+        cache[cache_key] = pushdown_result(
+            unconstrained, [], len(unconstrained), len(unconstrained), "", False, "no_compiled_constraints"
+        )
+        return unconstrained
+
+    attempts: list[tuple[list[dict], list[dict], list[dict], str]] = []
+    if entity_constraints:
+        attempts.append((entity_constraints[:1], time_constraints, order_constraints, "top_entity_with_time_order"))
+    if len(entity_constraints) > 1:
+        attempts.append((entity_constraints, time_constraints, order_constraints, "all_entities_with_time_order"))
+    if time_constraints or order_constraints:
+        attempts.append(([], time_constraints, order_constraints, "time_order_only"))
+    if entity_constraints:
+        attempts.append((entity_constraints[:1], [], [], "top_entity_only"))
+
+    errors = []
+    for ent_cs, time_cs, order_cs, attempt_name in attempts:
+        query = build_constraint_query(entity, relation, head, ent_cs, time_cs, order_cs)
+        try:
+            constrained = execute_entity_search_query(query)
+        except Exception as exc:
+            errors.append({"attempt": attempt_name, "error": repr(exc)})
+            continue
+        if constrained:
+            trace = pushdown_result(
+                constrained,
+                ent_cs + time_cs + order_cs,
+                len(unconstrained),
+                len(constrained),
+                query,
+                True,
+                "",
+            )
+            trace["attempt"] = attempt_name
+            trace["errors"] = errors
+            cache[cache_key] = trace
+            return constrained
+        errors.append({"attempt": attempt_name, "error": "empty_result"})
+
+    trace = pushdown_result(
+        unconstrained,
+        applied_constraints,
+        len(unconstrained),
+        len(unconstrained),
+        "",
+        False,
+        "fallback_unconstrained",
+    )
+    trace["errors"] = errors
+    cache[cache_key] = trace
+    return unconstrained
 
 
 def get_cvt_one_hop_triples(entity_id: str) -> List[NeighborTriple]:
@@ -256,6 +468,7 @@ def cvt_neighbor_prune(
     args: Any,
     intersection_keep: Optional[Sequence[str]] = None,
     intersection_trace: Optional[Dict[str, int]] = None,
+    constraint_trace: Optional[Dict[str, Any]] = None,
 ) -> Tuple[List[str], Optional[str], str, int, TokenUsage, Dict[str, Any]]:
     cur_call_time = 0
     cur_token = {'total': 0, 'input': 0, 'output': 0}
@@ -265,23 +478,33 @@ def cvt_neighbor_prune(
     cvt_entity_top_k = int(getattr(args, "cvt_entity_top_k", 30))
     intersection_keep = list(intersection_keep or [])
     intersection_trace = intersection_trace or {}
+    constraint_trace = constraint_trace or {}
+    constraint_pushdown_applied = bool(constraint_trace.get("pushdown_applied"))
 
     cvt_neighbor_relations = {}
     relation_counts = {}
     cvt_relation_llm_error = None
     cvt_entity_llm_error = None
-    for cvt_id in sorted(e_list):
-        relations = get_cvt_one_hop_relations(cvt_id)
-        cvt_neighbor_relations[cvt_id] = relations
-        for relation in relations:
-            relation_counts[relation] = relation_counts.get(relation, 0) + 1
+    if not constraint_pushdown_applied:
+        for cvt_id in sorted(e_list):
+            relations = get_cvt_one_hop_relations(cvt_id)
+            cvt_neighbor_relations[cvt_id] = relations
+            for relation in relations:
+                relation_counts[relation] = relation_counts.get(relation, 0) + 1
 
     cvt_selected_relations = []
     cvt_relation_llm_raw_output = None
     unique_neighbor_relations: List[str] = []
     candidate_relations_for_llm: List[str] = []
     filtered_e_list = list(e_list)
-    if relation_counts:
+    if constraint_pushdown_applied:
+        cvt_selected_relations = [
+            item.get("mid") or item.get("raw_text") or item.get("kind", "")
+            for item in constraint_trace.get("applied_constraints", [])
+            if item
+        ]
+        prune_method = "constraint_pushdown_cvt"
+    elif relation_counts:
         unique_neighbor_relations, candidate_relations_for_llm = prepare_cvt_neighbor_relations_for_llm(
             question,
             relation_counts,
@@ -325,12 +548,15 @@ def cvt_neighbor_prune(
     candidate_evidence = []
     evidence_name_to_id = {}
     for cvt_id in sorted(truncated_e_list):
-        neighbor_triples = get_cvt_selected_relation_triples(cvt_id, cvt_selected_relations)
+        if constraint_pushdown_applied:
+            neighbor_triples = get_cvt_one_hop_triples(cvt_id)
+        else:
+            neighbor_triples = get_cvt_selected_relation_triples(cvt_id, cvt_selected_relations)
         evidence_text, relation_values = make_cvt_evidence_text(
             cvt_id,
             topic_name,
             rela,
-            cvt_selected_relations,
+            cvt_selected_relations if not constraint_pushdown_applied else [triple[1] for triple in neighbor_triples],
             neighbor_triples,
             entid_name,
             name_entid,
@@ -376,6 +602,8 @@ def cvt_neighbor_prune(
 
     select_ent = [entid_name[ent_id] for ent_id in select_ids]
     cvt_trace = {
+        "constraint_trace": constraint_trace,
+        "constraint_pushdown_applied": constraint_pushdown_applied,
         "cvt_selected_relations": cvt_selected_relations,
         "cvt_unique_neighbor_relations": unique_neighbor_relations,
         "cvt_candidate_relations_sent_to_llm": candidate_relations_for_llm,
@@ -533,6 +761,7 @@ def get_cvt_next_nodes(cvt_id: str) -> set:
 def build_bucket_next_nodes(
     ent_rel_ent_dict: Dict[str, Dict[str, Dict[str, List[str]]]],
     entid_name: Dict[str, str],
+    constraint_trace_cache: Optional[Dict[Tuple[str, str, bool], dict]] = None,
 ) -> Dict[Tuple[str, str, str], Dict[str, set]]:
     """Precompute next-node sets for every (topic, head/tail, relation) bucket.
 
@@ -547,11 +776,12 @@ def build_bucket_next_nodes(
         for h_t, r_e_dict in h_t_dict.items():
             for rela, e_list in r_e_dict.items():
                 per_cvt: Dict[str, set] = {}
+                constraint_trace = (constraint_trace_cache or {}).get((topic_e, rela, h_t == "head"), {})
                 is_cvt_bucket = (
                     len(e_list) > 10
                     and all(is_cvt_like_entity(eid, entid_name) for eid in e_list)
                 )
-                if is_cvt_bucket:
+                if is_cvt_bucket and not constraint_trace.get("pushdown_applied"):
                     for cvt_id in e_list:
                         per_cvt[cvt_id] = get_cvt_next_nodes(cvt_id)
                 else:
@@ -562,6 +792,14 @@ def build_bucket_next_nodes(
 
 def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args):
     prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
+    constraint_context = ""
+    if is_constraint_pushdown_enabled(args):
+        constraint_context = format_constraints_for_prompt(getattr(args, "current_constraints", {}) or {})
+        if constraint_context:
+            prompt += (
+                "\nQuestion Constraints: " + constraint_context +
+                "\nPrefer relations that can reach the answer or verify these entity, time, and ordering constraints."
+            )
     prompt = maybe_prepend_reference_context(prompt, args, stage="relation")
     memory_context = ""
     if should_use_relation_memory_at_stage(args, "relation"):
@@ -577,6 +815,7 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
         if memory_context:
             prompt = memory_context + "\n\n" + prompt
     setattr(args, "current_relation_memory_context", memory_context)
+    setattr(args, "current_relation_constraint_context", constraint_context)
     return prompt
 
 
@@ -629,6 +868,7 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
         "llm_raw_output": result,
         "selection_success": bool(flag),
         "relation_memory_context": getattr(args, "current_relation_memory_context", ""),
+        "constraint_context": getattr(args, "current_relation_constraint_context", ""),
     }
 
     if flag:
@@ -739,13 +979,17 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
     no_prune = ['time', 'number', 'date']
     filter_entities_id, filter_tops, filter_relations, filter_candidates, filter_head = [], [], [], [], []
     entity_prune_details = []
-    bucket_next_nodes = build_bucket_next_nodes(ent_rel_ent_dict, entid_name)
+    constraint_trace_cache = getattr(args, "current_constraint_search_traces", {}) or {}
+    bucket_next_nodes = build_bucket_next_nodes(ent_rel_ent_dict, entid_name, constraint_trace_cache)
     for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
+                constraint_trace = constraint_trace_cache.get((topic_e, rela, h_t == "head"), {})
                 prune_method = "llm"
                 llm_raw = None
                 cvt_trace = {
+                    "constraint_trace": constraint_trace,
+                    "constraint_pushdown_applied": bool(constraint_trace.get("pushdown_applied")),
                     "cvt_selected_relations": [],
                     "cvt_neighbor_evidence": {},
                     "cvt_relation_llm_raw_output": None,
@@ -754,7 +998,11 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                 }
                 candidates_before = [entid_name[e_id] for e_id in sorted(e_list)]
 
-                if is_all_digits(e_list) or rela in no_prune or len(e_list) <= 1:
+                if constraint_trace.get("pushdown_applied") and len(e_list) <= int(getattr(args, "constraint_auto_keep_top_k", 50)):
+                    sorted_e_list = candidates_before
+                    select_ent = sorted_e_list
+                    prune_method = "constraint_pushdown_auto_keep"
+                elif is_all_digits(e_list) or rela in no_prune or len(e_list) <= 1:
                     sorted_e_list = candidates_before
                     select_ent = sorted_e_list
                     prune_method = "skip_auto_keep"
@@ -775,6 +1023,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                             args,
                             intersection_keep=intersection_keep,
                             intersection_trace=intersection_trace,
+                            constraint_trace=constraint_trace,
                         )
                         cur_call_time += cvt_call_time
                         for kk in cvt_token.keys():
@@ -818,6 +1067,11 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                     "cvt_relation_llm_raw_output": cvt_trace["cvt_relation_llm_raw_output"],
                     "cvt_relation_llm_error": cvt_trace["cvt_relation_llm_error"],
                     "cvt_entity_llm_error": cvt_trace["cvt_entity_llm_error"],
+                    "constraint_trace": cvt_trace.get("constraint_trace", constraint_trace),
+                    "constraint_pushdown_applied": bool(cvt_trace.get("constraint_pushdown_applied")),
+                    "before_pushdown_count": constraint_trace.get("before_count"),
+                    "after_pushdown_count": constraint_trace.get("after_count"),
+                    "fallback_reason": constraint_trace.get("fallback_reason", ""),
                 })
 
                 if len(select_ent) == 0 or all(x == '' for x in select_ent):

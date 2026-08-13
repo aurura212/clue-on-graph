@@ -18,6 +18,8 @@ Relations: language.human_language.main_country; language.human_language.languag
 The output is: 
 ['language.human_language.main_country','language.human_language.countries_spoken_in','base.rosetta.languoid.parent']
 
+When Question Constraints are provided after the relation list, prefer relations that can connect the answer path or verify those entity, time, and ordering constraints.
+
 Now you need to directly output relations highly related to the following question and its subobjectives in list format without other information or notes.
 Q: """
 
