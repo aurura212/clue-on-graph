@@ -31,6 +31,215 @@ color_green = "\033[92m"
 color_red= "\033[91m"
 color_end = "\033[0m"
 
+LLM_SYSTEM_MESSAGE = "You are an AI assistant that helps people find information."
+CONTEXT_SAFETY_TOKENS = 256
+MIN_COMPLETION_TOKENS = 16
+LLM_REQUEST_TIMEOUT = float(os.environ.get("OPENAI_TIMEOUT", "180"))
+LLM_MAX_RETRIES = int(os.environ.get("OPENAI_MAX_RETRIES", "5"))
+_TIKTOKEN_ENCODING = None
+
+
+def _get_tiktoken_encoding(engine: str = ""):
+    global _TIKTOKEN_ENCODING
+    if _TIKTOKEN_ENCODING is not None:
+        return _TIKTOKEN_ENCODING
+    try:
+        import tiktoken
+    except ImportError:
+        return None
+    for candidate in (engine, "gpt-3.5-turbo", "cl100k_base"):
+        if not candidate:
+            continue
+        try:
+            if candidate == "cl100k_base":
+                _TIKTOKEN_ENCODING = tiktoken.get_encoding(candidate)
+            else:
+                _TIKTOKEN_ENCODING = tiktoken.encoding_for_model(candidate)
+            return _TIKTOKEN_ENCODING
+        except Exception:
+            continue
+    return None
+
+
+def estimate_token_count(text: str, engine: str = "") -> int:
+    """Token count via tiktoken when available; otherwise a conservative heuristic."""
+    text = str(text or "")
+    if not text:
+        return 0
+    enc = _get_tiktoken_encoding(engine)
+    if enc is not None:
+        return len(enc.encode(text))
+    by_words = int(len(text.split()) * 1.3)
+    by_chars = int(len(text) / 3.5)
+    return max(1, int(max(by_words, by_chars) * 1.45))
+
+
+def get_model_context_limit(engine: str) -> int:
+    name = (engine or "").lower()
+    if any(k in name for k in ("gpt-4o", "gpt-4-turbo", "gpt-4.1", "o1", "o3")):
+        return 128000
+    if "gpt-4-32k" in name:
+        return 32768
+    if "gpt-4" in name:
+        return 8192
+    if "gpt-3.5-turbo-16k" in name or "gpt-3.5" in name:
+        return 16385
+    if "deepseek" in name:
+        return 65536
+    if "qwen" in name:
+        return 32768
+    return 16385
+
+
+def truncate_text_to_token_budget(
+    text: str,
+    token_budget: int,
+    suffix: str = "\n...[truncated]",
+    engine: str = "",
+) -> str:
+    """Keep as many leading lines/words as fit in token_budget."""
+    text = str(text or "").strip("\n")
+    if token_budget <= 0:
+        return ""
+    if estimate_token_count(text, engine) <= token_budget:
+        return text
+
+    suffix_tokens = estimate_token_count(suffix, engine)
+    budget = max(1, token_budget - suffix_tokens)
+    lines = text.split("\n")
+    kept = []
+    for line in lines:
+        trial = "\n".join(kept + [line]) if kept else line
+        if estimate_token_count(trial, engine) <= budget:
+            kept.append(line)
+            continue
+        if not kept:
+            words = line.split()
+            lo, hi = 0, len(words)
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if estimate_token_count(" ".join(words[:mid]), engine) <= budget:
+                    lo = mid
+                else:
+                    hi = mid - 1
+            if lo > 0:
+                kept.append(" ".join(words[:lo]))
+            else:
+                kept.append(line[: max(1, budget * 3)])
+        break
+    if not kept:
+        return suffix.strip()
+    return "\n".join(kept) + suffix
+
+
+def truncate_knowledge_triplets_for_prompt(
+    prompt_prefix: str,
+    chain_prompt: str,
+    engine: str,
+    requested_max_tokens: int,
+    safety: int = 128,
+    system_overhead: int = 24,
+) -> str:
+    """Truncate Knowledge Triplets so prefix + triplets + completion fit the model window."""
+    chain_prompt = str(chain_prompt or "")
+    if not chain_prompt.strip():
+        return chain_prompt
+
+    limit = get_model_context_limit(engine)
+    prefix_tokens = estimate_token_count(prompt_prefix, engine) + system_overhead
+    completion_reserve = max(MIN_COMPLETION_TOKENS, int(requested_max_tokens))
+    triplets_budget = limit - prefix_tokens - completion_reserve - safety
+    if triplets_budget < 256:
+        completion_reserve = min(completion_reserve, 256)
+        triplets_budget = limit - prefix_tokens - completion_reserve - safety
+    triplets_budget = max(64, triplets_budget)
+
+    original_est = estimate_token_count(chain_prompt, engine)
+    if original_est <= triplets_budget:
+        return chain_prompt
+
+    truncated = truncate_text_to_token_budget(chain_prompt, triplets_budget, engine=engine)
+    print(
+        f"[context] Knowledge Triplets truncated ~{original_est} -> "
+        f"~{estimate_token_count(truncated, engine)} tokens (budget={triplets_budget}, engine={engine})"
+    )
+    return truncated
+
+
+def _estimate_messages_tokens(messages, engine: str = "") -> int:
+    # Per-message framing overhead is small but non-zero for chat APIs.
+    return sum(estimate_token_count(m.get("content", ""), engine) + 4 for m in messages) + 2
+
+
+def fit_messages_and_max_tokens(messages, engine: str, requested_max_tokens: int):
+    """Shrink user content / max_tokens so prompt + completion stay under the context limit."""
+    limit = get_model_context_limit(engine)
+    requested_max_tokens = max(MIN_COMPLETION_TOKENS, int(requested_max_tokens))
+    messages = [dict(m) for m in messages]
+    user_idx = next((i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"), None)
+
+    for attempt in range(8):
+        prompt_est = _estimate_messages_tokens(messages, engine)
+        available = limit - prompt_est - CONTEXT_SAFETY_TOKENS
+        effective = min(requested_max_tokens, max(MIN_COMPLETION_TOKENS, available))
+
+        if prompt_est + effective + CONTEXT_SAFETY_TOKENS <= limit:
+            if effective < requested_max_tokens:
+                print(
+                    f"[context] max_tokens reduced {requested_max_tokens} -> {effective} "
+                    f"(prompt≈{prompt_est}, limit={limit}, engine={engine})"
+                )
+            return messages, effective
+
+        if user_idx is None:
+            return messages, MIN_COMPLETION_TOKENS
+
+        other_est = _estimate_messages_tokens([m for i, m in enumerate(messages) if i != user_idx], engine)
+        completion_reserve = min(requested_max_tokens, max(MIN_COMPLETION_TOKENS, effective))
+        user_budget = limit - other_est - completion_reserve - CONTEXT_SAFETY_TOKENS
+        if user_budget < 64:
+            completion_reserve = MIN_COMPLETION_TOKENS
+            user_budget = max(32, limit - other_est - completion_reserve - CONTEXT_SAFETY_TOKENS)
+
+        original = messages[user_idx].get("content", "")
+        if estimate_token_count(original, engine) > user_budget:
+            messages[user_idx]["content"] = truncate_text_to_token_budget(
+                original,
+                user_budget,
+                suffix="\n...[truncated to fit context window]",
+                engine=engine,
+            )
+            print(
+                f"[context] prompt truncated ~{estimate_token_count(original, engine)} -> "
+                f"~{estimate_token_count(messages[user_idx]['content'], engine)} tokens "
+                f"(user_budget={user_budget}, engine={engine}, attempt={attempt + 1})"
+            )
+        else:
+            requested_max_tokens = max(MIN_COMPLETION_TOKENS, completion_reserve // 2)
+
+    prompt_est = _estimate_messages_tokens(messages, engine)
+    effective = max(MIN_COMPLETION_TOKENS, limit - prompt_est - CONTEXT_SAFETY_TOKENS)
+    print(
+        f"[context] max_tokens fallback {requested_max_tokens} -> {effective} "
+        f"(prompt≈{prompt_est}, limit={limit}, engine={engine})"
+    )
+    return messages, effective
+
+
+def _is_transient_llm_error(exc: Exception) -> bool:
+    if isinstance(
+        exc,
+        (
+            openai.APITimeoutError,
+            openai.APIConnectionError,
+            openai.RateLimitError,
+            openai.InternalServerError,
+        ),
+    ):
+        return True
+    return type(exc).__name__ in {"ConnectTimeout", "ReadTimeout", "ConnectError", "RemoteProtocolError"}
+
+
 def retrieve_top_docs(query, docs, model, width=3):
     query_emb = model.encode(query)
     doc_emb = model.encode(docs)
@@ -45,20 +254,74 @@ def run_llm(prompt, temperature, max_tokens, openai_api_keys, engine="gpt-3.5-tu
         print(color_green+prompt+color_end)
 
     if is_openai_compatible_engine(engine):
-        messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
-        message_prompt = {"role":"user","content":prompt}
-        messages.append(message_prompt)
-        client = openai.OpenAI(api_key=openai_api_keys, base_url=os.environ['OPENAI_API_BASE'])
+        messages = [
+            {"role": "system", "content": LLM_SYSTEM_MESSAGE},
+            {"role": "user", "content": prompt},
+        ]
+        messages, effective_max_tokens = fit_messages_and_max_tokens(messages, engine, max_tokens)
+        client = openai.OpenAI(
+            api_key=openai_api_keys,
+            base_url=os.environ['OPENAI_API_BASE'],
+            timeout=LLM_REQUEST_TIMEOUT,
+            max_retries=0,
+        )
         completion_kwargs = {
             "model": engine,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": effective_max_tokens,
             "frequency_penalty": 0,
             "presence_penalty": 0,
         }
         completion_kwargs.update(get_chat_completion_extra_kwargs(engine))
-        completion = client.chat.completions.create(**completion_kwargs)
+
+        completion = None
+        last_error = None
+        for attempt in range(LLM_MAX_RETRIES):
+            try:
+                completion = client.chat.completions.create(**completion_kwargs)
+                break
+            except openai.BadRequestError as exc:
+                last_error = exc
+                err_text = str(exc).lower()
+                if "context_length_exceeded" not in err_text or attempt >= LLM_MAX_RETRIES - 1:
+                    raise
+                print(f"[context] API rejected request (attempt {attempt + 1}), shrinking prompt and retrying...")
+                user_idx = next(
+                    (i for i in range(len(completion_kwargs["messages"]) - 1, -1, -1)
+                     if completion_kwargs["messages"][i].get("role") == "user"),
+                    None,
+                )
+                if user_idx is None:
+                    raise
+                original = completion_kwargs["messages"][user_idx]["content"]
+                shrink_budget = max(
+                    32,
+                    int(estimate_token_count(original, engine) * 0.65),
+                )
+                completion_kwargs["messages"][user_idx]["content"] = truncate_text_to_token_budget(
+                    original,
+                    shrink_budget,
+                    suffix="\n...[truncated after context_length_exceeded]",
+                    engine=engine,
+                )
+                completion_kwargs["messages"], completion_kwargs["max_tokens"] = fit_messages_and_max_tokens(
+                    completion_kwargs["messages"],
+                    engine,
+                    max(MIN_COMPLETION_TOKENS, completion_kwargs["max_tokens"] // 2),
+                )
+            except Exception as exc:
+                last_error = exc
+                if not _is_transient_llm_error(exc) or attempt >= LLM_MAX_RETRIES - 1:
+                    raise
+                wait_s = min(2 ** attempt, 30)
+                print(
+                    f"[llm] transient error ({type(exc).__name__}), "
+                    f"retry {attempt + 1}/{LLM_MAX_RETRIES} in {wait_s}s..."
+                )
+                time.sleep(wait_s)
+        if completion is None:
+            raise last_error
 
         result = completion.choices[0].message.content
 
@@ -249,8 +512,17 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
 
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     
-    prompt = judge_reverse+question+'\nEntities set to be retrieved: ' + str(list(set(sorted([entid_name[ent_i] for ent_i in new_lst])))) +'\nMemory: '+his_mem+'\nKnowledge Triplets:'+chain_prompt
-    prompt = maybe_prepend_reference_context(prompt, args, stage="reverse")
+    prefix = (
+        judge_reverse + question
+        + '\nEntities set to be retrieved: ' + str(list(set(sorted([entid_name[ent_i] for ent_i in new_lst]))))
+        + '\nMemory: ' + his_mem
+        + '\nKnowledge Triplets:'
+    )
+    budget_prefix = maybe_prepend_reference_context(prefix, args, stage="reverse")
+    chain_prompt = truncate_knowledge_triplets_for_prompt(
+        budget_prefix, chain_prompt, args.LLM_type, args.max_length,
+    )
+    prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="reverse")
 
     cur_call_time += 1
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)

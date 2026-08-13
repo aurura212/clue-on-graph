@@ -126,6 +126,8 @@ def add_relation_memory_args(parser):
                         default=4, help="Top-k decomposition memories to inject.")
     parser.add_argument("--decomposition_memory_prompt_token_budget", type=int,
                         default=800, help="Approximate token budget for decomposition memory prompt context.")
+    parser.add_argument("--cvt_entity_top_k", type=int,
+                        default=30, help="Max CVT candidates sent to the Step-2 entity LLM after intersection-priority filtering.")
 
 
 def should_train_relation_memory(args):

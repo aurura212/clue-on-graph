@@ -221,6 +221,31 @@ def make_cvt_evidence_text(
     return " | ".join(pieces), relation_values
 
 
+def truncate_cvt_candidates(
+    e_list: Sequence[str],
+    intersection_keep: Sequence[str],
+    top_k: int,
+) -> Tuple[List[str], Dict[str, List[str]]]:
+    """Order CVTs by intersection priority, then truncate to top_k.
+
+    CVTs that also appear in other (topic_entity, relation) candidate sets are
+    kept first (cross-relation corroboration); the remainder is truncated to
+    top_k by stable sort. Returns the truncated id list and a small trace dict.
+    """
+    keep_set = set(intersection_keep)
+    prioritized = [cvt_id for cvt_id in sorted(e_list) if cvt_id in keep_set]
+    remainder = [cvt_id for cvt_id in sorted(e_list) if cvt_id not in keep_set]
+    limit = max(0, int(top_k))
+    if limit and len(remainder) > limit:
+        remainder = remainder[:limit]
+    truncated = sorted(set(prioritized) | set(remainder))
+    return truncated, {
+        "intersection_keep_count": len(prioritized),
+        "remainder_count": len(remainder),
+        "truncated_count": len(truncated),
+    }
+
+
 def cvt_neighbor_prune(
     question: str,
     topic_e: str,
@@ -229,12 +254,17 @@ def cvt_neighbor_prune(
     entid_name: Dict[str, str],
     name_entid: Dict[str, str],
     args: Any,
+    intersection_keep: Optional[Sequence[str]] = None,
+    intersection_trace: Optional[Dict[str, int]] = None,
 ) -> Tuple[List[str], Optional[str], str, int, TokenUsage, Dict[str, Any]]:
     cur_call_time = 0
     cur_token = {'total': 0, 'input': 0, 'output': 0}
     topic_name = entid_name[topic_e]
     max_fallback = int(getattr(args, "cvt_neighbor_fallback_top_k", 10))
     llm_retries = int(getattr(args, "cvt_neighbor_llm_retries", 3))
+    cvt_entity_top_k = int(getattr(args, "cvt_entity_top_k", 30))
+    intersection_keep = list(intersection_keep or [])
+    intersection_trace = intersection_trace or {}
 
     cvt_neighbor_relations = {}
     relation_counts = {}
@@ -248,14 +278,22 @@ def cvt_neighbor_prune(
 
     cvt_selected_relations = []
     cvt_relation_llm_raw_output = None
+    unique_neighbor_relations: List[str] = []
+    candidate_relations_for_llm: List[str] = []
+    filtered_e_list = list(e_list)
     if relation_counts:
+        unique_neighbor_relations, candidate_relations_for_llm = prepare_cvt_neighbor_relations_for_llm(
+            question,
+            relation_counts,
+            args,
+        )
         relation_summary = [
-            relation + " (covers " + str(count) + " candidates)"
-            for relation, count in sorted(relation_counts.items(), key=lambda x: (-x[1], x[0]))
+            relation + " (covers " + str(relation_counts[relation]) + " CVT nodes)"
+            for relation in candidate_relations_for_llm
         ]
         prompt = cvt_relation_prune_prompt + question
-        prompt += "\nCurrent Incoming Triple: " + topic_name + " " + rela + " " + str(sorted(e_list))
-        prompt += "\nCandidate Neighbor Relations: " + str(relation_summary)
+        prompt += "\nCurrent Incoming Triple: " + topic_name + " " + rela
+        prompt += "\nCandidate Neighbor Relations: " + "; ".join(relation_summary)
 
         cur_call_time += 1
         result, token_num, cvt_relation_llm_error = run_llm_with_retry(prompt, args, args.temperature_reasoning, llm_retries)
@@ -271,10 +309,22 @@ def cvt_neighbor_prune(
                 relation for relation, _ in sorted(relation_counts.items(), key=lambda x: (-x[1], x[0]))[:5]
             ]
 
+        filtered_e_list = filter_cvts_by_relations(e_list, cvt_neighbor_relations, cvt_selected_relations)
+        if not filtered_e_list:
+            filtered_e_list = list(e_list)
+
+    truncated_e_list, truncation_trace = truncate_cvt_candidates(
+        filtered_e_list,
+        intersection_keep,
+        cvt_entity_top_k,
+    )
+    if not truncated_e_list:
+        truncated_e_list = list(filtered_e_list)
+
     cvt_neighbor_evidence = {}
     candidate_evidence = []
     evidence_name_to_id = {}
-    for cvt_id in sorted(e_list):
+    for cvt_id in sorted(truncated_e_list):
         neighbor_triples = get_cvt_selected_relation_triples(cvt_id, cvt_selected_relations)
         evidence_text, relation_values = make_cvt_evidence_text(
             cvt_id,
@@ -327,6 +377,17 @@ def cvt_neighbor_prune(
     select_ent = [entid_name[ent_id] for ent_id in select_ids]
     cvt_trace = {
         "cvt_selected_relations": cvt_selected_relations,
+        "cvt_unique_neighbor_relations": unique_neighbor_relations,
+        "cvt_candidate_relations_sent_to_llm": candidate_relations_for_llm,
+        "cvt_filtered_entity_count": len(filtered_e_list),
+        "cvt_truncated_entity_count": len(truncated_e_list),
+        "cvt_total_entity_count": len(e_list),
+        "cvt_intersection_keep_count": truncation_trace["intersection_keep_count"],
+        "cvt_intersection_id_keep_count": intersection_trace.get("cvt_id_keep", 0),
+        "cvt_intersection_next_node_keep_count": intersection_trace.get("next_node_keep", 0),
+        "cvt_intersection_combined_keep_count": intersection_trace.get("combined_keep", 0),
+        "cvt_remainder_count": truncation_trace["remainder_count"],
+        "cvt_entity_top_k": cvt_entity_top_k,
         "cvt_neighbor_evidence": cvt_neighbor_evidence,
         "cvt_relation_llm_raw_output": cvt_relation_llm_raw_output,
         "cvt_relation_llm_error": cvt_relation_llm_error,
@@ -367,6 +428,136 @@ def semantic_filter_relations(question, total_relations, args, top_k=None):
     limit = min(max(1, top_k), len(total_relations))
     ranked, _ = retrieve_top_docs(question, total_relations, model, width=limit)
     return ranked
+
+
+def prepare_cvt_neighbor_relations_for_llm(
+    question: str,
+    relation_counts: Dict[str, int],
+    args: Any,
+) -> Tuple[List[str], List[str]]:
+    """Deduplicate CVT neighbor relations and semantically filter before LLM selection."""
+    unique_relations = sorted(relation_counts.keys())
+    semantic_top_k = int(getattr(args, "relation_semantic_top_k", 20))
+    if len(unique_relations) > semantic_top_k:
+        candidate_relations = semantic_filter_relations(
+            question,
+            unique_relations,
+            args,
+            top_k=semantic_top_k,
+        )
+    else:
+        candidate_relations = unique_relations
+    return unique_relations, candidate_relations
+
+
+def filter_cvts_by_relations(
+    e_list: Sequence[str],
+    cvt_neighbor_relations: Dict[str, List[str]],
+    selected_relations: Sequence[str],
+) -> List[str]:
+    selected = set(selected_relations)
+    if not selected:
+        return []
+    return sorted(
+        cvt_id
+        for cvt_id in e_list
+        if selected.intersection(cvt_neighbor_relations.get(cvt_id, []))
+    )
+
+
+def collect_cvt_intersection_keep(
+    ent_rel_ent_dict: Dict[str, Dict[str, Dict[str, List[str]]]],
+    topic_e: str,
+    h_t: str,
+    rela: str,
+    e_list: Sequence[str],
+    entid_name: Optional[Dict[str, str]] = None,
+    bucket_next_nodes: Optional[Dict[Tuple[str, str, str], Dict[str, set]]] = None,
+) -> Tuple[List[str], Dict[str, int]]:
+    """CVT ids in e_list corroborated by other (topic_entity, relation) buckets.
+
+    Two corroboration signals are combined:
+    1. CVT id itself appears in another bucket's candidate set (shared intermediate node).
+    2. The CVT's next-node neighbors (CVT, relation, next_node) appear in another
+       bucket's next-node set -- i.e. two paths converge on the same downstream entity.
+
+    Returns the priority-keep CVT id list and a small trace dict with per-signal counts.
+    """
+    current_set = set(e_list)
+    if not current_set:
+        return [], {"cvt_id_keep": 0, "next_node_keep": 0, "combined_keep": 0}
+
+    other_ids: set = set()
+    for other_topic, other_ht_dict in ent_rel_ent_dict.items():
+        for other_ht, other_r_e_dict in other_ht_dict.items():
+            for other_rela, other_e_list in other_r_e_dict.items():
+                if other_topic == topic_e and other_ht == h_t and other_rela == rela:
+                    continue
+                other_ids.update(other_e_list)
+    cvt_id_keep = current_set & other_ids
+
+    next_node_keep: set = set()
+    if bucket_next_nodes is not None:
+        current_per_cvt = bucket_next_nodes.get((topic_e, h_t, rela), {})
+        other_next_nodes: set = set()
+        for key, per_cvt in bucket_next_nodes.items():
+            if key == (topic_e, h_t, rela):
+                continue
+            for nodes in per_cvt.values():
+                other_next_nodes.update(nodes)
+        for cvt_id, nodes in current_per_cvt.items():
+            if nodes & other_next_nodes:
+                next_node_keep.add(cvt_id)
+
+    combined = sorted(cvt_id_keep | next_node_keep)
+    trace = {
+        "cvt_id_keep": len(cvt_id_keep),
+        "next_node_keep": len(next_node_keep),
+        "combined_keep": len(combined),
+    }
+    return combined, trace
+
+
+def is_cvt_like_entity(entity_id: str, entid_name: Dict[str, str]) -> bool:
+    """Heuristic: entity has no readable Freebase name (name resolved back to the id)."""
+    name = entid_name.get(entity_id, entity_id)
+    return name == entity_id and entity_id.startswith("m.")
+
+
+def get_cvt_next_nodes(cvt_id: str) -> set:
+    """Return next-node entity ids reachable from a CVT in one hop."""
+    triples = get_cvt_one_hop_triples(cvt_id)
+    return {neighbor_id for _, _, neighbor_id in triples}
+
+
+def build_bucket_next_nodes(
+    ent_rel_ent_dict: Dict[str, Dict[str, Dict[str, List[str]]]],
+    entid_name: Dict[str, str],
+) -> Dict[Tuple[str, str, str], Dict[str, set]]:
+    """Precompute next-node sets for every (topic, head/tail, relation) bucket.
+
+    For regular entity buckets the entities themselves are the next-nodes. For
+    CVT buckets each CVT is expanded via one-hop SPARQL into its downstream
+    entities. The result is cached once per depth iteration so that
+    `collect_cvt_intersection_keep` can compute next-node intersections without
+    reissuing SPARQL queries.
+    """
+    bucket_map: Dict[Tuple[str, str, str], Dict[str, set]] = {}
+    for topic_e, h_t_dict in ent_rel_ent_dict.items():
+        for h_t, r_e_dict in h_t_dict.items():
+            for rela, e_list in r_e_dict.items():
+                per_cvt: Dict[str, set] = {}
+                is_cvt_bucket = (
+                    len(e_list) > 10
+                    and all(is_cvt_like_entity(eid, entid_name) for eid in e_list)
+                )
+                if is_cvt_bucket:
+                    for cvt_id in e_list:
+                        per_cvt[cvt_id] = get_cvt_next_nodes(cvt_id)
+                else:
+                    per_cvt["__direct__"] = set(e_list)
+                bucket_map[(topic_e, h_t, rela)] = per_cvt
+    return bucket_map
 
 
 def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args):
@@ -516,8 +707,12 @@ def half_stop(question, question_string, subquestions, cluster_chain_of_entities
 def generate_answer(question, subquestions, cluster_chain_of_entities, args): 
     prompt = answer_prompt + question 
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
-    prompt += "\nKnowledge Triplets: " + chain_prompt
-    prompt = maybe_prepend_reference_context(prompt, args, stage="answer")
+    prefix = prompt + "\nKnowledge Triplets: "
+    budget_prefix = maybe_prepend_reference_context(prefix, args, stage="answer")
+    chain_prompt = truncate_knowledge_triplets_for_prompt(
+        budget_prefix, chain_prompt, args.LLM_type, args.max_length,
+    )
+    prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="answer")
     result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     return result, token_num
 
@@ -544,6 +739,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
     no_prune = ['time', 'number', 'date']
     filter_entities_id, filter_tops, filter_relations, filter_candidates, filter_head = [], [], [], [], []
     entity_prune_details = []
+    bucket_next_nodes = build_bucket_next_nodes(ent_rel_ent_dict, entid_name)
     for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
@@ -565,6 +761,10 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                 else:
                     if all(entid_name[item].startswith('m.') for item in e_list) and len(e_list) > 10:
                         sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
+                        intersection_keep, intersection_trace = collect_cvt_intersection_keep(
+                            ent_rel_ent_dict, topic_e, h_t, rela, e_list,
+                            entid_name=entid_name, bucket_next_nodes=bucket_next_nodes,
+                        )
                         select_ent, llm_raw, prune_method, cvt_call_time, cvt_token, cvt_trace = cvt_neighbor_prune(
                             question,
                             topic_e,
@@ -573,6 +773,8 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                             entid_name,
                             name_entid,
                             args,
+                            intersection_keep=intersection_keep,
+                            intersection_trace=intersection_trace,
                         )
                         cur_call_time += cvt_call_time
                         for kk in cvt_token.keys():
@@ -708,8 +910,12 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
                 sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
                 chain_prompt += entid_name[topic_e] + ' ' + rela + ' ' + str(sorted_e_list) + '\n'
 
-    prompt += "\nKnowledge Triplets:\n" + chain_prompt
-    prompt = maybe_prepend_reference_context(prompt, args, stage="memory")
+    prefix = prompt + "\nKnowledge Triplets:\n"
+    budget_prefix = maybe_prepend_reference_context(prefix, args, stage="memory")
+    chain_prompt = truncate_knowledge_triplets_for_prompt(
+        budget_prefix, chain_prompt, args.LLM_type, args.max_length,
+    )
+    prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="memory")
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     
@@ -740,8 +946,12 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
                 sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
                 chain_prompt += entid_name[topic_e] + ', ' + rela + ', ' + str(sorted_e_list) + '\n'
 
-    prompt += "\nKnowledge Triplets:\n" + chain_prompt
-    prompt = maybe_prepend_reference_context(prompt, args, stage="reasoning")
+    prefix = prompt + "\nKnowledge Triplets:\n"
+    budget_prefix = maybe_prepend_reference_context(prefix, args, stage="reasoning")
+    chain_prompt = truncate_knowledge_triplets_for_prompt(
+        budget_prefix, chain_prompt, args.LLM_type, args.max_length,
+    )
+    prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="reasoning")
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     print("Response from reasoning:", response)

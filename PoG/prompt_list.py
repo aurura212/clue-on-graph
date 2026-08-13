@@ -104,8 +104,9 @@ Now you need to directly output the entities from [] in Triplets for the followi
 Q: """
 
 cvt_relation_prune_prompt = """
-The candidate entities are unnamed Freebase CVT/intermediate nodes. To decide which CVT nodes are useful, first choose the neighboring relations that provide the strongest evidence for answering the question.
-Use the current incoming triple and the candidate neighboring relations. Prefer relations that can verify constraints in the question or reveal the next answer-bearing entity.
+The downstream entities are unnamed Freebase CVT/intermediate nodes reached through the current incoming triple.
+Do not assume any CVT ids are provided. From the deduplicated candidate neighboring relations below, choose the relations that are most relevant to answering the question.
+Prefer relations that can verify constraints in the question or reveal the next answer-bearing entity.
 
 Now directly output relation names from Candidate Neighbor Relations in list format. Select at most 5 relations and do not output explanations.
 Q: """
