@@ -9,6 +9,7 @@ def new_run_trace(subquestions: Any, topic_entity: dict[str, str]) -> dict[str, 
     return {
         "subquestions": subquestions,
         "topic_entity": dict(topic_entity),
+        "constraints": None,
         "depths": [],
         "final_stop_reason": None,
         "final_stop_depth": None,

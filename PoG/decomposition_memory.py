@@ -196,13 +196,16 @@ def select_decomposition_memory_items(
     return [(scores[i], memory_bank[i]) for i in ranked_indices[:top_k]]
 
 
-def format_memory_item_for_prompt(score: float, item: dict[str, Any]) -> str:
+def format_memory_item_for_prompt(score: float, item: dict[str, Any], args: Any = None) -> str:
     lines = ["Q: " + str(item.get("question", ""))]
     topic_names = list((item.get("topic_entity") or {}).values())
     if topic_names:
         lines.append("Topic Entity: " + "; ".join(str(name) for name in topic_names))
 
     steps = [str(step).strip() for step in (item.get("gold_subobjectives") or []) if str(step).strip()]
+    if steps and args is not None and str(getattr(args, "constraint_pushdown", "off")).lower() == "on" and int(getattr(args, "decomposition_memory_mask_literals", 1)):
+        from constraint_runtime import mask_planning_steps
+        steps = mask_planning_steps(steps, [str(name) for name in topic_names])
     if steps:
         lines.append("Correct Planning Steps:")
         lines.extend(f"{index + 1}. {step}" for index, step in enumerate(steps))
@@ -229,7 +232,7 @@ def decomposition_memory_context(
         "Use their Output format and planning style as guidance, but answer the current question only.",
     ]
     for score, item in selected:
-        block = format_memory_item_for_prompt(score, item)
+        block = format_memory_item_for_prompt(score, item, args)
         candidate = lines + ["", block]
         if estimate_token_count("\n".join(candidate)) > token_budget:
             break

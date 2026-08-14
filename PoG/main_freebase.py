@@ -22,7 +22,14 @@ from relation_memory import (
     load_relation_memory,
     load_webqsp_train_episodes,
 )
-from constraint_compiler import compile_question_constraints
+from constraint_compiler import compile_question_constraints, format_constraints_for_prompt
+from constraint_runtime import (
+    answer_gate_mode,
+    answer_in_covering_set,
+    apply_frontier_bias,
+    covering_answer_names,
+    reset_coverage_map,
+)
 from decomposition_memory import (
     append_decomposition_memory,
     build_gold_planning_prompt,
@@ -130,7 +137,7 @@ def add_relation_memory_args(parser):
     parser.add_argument("--cvt_entity_top_k", type=int,
                         default=30, help="Max CVT candidates sent to the Step-2 entity LLM after intersection-priority filtering.")
     parser.add_argument("--constraint_pushdown", type=str, choices=["off", "on"],
-                        default="off", help="Enable question constraint compilation and SPARQL pushdown in test mode.")
+                        default="off", help="Enable question constraint compilation and SPARQL pushdown in test and train modes.")
     parser.add_argument("--constraint_asof_date", type=str,
                         default="2015-08-10", help="Snapshot date used for current/present time constraints.")
     parser.add_argument("--constraint_link_top_k", type=int,
@@ -141,6 +148,23 @@ def add_relation_memory_args(parser):
                         default=2, help="Max linked non-topic entity constraints used by pushdown.")
     parser.add_argument("--constraint_auto_keep_top_k", type=int,
                         default=50, help="Auto-keep already pushdown-filtered buckets up to this size before LLM pruning.")
+    parser.add_argument("--constraint_hub_threshold", type=int,
+                        default=50, help="Skip time-only pushdown when unconstrained neighbor count is below this threshold.")
+    parser.add_argument("--constraint_prompt_stages", type=str,
+                        default="relation,memory,reasoning,answer",
+                        help="Stages that receive compiled question constraints in prompts.")
+    parser.add_argument("--constraint_answer_gate", type=str, choices=["off", "soft", "hard"],
+                        default="hard", help="Stop-search gate using constraint-covering provenance. off=disabled, soft=prompt only, hard=reject uncovered answers.")
+    parser.add_argument("--decomposition_grounding_check", type=int,
+                        default=1, help="Strip ungrounded quoted literals from subobjectives.")
+    parser.add_argument("--decomposition_memory_mask_literals", type=int,
+                        default=1, help="Mask topic names and quoted literals in decomposition memory examples.")
+    parser.add_argument("--memory_conflict_policy", type=str, choices=["keep_both", "overwrite"],
+                        default="keep_both", help="How to handle memory slot value changes when both mention constraint-covering entities.")
+    parser.add_argument("--constraint_frontier_bias", type=int,
+                        default=1, help="Prefer constraint-covering entities when building the next-hop frontier.")
+    parser.add_argument("--decomposition_repair", type=str, choices=["off", "on"],
+                        default="off", help="Optionally re-plan once after repeated insufficient reasoning. Default off.")
 
 
 def should_train_relation_memory(args):
@@ -230,6 +254,7 @@ def run_combined_memory_train(args, run_output, episodes, model):
         question = episode["RawQuestion"]
         topic_entity = dict(episode.get("topic_entity", {}))
         setattr(args, "current_constraint_search_traces", {})
+        reset_coverage_map(args)
         if args.constraint_pushdown == "on":
             constraints = compile_question_constraints(
                 question,
@@ -239,6 +264,9 @@ def run_combined_memory_train(args, run_output, episodes, model):
                 sparql_executor=execurte_sparql,
             )
             setattr(args, "current_constraints", constraints)
+            prompt_context = format_constraints_for_prompt(constraints)
+            if prompt_context:
+                print(f"compiled constraints [{parse_id}]: {prompt_context}")
         else:
             setattr(args, "current_constraints", {})
 
@@ -291,6 +319,16 @@ def run_combined_memory_train(args, run_output, episodes, model):
                     args=args,
                     question=question,
                 )
+                if args.constraint_pushdown == "on":
+                    traces = getattr(args, "current_constraint_search_traces", {}) or {}
+                    for (entity_id, relation, head), trace in traces.items():
+                        print(
+                            "constraint pushdown "
+                            f"parse={parse_id} entity={entity_id} relation={relation} head={head} "
+                            f"before={trace.get('before_count')} after={trace.get('after_count')} "
+                            f"applied={trace.get('pushdown_applied')} bind={trace.get('bind_relation')} "
+                            f"attempt={trace.get('attempt', '')} reason={trace.get('fallback_reason', '')}"
+                        )
                 hop_buffer = TrainRelationMemoryBuffer()
                 for entity_id in current_frontier:
                     entity_name = entid_name.get(entity_id)
@@ -351,6 +389,7 @@ def run_combined_memory_train(args, run_output, episodes, model):
         "memory_output_dir": memory_dir,
         "constraint_pushdown": getattr(args, "constraint_pushdown", "off"),
         "constraint_asof_date": getattr(args, "constraint_asof_date", ""),
+        "constraint_hub_threshold": getattr(args, "constraint_hub_threshold", 50),
     }
     if train_decomp:
         decomp_count = count_decomposition_memory(decomposition_memory_path)
@@ -542,17 +581,10 @@ if __name__ == '__main__':
                 if not os.path.exists(q_mem_f_path):
                     os.makedirs(q_mem_f_path)
 
-                call_num += 1
-                sub_questions, token_num = get_subquestions(q_mem_f_path, question, args)
-                for kk in token_num.keys():
-                    all_t[kk] += token_num[kk]
-
                 topic_entity = data['topic_entity']
-                cluster_chain_of_entities = []
-                depth_ent_rel_ent_dict = {}
-                reverse_rec = {'time': 0, 'ent': []}
-                pog_trace = new_run_trace(sub_questions, topic_entity)
+                setattr(args, "current_topic_entity", topic_entity)
                 setattr(args, "current_constraint_search_traces", {})
+                reset_coverage_map(args)
                 if args.constraint_pushdown == "on":
                     constraints = compile_question_constraints(
                         question,
@@ -562,14 +594,30 @@ if __name__ == '__main__':
                         sparql_executor=execurte_sparql,
                     )
                     setattr(args, "current_constraints", constraints)
-                    pog_trace["constraints"] = constraints
+                    extract_tokens = (constraints.get("trace") or {}).get("llm_token_num") or {}
+                    if any(extract_tokens.get(key, 0) for key in ("total", "input", "output")):
+                        call_num += 1
+                        for kk in extract_tokens.keys():
+                            all_t[kk] += extract_tokens[kk]
                 else:
                     setattr(args, "current_constraints", {})
+
+                call_num += 1
+                sub_questions, token_num = get_subquestions(q_mem_f_path, question, args)
+                for kk in token_num.keys():
+                    all_t[kk] += token_num[kk]
+
+                cluster_chain_of_entities = []
+                depth_ent_rel_ent_dict = {}
+                reverse_rec = {'time': 0, 'ent': []}
+                pog_trace = new_run_trace(sub_questions, topic_entity)
+                pog_trace["constraints"] = getattr(args, "current_constraints", {}) or {}
                 pog_trace["decomposition"] = {
                     "subquestions": sub_questions,
                     "memory_context": getattr(args, "current_decomposition_memory_context", ""),
                     "reference_context": getattr(args, "current_decomposition_reference_context", ""),
                     "llm_raw_output": getattr(args, "current_decomposition_raw_output", ""),
+                    "grounding": getattr(args, "current_decomposition_grounding", {}),
                 }
 
                 entid_name = {}
@@ -679,6 +727,10 @@ if __name__ == '__main__':
                     depth_record["entity_prune_details"] = entity_prune_details
                     depth_record["pruned_triples"] = flatten_chain_triples(chain_of_entities)
                     depth_record["entity_prune_success"] = flag
+                    depth_record["constraint_covering_entities"] = sorted(
+                        name for name in covering_answer_names(args, entid_name)
+                        if not str(name).startswith(("m.", "g."))
+                    )
                     cluster_chain_of_entities.append(chain_of_entities)
 
                     call_num += cur_call_time
@@ -686,6 +738,7 @@ if __name__ == '__main__':
                         all_t[kk] += cur_token[kk]
 
                     pprint.pprint(convert_dict_name(new_ent_rel_ent_dict, entid_name))
+                    setattr(args, "current_entid_name", entid_name)
                     if flag:
                         call_num += 1
                         token_num, mem_trace = update_memory(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
@@ -698,16 +751,56 @@ if __name__ == '__main__':
                         for kk in token_num.keys():
                             all_t[kk] += token_num[kk]
 
+                        covering_names = covering_answer_names(args, entid_name)
+                        gate_trace = {
+                            "mode": answer_gate_mode(args),
+                            "triggered": False,
+                            "reasked": False,
+                            "covering_names": sorted(name for name in covering_names if not str(name).startswith(("m.", "g."))),
+                        }
+
                         if str(answer).lower() == 'null' or str(answer).lower() == 'none'  or str(answer).startswith('m.') or str(answer).startswith('[\"m.') or str(answer).startswith("['m.") or 'yes' not in str(sufficient).lower():
                             stop = False
                         else:
                             stop = True
+
+                        if (
+                            stop
+                            and answer_gate_mode(args) == "hard"
+                            and covering_names
+                            and not answer_in_covering_set(answer, covering_names)
+                        ):
+                            gate_trace["triggered"] = True
+                            gate_trace["rejected_answer"] = answer
+                            call_num += 1
+                            results2, answer2, sufficient2, token_num2 = reasoning(
+                                question, sub_questions, new_ent_rel_ent_dict, entid_name,
+                                cluster_chain_of_entities, q_mem_f_path, args,
+                                restrict_to_covering=True,
+                            )
+                            for kk in token_num2.keys():
+                                all_t[kk] += token_num2[kk]
+                            gate_trace["reasked"] = True
+                            gate_trace["reask_answer"] = answer2
+                            gate_trace["reask_sufficient"] = sufficient2
+                            uncovered = (
+                                str(answer2).lower() in {"null", "none"}
+                                or str(answer2).startswith("m.")
+                                or "yes" not in str(sufficient2).lower()
+                                or not answer_in_covering_set(answer2, covering_names)
+                            )
+                            if uncovered:
+                                stop = False
+                            else:
+                                results, answer, sufficient = results2, answer2, sufficient2
+                                stop = True
 
                         depth_record["evaluation"] = {
                             "llm_response": results,
                             "answer": answer,
                             "sufficient": sufficient,
                             "stop": stop,
+                            "answer_gate": gate_trace,
                         }
 
                         if stop:
@@ -756,7 +849,8 @@ if __name__ == '__main__':
                                 break
                             else:
                                 topic_entity = {}
-                                for entity in entities_id:
+                                biased_ids = apply_frontier_bias(entities_id, args)
+                                for entity in biased_ids:
                                     if if_topic_non_retrieve(entity):
                                         continue
                                     if entity.startswith("m."):

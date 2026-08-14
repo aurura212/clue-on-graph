@@ -13,6 +13,19 @@ from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
 from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
 from constraint_compiler import format_constraints_for_prompt, is_constraint_pushdown_enabled
+from constraint_runtime import (
+    add_coverage,
+    answer_gate_mode,
+    append_constraint_prompt,
+    covering_answer_names,
+    covering_entity_ids,
+    coverage_for,
+    filter_cluster_chains_to_covering,
+    filter_ent_rel_ent_dict_to_covering,
+    keys_from_applied_constraints,
+    merge_memory_conflicts,
+    should_inject_constraint_prompt,
+)
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import traceback
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
@@ -57,6 +70,13 @@ sparql_id = """PREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?tailEn
 DATE_RELATION_REGEX = r"([.]from$|[.]to$|[.]start_date$|[.]end_date$|[.]start$|[.]end$)"
 START_RELATION_REGEX = r"([.]from$|[.]start_date$|[.]start$)"
 END_RELATION_REGEX = r"([.]to$|[.]end_date$|[.]end$)"
+NUMERIC_RELATION_REGEX = r"(code|number|count|population|rank|value|amount|quantity|calling)"
+BIND_RELATION_HINTS = (
+    "district", "represented", "jurisdiction", "location", "country",
+    "administrative", "place", "region", "state", "city", "county",
+    "contained", "contains", "nationality", "religion", "language",
+    "gender", "profession", "party", "office",
+)
 
 # def check_end_word(s):
 #     words = [" ID", " code", " number", "instance of", "website", "URL", "inception", "image", " rate", " count"]
@@ -154,6 +174,163 @@ def execute_entity_search_query(sparql_query: str) -> List[str]:
     return replace_entities_prefix(bindings)
 
 
+def count_one_hop_entities(entity: str, relation: str, head: bool) -> int:
+    pattern = build_one_hop_base_pattern(entity, relation, head)
+    query = f"""PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT (COUNT(DISTINCT ?tailEntity) AS ?c)
+WHERE {{
+  {pattern}
+}}"""
+    try:
+        bindings = execurte_sparql(query)
+    except Exception:
+        return -1
+    if not bindings:
+        return 0
+    try:
+        return int(float(bindings[0].get("c", {}).get("value", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def sample_one_hop_entities(entity: str, relation: str, head: bool, limit: int = 3) -> List[str]:
+    pattern = build_one_hop_base_pattern(entity, relation, head)
+    query = f"""PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT DISTINCT ?tailEntity
+WHERE {{
+  {pattern}
+}}
+LIMIT {max(1, int(limit))}"""
+    try:
+        return execute_entity_search_query(query)
+    except Exception:
+        return []
+
+
+def sample_one_hop_entity(entity: str, relation: str, head: bool) -> Optional[str]:
+    ids = sample_one_hop_entities(entity, relation, head, limit=1)
+    return ids[0] if ids else None
+
+
+def sample_neighbor_relations(sample_id: str) -> List[str]:
+    if not sample_id:
+        return []
+    try:
+        return get_cvt_one_hop_relations(sample_id)
+    except Exception:
+        return []
+
+
+def collect_neighbor_relations(sample_ids: Sequence[str]) -> List[str]:
+    relations = []
+    seen = set()
+    for sample_id in sample_ids:
+        for relation in sample_neighbor_relations(sample_id):
+            if relation in seen:
+                continue
+            seen.add(relation)
+            relations.append(relation)
+    return relations
+
+
+def parse_rank_value(value: Any) -> Optional[float]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        pass
+    date_value = normalize_literal_date(text)
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", date_value)
+    if not match:
+        return None
+    year, month, day = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    return year * 10000 + month * 100 + day
+
+
+def fetch_rank_values(entity_ids: Sequence[str], limit_per_entity: int = 8) -> Dict[str, float]:
+    values: Dict[str, float] = {}
+    for entity_id in entity_ids:
+        query = f"""PREFIX ns: <http://rdf.freebase.com/ns/>
+SELECT ?rel ?val
+WHERE {{
+  ns:{entity_id} ?rel ?val .
+  FILTER(
+    isNumeric(?val) ||
+    REGEX(STR(?rel), "{NUMERIC_RELATION_REGEX}", "i") ||
+    REGEX(STR(?rel), "{DATE_RELATION_REGEX}")
+  )
+}}
+LIMIT {max(1, int(limit_per_entity))}"""
+        try:
+            bindings = execurte_sparql(query)
+        except Exception:
+            continue
+        parsed_values = []
+        for binding in bindings:
+            parsed = parse_rank_value(binding.get("val", {}).get("value", ""))
+            if parsed is not None:
+                parsed_values.append(parsed)
+        if parsed_values:
+            values[str(entity_id)] = parsed_values[0]
+    return values
+
+
+def apply_local_rank(entity_ids: Sequence[str], order_constraints: Sequence[dict], max_n: int = 50) -> Tuple[List[str], bool]:
+    entity_ids = [str(item) for item in entity_ids]
+    if not order_constraints or not entity_ids or len(entity_ids) > max_n:
+        return entity_ids, True
+    values = fetch_rank_values(entity_ids)
+    if not values:
+        return entity_ids, True
+    reverse = order_constraints[0].get("kind") == "max"
+    ranked = sorted(values.keys(), key=lambda item: (values[item], item), reverse=reverse)
+    limit = int(order_constraints[0].get("limit", 1) or 1)
+    return ranked[:max(1, limit)], False
+
+
+def score_bind_relation(relation: str, question: str, mentions: Sequence[str]) -> int:
+    rel = str(relation).replace(".", " ").replace("_", " ").lower()
+    rel_tokens = set(rel.split())
+    question_tokens = set(re.findall(r"[a-z0-9]+", str(question or "").lower()))
+    mention_tokens = set()
+    for mention in mentions:
+        mention_tokens.update(re.findall(r"[a-z0-9]+", str(mention or "").lower()))
+    score = 0
+    for hint in BIND_RELATION_HINTS:
+        if hint in rel:
+            score += 2
+    score += len(rel_tokens & question_tokens)
+    score += 2 * len(rel_tokens & mention_tokens)
+    return score
+
+
+def select_bind_predicates(
+    neighbor_relations: Sequence[str],
+    question: str,
+    entity_constraints: Sequence[dict],
+    limit: int = 2,
+) -> List[str]:
+    mentions = [str(item.get("mention") or item.get("name") or "") for item in entity_constraints]
+    scored = []
+    for relation in neighbor_relations:
+        if abandon_rels(relation):
+            continue
+        score = score_bind_relation(relation, question, mentions)
+        if score > 0:
+            scored.append((score, relation))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [relation for _, relation in scored[:max(0, int(limit))]]
+
+
+def rank_relation_regex(question: str) -> str:
+    hint_terms = [term for term in ("calling", "code", "population", "rank", "number", "count", "amount", "quantity") if term in str(question or "").lower()]
+    if hint_terms:
+        return "(" + "|".join(re.escape(term) for term in hint_terms) + ")"
+    return NUMERIC_RELATION_REGEX
+
+
 def build_constraint_query(
     entity: str,
     relation: str,
@@ -162,27 +339,39 @@ def build_constraint_query(
     time_constraints: Sequence[dict],
     order_constraints: Sequence[dict],
     limit: Optional[int] = None,
+    bind_predicates: Optional[Sequence[str]] = None,
+    include_rank: bool = True,
+    question: str = "",
 ) -> str:
     where_lines = [build_one_hop_base_pattern(entity, relation, head)]
+    bind_predicates = [pred for pred in (bind_predicates or []) if pred]
 
-    for constraint in entity_constraints:
+    for index, constraint in enumerate(entity_constraints):
         mid = str(constraint.get("mid", "")).strip()
         if not is_mid(mid):
             continue
-        where_lines.append(
-            f"""{{
-  {{ ?tailEntity ?constraintRelation ns:{mid} . }}
+        if bind_predicates:
+            unions = []
+            for pred in bind_predicates:
+                unions.append(f"{{ ?tailEntity ns:{pred} ns:{mid} . }}")
+                unions.append(f"{{ ns:{mid} ns:{pred} ?tailEntity . }}")
+            where_lines.append("{\n  " + "\n  UNION\n  ".join(unions) + "\n}")
+        else:
+            var = f"?constraintRelation{index}"
+            where_lines.append(
+                f"""{{
+  {{ ?tailEntity {var} ns:{mid} . }}
   UNION
-  {{ ns:{mid} ?constraintRelation ?tailEntity . }}
+  {{ ns:{mid} {var} ?tailEntity . }}
 }}"""
-        )
-        where_lines.append(
-            "FILTER("
-            "!STRSTARTS(STR(?constraintRelation), STR(ns:type.object.name)) && "
-            "!STRSTARTS(STR(?constraintRelation), STR(ns:common.)) && "
-            "!STRSTARTS(STR(?constraintRelation), STR(ns:freebase.))"
-            ")"
-        )
+            )
+            where_lines.append(
+                "FILTER("
+                f'!STRSTARTS(STR({var}), "http://rdf.freebase.com/ns/type.object.name") && '
+                f'!STRSTARTS(STR({var}), "http://rdf.freebase.com/ns/common.") && '
+                f'!STRSTARTS(STR({var}), "http://rdf.freebase.com/ns/freebase.")'
+                ")"
+            )
 
     for time_constraint in time_constraints:
         start = normalize_literal_date(time_constraint.get("start", ""))
@@ -210,13 +399,17 @@ def build_constraint_query(
         where_lines.append("FILTER(BOUND(?constraintStart) || BOUND(?constraintEnd))")
 
     order_clause = ""
-    if order_constraints:
+    if include_rank and order_constraints:
         direction = "ASC"
         if order_constraints[0].get("kind") == "max":
             direction = "DESC"
+        numeric_regex = rank_relation_regex(question)
         where_lines.append(
             f"""OPTIONAL {{ ?tailEntity ?constraintOrderRelation ?constraintOrderValue .
-  FILTER(REGEX(STR(?constraintOrderRelation), "{DATE_RELATION_REGEX}"))
+  FILTER(
+    REGEX(STR(?constraintOrderRelation), "{numeric_regex}", "i") ||
+    REGEX(STR(?constraintOrderRelation), "{DATE_RELATION_REGEX}")
+  )
 }}"""
         )
         where_lines.append("FILTER(BOUND(?constraintOrderValue))")
@@ -265,71 +458,119 @@ def pushdown_result(
 
 
 def entity_search_with_constraints(entity, relation, head=True, question=None, args=None):
-    del question
     if args is None or not is_constraint_pushdown_enabled(args):
         return entity_search(entity, relation, head)
 
     compiled = getattr(args, "current_constraints", {}) or {}
     cache = get_constraint_trace_cache(args)
     cache_key = (entity, relation, bool(head))
-    unconstrained = entity_search(entity, relation, head)
     entity_constraints = list(compiled.get("entity_constraints", []))
     time_constraints = list(compiled.get("time_constraints", []))
     order_constraints = list(compiled.get("order_constraints", []))
-
     applied_constraints = entity_constraints + time_constraints + order_constraints
-    if not applied_constraints:
-        cache[cache_key] = pushdown_result(
-            unconstrained, [], len(unconstrained), len(unconstrained), "", False, "no_compiled_constraints"
-        )
-        return unconstrained
+    question = question or ""
+    hub_threshold = int(getattr(args, "constraint_hub_threshold", 50))
+    before_count = count_one_hop_entities(entity, relation, head)
 
-    attempts: list[tuple[list[dict], list[dict], list[dict], str]] = []
+    def cache_and_return(entity_ids, applied, reason, sparql="", bind_relation=None, extra=None, after_count=None):
+        trace = pushdown_result(
+            entity_ids,
+            applied_constraints if applied else [],
+            before_count if before_count >= 0 else len(entity_ids),
+            after_count if after_count is not None else len(entity_ids),
+            sparql,
+            applied,
+            reason,
+        )
+        trace["bind_relation"] = bind_relation or []
+        if extra:
+            trace.update(extra)
+        cache[cache_key] = trace
+        return list(entity_ids)
+
+    if not applied_constraints:
+        unconstrained = entity_search(entity, relation, head)
+        return cache_and_return(unconstrained, False, "no_compiled_constraints")
+
+    small_bucket = 0 <= before_count < hub_threshold
+    if small_bucket and not entity_constraints and not order_constraints:
+        unconstrained = entity_search(entity, relation, head)
+        return cache_and_return(
+            unconstrained,
+            False,
+            "skip_small_bucket",
+            extra={"before_count": before_count},
+        )
+
+    bind_predicates = []
     if entity_constraints:
-        attempts.append((entity_constraints[:1], time_constraints, order_constraints, "top_entity_with_time_order"))
-    if len(entity_constraints) > 1:
-        attempts.append((entity_constraints, time_constraints, order_constraints, "all_entities_with_time_order"))
+        sample_ids = sample_one_hop_entities(entity, relation, head, limit=3)
+        neighbor_relations = collect_neighbor_relations(sample_ids)
+        bind_predicates = select_bind_predicates(neighbor_relations, question, entity_constraints)
+
+    attempts: list[tuple[list[dict], list[dict], list[dict], Optional[list[str]], bool, str]] = []
+    if entity_constraints and bind_predicates:
+        attempts.append((entity_constraints[:1], time_constraints, order_constraints, bind_predicates, True, "bind_top_entity_with_time_rank"))
+        attempts.append((entity_constraints[:1], time_constraints, [], bind_predicates, False, "bind_top_entity_with_time"))
+        attempts.append((entity_constraints[:1], [], [], bind_predicates, False, "bind_top_entity_only"))
+        if len(entity_constraints) > 1:
+            attempts.append((entity_constraints, time_constraints, [], bind_predicates, False, "bind_all_entities_with_time"))
+    if entity_constraints:
+        attempts.append((entity_constraints[:1], time_constraints, order_constraints, None, True, "anyhop_top_entity_with_time_rank"))
+        attempts.append((entity_constraints[:1], time_constraints, [], None, False, "anyhop_top_entity_with_time"))
+        attempts.append((entity_constraints[:1], [], [], None, False, "anyhop_top_entity_only"))
     if time_constraints or order_constraints:
-        attempts.append(([], time_constraints, order_constraints, "time_order_only"))
-    if entity_constraints:
-        attempts.append((entity_constraints[:1], [], [], "top_entity_only"))
+        attempts.append(([], time_constraints, order_constraints, None, True, "time_rank_only"))
+        if time_constraints:
+            attempts.append(([], time_constraints, [], None, False, "time_only"))
 
     errors = []
-    for ent_cs, time_cs, order_cs, attempt_name in attempts:
-        query = build_constraint_query(entity, relation, head, ent_cs, time_cs, order_cs)
+    rank_skipped = False
+    last_query = ""
+    for ent_cs, time_cs, order_cs, preds, include_rank, attempt_name in attempts:
+        query = build_constraint_query(
+            entity, relation, head, ent_cs, time_cs, order_cs,
+            bind_predicates=preds, include_rank=include_rank, question=question,
+        )
+        last_query = query
         try:
             constrained = execute_entity_search_query(query)
         except Exception as exc:
             errors.append({"attempt": attempt_name, "error": repr(exc)})
             continue
         if constrained:
-            trace = pushdown_result(
+            local_rank_skipped = False
+            if order_constraints and not include_rank and 0 < len(constrained) <= hub_threshold:
+                constrained, local_rank_skipped = apply_local_rank(constrained, order_constraints, max_n=hub_threshold)
+                rank_skipped = local_rank_skipped
+            elif order_constraints and not include_rank:
+                rank_skipped = True
+            return cache_and_return(
                 constrained,
-                ent_cs + time_cs + order_cs,
-                len(unconstrained),
-                len(constrained),
-                query,
                 True,
                 "",
+                sparql=query,
+                bind_relation=list(preds or []),
+                extra={
+                    "attempt": attempt_name,
+                    "errors": errors,
+                    "rank_skipped": rank_skipped,
+                    "applied_constraints": ent_cs + time_cs + (order_cs if include_rank or not rank_skipped else []),
+                },
             )
-            trace["attempt"] = attempt_name
-            trace["errors"] = errors
-            cache[cache_key] = trace
-            return constrained
         errors.append({"attempt": attempt_name, "error": "empty_result"})
+        if include_rank and order_cs:
+            rank_skipped = True
 
-    trace = pushdown_result(
+    unconstrained = entity_search(entity, relation, head)
+    return cache_and_return(
         unconstrained,
-        applied_constraints,
-        len(unconstrained),
-        len(unconstrained),
-        "",
         False,
         "fallback_unconstrained",
+        sparql=last_query,
+        bind_relation=bind_predicates,
+        extra={"errors": errors, "rank_skipped": rank_skipped},
     )
-    trace["errors"] = errors
-    cache[cache_key] = trace
-    return unconstrained
 
 
 def get_cvt_one_hop_triples(entity_id: str) -> List[NeighborTriple]:
@@ -793,7 +1034,7 @@ def build_bucket_next_nodes(
 def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args):
     prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
     constraint_context = ""
-    if is_constraint_pushdown_enabled(args):
+    if should_inject_constraint_prompt(args, "relation"):
         constraint_context = format_constraints_for_prompt(getattr(args, "current_constraints", {}) or {})
         if constraint_context:
             prompt += (
@@ -945,8 +1186,13 @@ def half_stop(question, question_string, subquestions, cluster_chain_of_entities
 
 
 def generate_answer(question, subquestions, cluster_chain_of_entities, args): 
-    prompt = answer_prompt + question 
-    chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
+    prompt = answer_prompt + question
+    prompt = append_constraint_prompt(prompt, args, "answer", covering_names=covering_answer_names(args, getattr(args, "current_entid_name", {}) or {}))
+    chains = cluster_chain_of_entities
+    covering_names = covering_answer_names(args, getattr(args, "current_entid_name", {}) or {})
+    if answer_gate_mode(args) == "hard" and covering_names:
+        chains = filter_cluster_chains_to_covering(cluster_chain_of_entities, covering_names)
+    chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in chains for chain in sublist])
     prefix = prompt + "\nKnowledge Triplets: "
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="answer")
     chain_prompt = truncate_knowledge_triplets_for_prompt(
@@ -1052,6 +1298,11 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                         select_ent = [x for x in select_ent if x in sorted_e_list]
 
                 dropped = sorted(set(candidates_before) - set(select_ent))
+                parent_keys = coverage_for(args, topic_e)
+                bucket_keys = set()
+                if constraint_trace.get("pushdown_applied"):
+                    bucket_keys = keys_from_applied_constraints(constraint_trace.get("applied_constraints"))
+                child_keys = parent_keys | bucket_keys
                 entity_prune_details.append({
                     "topic_entity": entid_name[topic_e],
                     "topic_entity_id": topic_e,
@@ -1071,7 +1322,9 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                     "constraint_pushdown_applied": bool(cvt_trace.get("constraint_pushdown_applied")),
                     "before_pushdown_count": constraint_trace.get("before_count"),
                     "after_pushdown_count": constraint_trace.get("after_count"),
+                    "bind_relation": constraint_trace.get("bind_relation", []),
                     "fallback_reason": constraint_trace.get("fallback_reason", ""),
+                    "satisfied_constraint_keys": sorted(child_keys),
                 })
 
                 if len(select_ent) == 0 or all(x == '' for x in select_ent):
@@ -1086,11 +1339,13 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                 
                 for ent in select_ent:
                     if ent in sorted_e_list:
-                        new_ent_rel_ent_dict[topic_e][h_t][rela].append(name_entid[ent])
+                        child_id = name_entid[ent]
+                        new_ent_rel_ent_dict[topic_e][h_t][rela].append(child_id)
+                        add_coverage(args, child_id, child_keys)
                         filter_tops.append(entid_name[topic_e])
                         filter_relations.append(rela)
                         filter_candidates.append(ent)
-                        filter_entities_id.append(name_entid[ent])
+                        filter_entities_id.append(child_id)
                         if h_t == 'head':
                             filter_head.append(True)
                         else:
@@ -1156,9 +1411,15 @@ def read_question_memory(q_mem_f_path):
 def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args):
     his_mem = read_question_memory(q_mem_f_path)
     prompt = update_mem_prompt + question + '\nSubobjectives: '+str(subquestions)+'\nMemory: ' + his_mem
+    prompt = append_constraint_prompt(prompt, args, "memory", covering_names=covering_answer_names(args, entid_name))
+
+    use_dict = ent_rel_ent_dict
+    covering_ids = covering_entity_ids(args)
+    if answer_gate_mode(args) != "off" and covering_ids:
+        use_dict = filter_ent_rel_ent_dict_to_covering(ent_rel_ent_dict, covering_ids)
 
     chain_prompt = ''
-    for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
+    for topic_e, h_t_dict in sorted(use_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
                 sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
@@ -1174,6 +1435,7 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
     
     mem = extract_memory(response)
+    mem, conflicts = merge_memory_conflicts(his_mem, mem, args, entid_name)
     print(mem)
     with open(q_mem_f_path+'/mem', 'w', encoding='utf-8') as f:
         f.write(mem)
@@ -1182,19 +1444,27 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
         "memory_after": mem,
         "llm_raw_output": response,
         "knowledge_triplets_prompt": chain_prompt.strip(),
+        "conflicts": conflicts,
     }
     return token_num, mem_trace
 
 
-def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args):
+def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args, restrict_to_covering: bool = False):
     with open(q_mem_f_path+'/mem', 'r', encoding='utf-8') as f:
         his_mem = f.read()
 
+    covering_names = covering_answer_names(args, entid_name)
     prompt = answer_depth_prompt + question + '\nMemory: ' + his_mem
+    prompt = append_constraint_prompt(prompt, args, "reasoning", covering_names=covering_names)
+
+    use_dict = ent_rel_ent_dict
+    covering_ids = covering_entity_ids(args)
+    if restrict_to_covering and covering_ids:
+        use_dict = filter_ent_rel_ent_dict_to_covering(ent_rel_ent_dict, covering_ids)
 
     chain_prompt = ''
 
-    for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
+    for topic_e, h_t_dict in sorted(use_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
                 sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]

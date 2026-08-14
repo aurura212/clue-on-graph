@@ -23,6 +23,40 @@ When Question Constraints are provided after the relation list, prefer relations
 Now you need to directly output relations highly related to the following question and its subobjectives in list format without other information or notes.
 Q: """
 
+
+constraint_extract_prompt = """Extract executable constraints from the question. These are conditions that filter graph neighbors, not the topic entity itself and not the answer type being asked for.
+
+Return a JSON list. Each item must be:
+{"type":"entity"|"time"|"rank","mention":"...","operator":"...","value":"..."}
+
+Rules:
+- type=entity: a named entity in the question that is not already listed as a topic entity. operator is usually "eq". value is the same mention.
+- type=time: current/present/now, a year, or a year range. For current use operator "asof" and value "current". For a year use operator "eq" and value like "1980". For a range use operator "range" and value like "2008-2012".
+- type=rank: min/max/first/latest/smallest/largest. operator is "min" or "max". value may repeat the cue word.
+- Do not output SPARQL, explanations, or topic-entity strings.
+- If there are no constraints, output [].
+
+Example:
+Topic Entities: United States Senate
+Q: who is the current ohio state senator?
+Output:
+[{"type":"entity","mention":"Ohio","operator":"eq","value":"Ohio"},{"type":"time","mention":"current","operator":"asof","value":"current"}]
+
+Example:
+Topic Entities: Brahui Language
+Q: Name the president of the country whose main spoken language was Brahui in 1980?
+Output:
+[{"type":"time","mention":"1980","operator":"eq","value":"1980"}]
+
+Example:
+Topic Entities: (none)
+Q: Which of the countries in the Caribbean has the smallest country calling code?
+Output:
+[{"type":"entity","mention":"Caribbean","operator":"eq","value":"Caribbean"},{"type":"rank","mention":"smallest","operator":"min","value":"smallest"}]
+
+Now extract constraints for:
+Topic Entities: """
+
 answer_prompt = """Given a question and the associated retrieved knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your knowledge.
 
 Here are five examples:

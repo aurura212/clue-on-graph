@@ -22,7 +22,9 @@ _llm_api_spec.loader.exec_module(_llm_api)
 get_chat_completion_extra_kwargs = _llm_api.get_chat_completion_extra_kwargs
 is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
-from decomposition_memory import decomposition_memory_context
+from decomposition_memory import decomposition_memory_context, parse_planning_steps
+from constraint_compiler import format_constraints_for_prompt, is_constraint_pushdown_enabled
+from constraint_runtime import ground_subobjectives
 from output_paths import get_current_run
 from jsonl_io import append_jsonl_record
 
@@ -457,6 +459,19 @@ def extract_list_output(text):
 
 def break_question(question, args): 
     prompt = subobjective_prompt + question
+    if is_constraint_pushdown_enabled(args):
+        topic_names = [str(name) for name in (getattr(args, "current_topic_entity", {}) or {}).values() if name]
+        extra_parts = []
+        if topic_names:
+            extra_parts.append("Topic Entities: " + "; ".join(topic_names))
+        constraint_context = format_constraints_for_prompt(getattr(args, "current_constraints", {}) or {})
+        if constraint_context:
+            extra_parts.append(constraint_context)
+        extra_parts.append(
+            "Do not add extra quoted office/type filters. Answer-type words are not graph constraints. "
+            "Topic entities are start nodes. Extra quoted filters must come from Topic Entities or Question Constraints."
+        )
+        prompt += "\n" + "\n".join(extra_parts)
     memory_context = decomposition_memory_context(
         getattr(args, "decomposition_memory_bank", []),
         question,
@@ -471,7 +486,14 @@ def break_question(question, args):
     setattr(args, "current_decomposition_memory_context", memory_context)
     setattr(args, "current_decomposition_prompt", prompt)
     setattr(args, "current_decomposition_raw_output", response)
-    response = extract_list_output(response)
+    raw_list = extract_list_output(response)
+    steps = parse_planning_steps(raw_list)
+    steps, grounding_trace = ground_subobjectives(steps, question, args)
+    setattr(args, "current_decomposition_grounding", grounding_trace)
+    if steps:
+        response = json.dumps(steps, ensure_ascii=False)
+    else:
+        response = raw_list
     return response, token_num
 
 def get_subquestions(q_mem_f_path, question, args):
