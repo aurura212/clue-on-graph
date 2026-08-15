@@ -41,7 +41,10 @@ def serialize_name_dict(name_dict: dict) -> dict:
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             out[str(topic)][str(h_t)] = {}
             for rela, e_list in sorted(r_e_dict.items()):
-                out[str(topic)][str(h_t)][str(rela)] = [str(x) for x in e_list]
+                ents = [str(x) for x in e_list]
+                if len(ents) > 50:
+                    ents = ents[:50] + [f"... +{len(e_list) - 50} more"]
+                out[str(topic)][str(h_t)][str(rela)] = ents
     return out
 
 

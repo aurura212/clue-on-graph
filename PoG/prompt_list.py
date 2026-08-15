@@ -8,6 +8,34 @@ Now you need to directly output subobjectives of the following question in list 
 Q: """
 
 
+subobjective_with_constraints_prompt = """Break the question into executable graph hops. Each step is one neighbor expansion (choose a relation, then fetch neighbors). Attach entity/time constraints to the hop that must apply them in SPARQL, usually the first membership or position expansion.
+
+Output format: JSON list. Each element is:
+{"step": "From <start>, expand to <neighbors>", "constraints": ["entity:Wyoming", "time:current", ...] | []}
+
+Constraint key format:
+- entity:<mention> for a named entity constraint (example: "entity:Wyoming")
+- time:<kind> for a time constraint (example: "time:current", "time:1980")
+- rank:<kind> for an ordering constraint (example: "rank:min", "rank:max")
+Copy keys only from Available constraint keys. Put entity/time keys on the expansion hop that needs them. Do not write standalone Filter or Select steps. A rank key may be its own final comparison step. Topic entities are start nodes, not constraints. Use 1 to 3 hops.
+
+Here is an example:
+Q: who is the current wyoming at-large representative?
+Topic Entities: United States House of Representatives
+Linked entity constraints: Wyoming -> Wyoming (m.0846v)
+Time constraints: current/as of 2015-08-10
+Available constraint keys: entity:Wyoming; time:current
+You must assign every available constraint key to at least one subobjective. Use [] only for steps that do not apply a constraint. Do not invent extra keys.
+Output: [
+  {"step": "From United States House of Representatives, expand to representative position nodes", "constraints": ["entity:Wyoming", "time:current"]},
+  {"step": "From those position nodes, expand to the office holder", "constraints": []}
+]
+
+Now you need to directly output subobjectives of the following question in this JSON list format without other information or notes.
+Q: """
+
+
+
 
 extract_relation_prompt = """Please provide as few highly relevant relations as possible to the question and its subobjectives from the following relations (separated by semicolons).
 Here is an example:
@@ -37,10 +65,10 @@ Rules:
 - If there are no constraints, output [].
 
 Example:
-Topic Entities: United States Senate
-Q: who is the current ohio state senator?
+Topic Entities: United States House of Representatives
+Q: who is the current wyoming at-large representative?
 Output:
-[{"type":"entity","mention":"Ohio","operator":"eq","value":"Ohio"},{"type":"time","mention":"current","operator":"asof","value":"current"}]
+[{"type":"entity","mention":"Wyoming","operator":"eq","value":"Wyoming"},{"type":"time","mention":"current","operator":"asof","value":"current"}]
 
 Example:
 Topic Entities: Brahui Language

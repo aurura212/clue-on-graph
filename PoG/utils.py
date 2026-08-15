@@ -23,8 +23,17 @@ get_chat_completion_extra_kwargs = _llm_api.get_chat_completion_extra_kwargs
 is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
 from decomposition_memory import decomposition_memory_context, parse_planning_steps
-from constraint_compiler import format_constraints_for_prompt, is_constraint_pushdown_enabled
-from constraint_runtime import ground_subobjectives
+from constraint_compiler import (
+    format_constraints_for_prompt,
+    is_constraint_pushdown_enabled,
+    constraint_routing_mode,
+    format_available_constraint_keys,
+    parse_subobjective_routing,
+    resolve_subobjective_routing,
+    normalize_hop_routing,
+    unassigned_compiled_constraints,
+)
+from constraint_runtime import ground_subobjectives, ground_subobjective_routing
 from output_paths import get_current_run
 from jsonl_io import append_jsonl_record
 
@@ -38,6 +47,8 @@ CONTEXT_SAFETY_TOKENS = 256
 MIN_COMPLETION_TOKENS = 16
 LLM_REQUEST_TIMEOUT = float(os.environ.get("OPENAI_TIMEOUT", "180"))
 LLM_MAX_RETRIES = int(os.environ.get("OPENAI_MAX_RETRIES", "5"))
+# tiktoken.encode on multi-megabyte prompts is itself a hang; use a char heuristic above this.
+_TIKTOKEN_MAX_CHARS = 80000
 _TIKTOKEN_ENCODING = None
 
 
@@ -68,6 +79,8 @@ def estimate_token_count(text: str, engine: str = "") -> int:
     text = str(text or "")
     if not text:
         return 0
+    if len(text) > _TIKTOKEN_MAX_CHARS:
+        return max(1, int(len(text) / 3.5))
     enc = _get_tiktoken_encoding(engine)
     if enc is not None:
         return len(enc.encode(text))
@@ -108,6 +121,13 @@ def truncate_text_to_token_budget(
 
     suffix_tokens = estimate_token_count(suffix, engine)
     budget = max(1, token_budget - suffix_tokens)
+    # Never run tiktoken / line-scan over megabyte strings; slice first.
+    max_chars = max(64, budget * 4)
+    if len(text) > max_chars:
+        text = text[:max_chars]
+        if estimate_token_count(text, engine) <= budget:
+            return text.rstrip() + suffix
+
     lines = text.split("\n")
     kept = []
     for line in lines:
@@ -116,7 +136,8 @@ def truncate_text_to_token_budget(
             kept.append(line)
             continue
         if not kept:
-            words = line.split()
+            char_cut = line[: max(1, budget * 3)]
+            words = char_cut.split()
             lo, hi = 0, len(words)
             while lo < hi:
                 mid = (lo + hi + 1) // 2
@@ -127,7 +148,7 @@ def truncate_text_to_token_budget(
             if lo > 0:
                 kept.append(" ".join(words[:lo]))
             else:
-                kept.append(line[: max(1, budget * 3)])
+                kept.append(char_cut)
         break
     if not kept:
         return suffix.strip()
@@ -204,7 +225,8 @@ def fit_messages_and_max_tokens(messages, engine: str, requested_max_tokens: int
             user_budget = max(32, limit - other_est - completion_reserve - CONTEXT_SAFETY_TOKENS)
 
         original = messages[user_idx].get("content", "")
-        if estimate_token_count(original, engine) > user_budget:
+        original_est = estimate_token_count(original, engine)
+        if original_est > user_budget:
             messages[user_idx]["content"] = truncate_text_to_token_budget(
                 original,
                 user_budget,
@@ -212,7 +234,7 @@ def fit_messages_and_max_tokens(messages, engine: str, requested_max_tokens: int
                 engine=engine,
             )
             print(
-                f"[context] prompt truncated ~{estimate_token_count(original, engine)} -> "
+                f"[context] prompt truncated ~{original_est} -> "
                 f"~{estimate_token_count(messages[user_idx]['content'], engine)} tokens "
                 f"(user_budget={user_budget}, engine={engine}, attempt={attempt + 1})"
             )
@@ -253,7 +275,10 @@ def retrieve_top_docs(query, docs, model, width=3):
 
 def run_llm(prompt, temperature, max_tokens, openai_api_keys, engine="gpt-3.5-turbo", print_in=True, print_out=True):
     if print_in:
-        print(color_green+prompt+color_end)
+        if len(str(prompt or "")) > 20000:
+            print(color_green + str(prompt)[:20000] + "\n...[prompt omitted]..." + color_end)
+        else:
+            print(color_green+prompt+color_end)
 
     if is_openai_compatible_engine(engine):
         messages = [
@@ -354,6 +379,29 @@ def convert_dict_name(ent_rel_ent_dict, entid_name):
                         name_dict[entid_name[topic_e]][h_t][rela].append(entid_name[ent])
     return name_dict
 
+
+def format_capped_list(items, limit=70):
+    items = list(items)
+    if len(items) <= limit:
+        return str(items)
+    return str(items[:limit]) + f" ...(+{len(items) - limit} more)"
+
+
+def summarize_name_dict(name_dict, max_per_rel=20):
+    """Shrink convert_dict_name output so pprint cannot freeze the terminal."""
+    summary = {}
+    for topic, h_t_dict in name_dict.items():
+        summary[topic] = {}
+        for h_t, r_e_dict in h_t_dict.items():
+            summary[topic][h_t] = {}
+            for rela, e_list in r_e_dict.items():
+                e_list = list(e_list)
+                if len(e_list) > max_per_rel:
+                    summary[topic][h_t][rela] = e_list[:max_per_rel] + [f"... +{len(e_list) - max_per_rel} more"]
+                else:
+                    summary[topic][h_t][rela] = e_list
+    return summary
+
     
 
 def save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=None, pog_trace=None):
@@ -416,14 +464,28 @@ def extract_reason_and_anwer(string):
         else:
             answer = re.search(r'"Answer":\s*(\[[^\]]+\])', string).group(1)
     except:
-        return None, None, None
+        return None, None, None, None
 
     reason = re.search(r'"R":\s*"(.*?)"', string).group(1)
     sufficient = re.search(r'"Sufficient":\s*"(.*?)"', string).group(1)
+    progress = extract_subobjective_progress(string)
     print("Answer:", answer)
     print("Reason:", reason)
     print("Sufficient:", sufficient)
-    return answer, reason, sufficient
+    if progress is not None:
+        print("Subobjective_Progress:", progress)
+    return answer, reason, sufficient, progress
+
+
+def extract_subobjective_progress(string):
+    """Parse 1-based completed-subobjective count. None if the field is absent."""
+    match = re.search(r'"Subobjective_Progress"\s*:\s*"?(\d+)"?', str(string or ""))
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except (TypeError, ValueError):
+        return None
 
 def extract_add_and_reason(string):
     first_brace_p = string.find('{')
@@ -457,8 +519,10 @@ def extract_list_output(text):
     return str(text).strip()
 
 
-def break_question(question, args): 
-    prompt = subobjective_prompt + question
+def break_question(question, args):
+    routing_mode = constraint_routing_mode(args)
+    use_routing_prompt = routing_mode in {"auto", "on"}
+    prompt = (subobjective_with_constraints_prompt if use_routing_prompt else subobjective_prompt) + question
     if is_constraint_pushdown_enabled(args):
         topic_names = [str(name) for name in (getattr(args, "current_topic_entity", {}) or {}).values() if name]
         extra_parts = []
@@ -467,6 +531,15 @@ def break_question(question, args):
         constraint_context = format_constraints_for_prompt(getattr(args, "current_constraints", {}) or {})
         if constraint_context:
             extra_parts.append(constraint_context)
+        if use_routing_prompt:
+            available_keys = format_available_constraint_keys(getattr(args, "current_constraints", {}) or {})
+            if available_keys:
+                extra_parts.append("Available constraint keys: " + "; ".join(available_keys))
+                extra_parts.append(
+                    "You must assign every available constraint key to at least one subobjective. "
+                    "Use [] only for steps that do not apply a constraint. "
+                    "Do not invent extra keys."
+                )
         extra_parts.append(
             "Do not add extra quoted office/type filters. Answer-type words are not graph constraints. "
             "Topic entities are start nodes. Extra quoted filters must come from Topic Entities or Question Constraints."
@@ -487,9 +560,52 @@ def break_question(question, args):
     setattr(args, "current_decomposition_prompt", prompt)
     setattr(args, "current_decomposition_raw_output", response)
     raw_list = extract_list_output(response)
-    steps = parse_planning_steps(raw_list)
-    steps, grounding_trace = ground_subobjectives(steps, question, args)
+
+    routing = None
+    routing_status = "off"
+    if use_routing_prompt:
+        routing = parse_subobjective_routing(raw_list)
+        if routing is not None:
+            routing_status = "ok"
+            steps = [item["step"] for item in routing]
+            routing, grounding_trace = ground_subobjective_routing(routing, question, args)
+            routing = normalize_hop_routing(routing)
+            steps = [item["step"] for item in routing]
+        else:
+            steps = parse_planning_steps(raw_list)
+            steps, grounding_trace = ground_subobjectives(steps, question, args)
+            routing_status = "legacy_list" if steps else "failed"
+            if routing_mode == "auto":
+                print("Warning: constraint routing parse failed; falling back to full constraints")
+            else:
+                print("Warning: constraint routing unavailable; skipping SPARQL constraint pushdown")
+    else:
+        steps = parse_planning_steps(raw_list)
+        steps, grounding_trace = ground_subobjectives(steps, question, args)
+
     setattr(args, "current_decomposition_grounding", grounding_trace)
+    setattr(args, "sub_constraint_routing", routing)
+    compiled = getattr(args, "current_constraints", None) or {}
+    if routing:
+        resolved = resolve_subobjective_routing(routing, compiled)
+        if compiled:
+            compiled["resolved_routing"] = resolved
+            compiled["sub_constraint_routing"] = routing
+        setattr(args, "resolved_constraint_routing", resolved)
+        leftover = unassigned_compiled_constraints(resolved, compiled)
+        leftover_keys = []
+        leftover_keys.extend(f"entity:{item.get('mention')}" for item in leftover.get("entity_constraints") or [])
+        leftover_keys.extend(f"time:{item.get('kind')}" for item in leftover.get("time_constraints") or [])
+        leftover_keys.extend(f"rank:{item.get('kind')}" for item in leftover.get("order_constraints") or [])
+        if leftover_keys:
+            print("Warning: decomposition omitted constraint keys; keeping them active on every hop: " + ", ".join(leftover_keys))
+    else:
+        if compiled:
+            compiled["resolved_routing"] = None
+            compiled["sub_constraint_routing"] = None
+        setattr(args, "resolved_constraint_routing", None)
+    setattr(args, "constraint_routing_status", routing_status)
+
     if steps:
         response = json.dumps(steps, ensure_ascii=False)
     else:
@@ -559,7 +675,7 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         
         print('filter already', [entid_name[ent_i] for ent_i in new_lst], [entid_name[ent_i] for ent_i in all_ent_set], other_entities_name)
 
-        prompt = add_ent_prompt+question+'\nReason: '+reason+'\nCandidate Entities: ' + str(sorted(other_entities_name))+'\nMemory: '+his_mem
+        prompt = add_ent_prompt+question+'\nReason: '+reason+'\nCandidate Entities: ' + format_capped_list(sorted(other_entities_name), 70)+'\nMemory: '+his_mem
         prompt = maybe_prepend_reference_context(prompt, args, stage="add_entity")
 
         cur_call_time += 1

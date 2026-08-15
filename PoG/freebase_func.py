@@ -12,7 +12,14 @@ from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
 from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
-from constraint_compiler import format_constraints_for_prompt, is_constraint_pushdown_enabled
+from constraint_compiler import (
+    format_constraints_for_prompt,
+    is_constraint_pushdown_enabled,
+    constraint_routing_mode,
+    lookup_constraint_trace,
+    select_prompt_constraints,
+    select_search_constraints,
+)
 from constraint_runtime import (
     add_coverage,
     answer_gate_mode,
@@ -29,6 +36,7 @@ from constraint_runtime import (
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import traceback
 SPARQLPATH = "http://localhost:8890/sparql"  #your own IP and port
+SPARQL_TIMEOUT = int(os.environ.get("SPARQL_TIMEOUT", "15"))
 
 # pre-defined sparqls
 sparql_head_relations = """\nPREFIX ns: <http://rdf.freebase.com/ns/>\nSELECT DISTINCT ?relation\nWHERE {\n  ns:%s ?relation ?x .\n}"""
@@ -91,6 +99,7 @@ def execurte_sparql(sparql_query):
     sparql = SPARQLWrapper(SPARQLPATH)
     sparql.setQuery(sparql_query)
     sparql.setReturnFormat(JSON)
+    sparql.setTimeout(SPARQL_TIMEOUT)
     results = sparql.query().convert()
     # print(results["results"]["bindings"])
     return results["results"]["bindings"]
@@ -108,6 +117,7 @@ def id2entity_name_or_type(entity_id):
     sparql = SPARQLWrapper(SPARQLPATH)
     sparql.setQuery(sparql_query)
     sparql.setReturnFormat(JSON)
+    sparql.setTimeout(SPARQL_TIMEOUT)
     results = sparql.query().convert()
     if len(results["results"]["bindings"])==0:
         return entity_id
@@ -457,17 +467,21 @@ def pushdown_result(
     }
 
 
-def entity_search_with_constraints(entity, relation, head=True, question=None, args=None):
+def entity_search_with_constraints(entity, relation, head=True, question=None, args=None, subobjective_idx=None):
     if args is None or not is_constraint_pushdown_enabled(args):
         return entity_search(entity, relation, head)
 
     compiled = getattr(args, "current_constraints", {}) or {}
     cache = get_constraint_trace_cache(args)
-    cache_key = (entity, relation, bool(head))
-    entity_constraints = list(compiled.get("entity_constraints", []))
-    time_constraints = list(compiled.get("time_constraints", []))
-    order_constraints = list(compiled.get("order_constraints", []))
+    idx = subobjective_idx if subobjective_idx is not None else getattr(args, "current_subobjective_idx", None)
+    routed = select_search_constraints(args, compiled, idx)
+    entity_constraints = list(routed.get("entity_constraints", []))
+    time_constraints = list(routed.get("time_constraints", []))
+    order_constraints = list(routed.get("order_constraints", []))
     applied_constraints = entity_constraints + time_constraints + order_constraints
+    # Prune/bucket look up by (entity, relation, head) only. routed_sig is not
+    # part of that contract: this depth's e_list came from the latest search.
+    cache_key = (entity, relation, bool(head))
     question = question or ""
     hub_threshold = int(getattr(args, "constraint_hub_threshold", 50))
     before_count = count_one_hop_entities(entity, relation, head)
@@ -483,6 +497,7 @@ def entity_search_with_constraints(entity, relation, head=True, question=None, a
             reason,
         )
         trace["bind_relation"] = bind_relation or []
+        trace["subobjective_idx"] = idx
         if extra:
             trace.update(extra)
         cache[cache_key] = trace
@@ -588,7 +603,7 @@ def get_cvt_one_hop_triples(entity_id: str) -> List[NeighborTriple]:
             triples.append(("tail", relation, entity_from_binding(item["entity"]["value"])))
 
     triples.sort()
-    return triples
+    return triples[:200]
 
 
 def get_cvt_one_hop_relations(entity_id: str) -> List[str]:
@@ -620,7 +635,7 @@ def get_cvt_selected_relation_triples(entity_id: str, selected_relations: Sequen
             triples.append(("tail", relation, entity_from_binding(item["entity"]["value"])))
 
     triples.sort()
-    return triples
+    return triples[:200]
 
 
 def ensure_entity_name(entity_id: str, entid_name: Dict[str, str], name_entid: Dict[str, str]) -> str:
@@ -642,6 +657,8 @@ def run_llm_with_retry(prompt: str, args: Any, temperature: float, retries: int 
         except Exception as exc:
             last_error = repr(exc)
             traceback.print_exc()
+            if isinstance(exc, openai.APITimeoutError) or type(exc).__name__ == "APITimeoutError":
+                return "", {'total': 0, 'input': 0, 'output': 0}, last_error
             if attempt + 1 < retries:
                 time.sleep(min(2 ** attempt, 8))
 
@@ -670,7 +687,10 @@ def make_cvt_evidence_text(
 
     for relation in selected_relations:
         if relation in relation_values:
-            pieces.append(relation + ": " + ", ".join(sorted(relation_values[relation])))
+            names = sorted(relation_values[relation])
+            if len(names) > 15:
+                names = names[:15] + [f"...(+{len(relation_values[relation]) - 15} more)"]
+            pieces.append(relation + ": " + ", ".join(names))
     return " | ".join(pieces), relation_values
 
 
@@ -727,7 +747,11 @@ def cvt_neighbor_prune(
     cvt_relation_llm_error = None
     cvt_entity_llm_error = None
     if not constraint_pushdown_applied:
-        for cvt_id in sorted(e_list):
+        relation_scan_ids = sorted(e_list)
+        if len(relation_scan_ids) > 80:
+            print(f"[cvt] sampling {80}/{len(relation_scan_ids)} CVTs for neighbor-relation scan on {rela}")
+            relation_scan_ids = relation_scan_ids[:80]
+        for cvt_id in relation_scan_ids:
             relations = get_cvt_one_hop_relations(cvt_id)
             cvt_neighbor_relations[cvt_id] = relations
             for relation in relations:
@@ -1017,13 +1041,17 @@ def build_bucket_next_nodes(
         for h_t, r_e_dict in h_t_dict.items():
             for rela, e_list in r_e_dict.items():
                 per_cvt: Dict[str, set] = {}
-                constraint_trace = (constraint_trace_cache or {}).get((topic_e, rela, h_t == "head"), {})
+                constraint_trace = lookup_constraint_trace(constraint_trace_cache, topic_e, rela, h_t == "head")
                 is_cvt_bucket = (
                     len(e_list) > 10
                     and all(is_cvt_like_entity(eid, entid_name) for eid in e_list)
                 )
                 if is_cvt_bucket and not constraint_trace.get("pushdown_applied"):
-                    for cvt_id in e_list:
+                    expand_ids = sorted(e_list)
+                    if len(expand_ids) > 80:
+                        print(f"[cvt] skipping next-node expansion for {len(expand_ids) - 80} extra CVTs on {rela}")
+                        expand_ids = expand_ids[:80]
+                    for cvt_id in expand_ids:
                         per_cvt[cvt_id] = get_cvt_next_nodes(cvt_id)
                 else:
                     per_cvt["__direct__"] = set(e_list)
@@ -1035,7 +1063,12 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
     prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
     constraint_context = ""
     if should_inject_constraint_prompt(args, "relation"):
-        constraint_context = format_constraints_for_prompt(getattr(args, "current_constraints", {}) or {})
+        compiled = select_prompt_constraints(
+            args,
+            getattr(args, "current_constraints", {}) or {},
+            getattr(args, "current_subobjective_idx", None),
+        )
+        constraint_context = format_constraints_for_prompt(compiled)
         if constraint_context:
             prompt += (
                 "\nQuestion Constraints: " + constraint_context +
@@ -1230,7 +1263,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
     for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
-                constraint_trace = constraint_trace_cache.get((topic_e, rela, h_t == "head"), {})
+                constraint_trace = lookup_constraint_trace(constraint_trace_cache, topic_e, rela, h_t == "head")
                 prune_method = "llm"
                 llm_raw = None
                 cvt_trace = {
@@ -1284,7 +1317,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
 
                         prompt = prune_entity_prompt + question +'\nTriples: '
                         sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
-                        prompt += entid_name[topic_e] + ' ' + rela + ' ' + str(sorted_e_list)
+                        prompt += entid_name[topic_e] + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70)
 
                         cur_call_time += 1
                         result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
@@ -1308,7 +1341,9 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                     "topic_entity_id": topic_e,
                     "head_or_tail": h_t,
                     "relation": rela,
-                    "candidates_before_prune": candidates_before,
+                    "candidates_before_prune": candidates_before[:50] + (
+                        [f"... +{len(candidates_before) - 50} more"] if len(candidates_before) > 50 else []
+                    ),
                     "candidates_after_prune": list(select_ent),
                     "dropped_candidates": dropped,
                     "prune_method": prune_method,
@@ -1423,7 +1458,7 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
                 sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
-                chain_prompt += entid_name[topic_e] + ' ' + rela + ' ' + str(sorted_e_list) + '\n'
+                chain_prompt += entid_name[topic_e] + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70) + '\n'
 
     prefix = prompt + "\nKnowledge Triplets:\n"
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="memory")
@@ -1456,6 +1491,17 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
     covering_names = covering_answer_names(args, entid_name)
     prompt = answer_depth_prompt + question + '\nMemory: ' + his_mem
     prompt = append_constraint_prompt(prompt, args, "reasoning", covering_names=covering_names)
+    if constraint_routing_mode(args) != "off":
+        from decomposition_memory import parse_planning_steps
+        steps = parse_planning_steps(str(subquestions or ""))
+        n_steps = max(1, len(steps) or 1)
+        current_idx = int(getattr(args, "current_subobjective_idx", 0) or 0)
+        prompt += (
+            "\nSubobjectives: " + str(steps or subquestions)
+            + f"\nCurrently working on subobjective {min(current_idx + 1, n_steps)}/{n_steps}."
+            + '\nAlso include "Subobjective_Progress" in the JSON: the number of subobjectives already completed '
+            "(0 if none; after completing the first subobjective output 1)."
+        )
 
     use_dict = ent_rel_ent_dict
     covering_ids = covering_entity_ids(args)
@@ -1468,7 +1514,7 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
                 sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
-                chain_prompt += entid_name[topic_e] + ', ' + rela + ', ' + str(sorted_e_list) + '\n'
+                chain_prompt += entid_name[topic_e] + ', ' + rela + ', ' + format_capped_list(sorted_e_list, 70) + '\n'
 
     prefix = prompt + "\nKnowledge Triplets:\n"
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="reasoning")
@@ -1479,7 +1525,8 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
     print("Response from reasoning:", response)
-    answer, reason, sufficient = extract_reason_and_anwer(response)
+    answer, reason, sufficient, progress = extract_reason_and_anwer(response)
+    setattr(args, "last_subobjective_progress", progress)
     return response, answer, sufficient, token_num
 
     

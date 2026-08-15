@@ -22,7 +22,12 @@ from relation_memory import (
     load_relation_memory,
     load_webqsp_train_episodes,
 )
-from constraint_compiler import compile_question_constraints, format_constraints_for_prompt
+from constraint_compiler import (
+    compile_question_constraints,
+    format_constraints_for_prompt,
+    constraint_routing_mode,
+    select_search_constraints,
+)
 from constraint_runtime import (
     answer_gate_mode,
     answer_in_covering_set,
@@ -138,6 +143,8 @@ def add_relation_memory_args(parser):
                         default=30, help="Max CVT candidates sent to the Step-2 entity LLM after intersection-priority filtering.")
     parser.add_argument("--constraint_pushdown", type=str, choices=["off", "on"],
                         default="off", help="Enable question constraint compilation and SPARQL pushdown in test and train modes.")
+    parser.add_argument("--constraint_routing", type=str, choices=["off", "auto", "on"],
+                        default="auto", help="Per-hop constraint routing from decomposition. off=all constraints every hop; auto=use routing with full-constraint fallback; on=routing required or skip SPARQL pushdown.")
     parser.add_argument("--constraint_asof_date", type=str,
                         default="2015-08-10", help="Snapshot date used for current/present time constraints.")
     parser.add_argument("--constraint_link_top_k", type=int,
@@ -179,6 +186,29 @@ def resolve_split(args):
     if args.split:
         return args.split
     return "train" if args.run_mode == "train" else "test"
+
+
+def update_current_subobjective_idx(args, depth, sub_questions):
+    """Set args.current_subobjective_idx for this hop.
+
+    LLM Subobjective_Progress is a 1-based completed count; otherwise assume
+    1 subobjective per hop: idx = min(depth - 1, n_steps - 1).
+    """
+    if isinstance(sub_questions, list):
+        steps = [str(item).strip() for item in sub_questions if str(item).strip()]
+    else:
+        steps = parse_planning_steps(str(sub_questions or ""))
+    n_steps = max(1, len(steps) or 1)
+    progress = getattr(args, "last_subobjective_progress", None)
+    try:
+        progress = int(progress) if progress is not None else None
+    except (TypeError, ValueError):
+        progress = None
+    if progress is not None:
+        args.current_subobjective_idx = min(max(progress, 0), n_steps - 1)
+    else:
+        args.current_subobjective_idx = min(max(int(depth) - 1, 0), n_steps - 1)
+    return args.current_subobjective_idx
 
 
 def execute_gold_step(entity_ids, relation, frontier_limit, args=None, question=""):
@@ -584,6 +614,11 @@ if __name__ == '__main__':
                 topic_entity = data['topic_entity']
                 setattr(args, "current_topic_entity", topic_entity)
                 setattr(args, "current_constraint_search_traces", {})
+                setattr(args, "current_subobjective_idx", 0)
+                setattr(args, "last_subobjective_progress", None)
+                setattr(args, "sub_constraint_routing", None)
+                setattr(args, "resolved_constraint_routing", None)
+                setattr(args, "constraint_routing_status", "off")
                 reset_coverage_map(args)
                 if args.constraint_pushdown == "on":
                     constraints = compile_question_constraints(
@@ -618,6 +653,9 @@ if __name__ == '__main__':
                     "reference_context": getattr(args, "current_decomposition_reference_context", ""),
                     "llm_raw_output": getattr(args, "current_decomposition_raw_output", ""),
                     "grounding": getattr(args, "current_decomposition_grounding", {}),
+                    "constraint_routing": getattr(args, "sub_constraint_routing", None),
+                    "resolved_constraint_routing": getattr(args, "resolved_constraint_routing", None),
+                    "constraint_routing_status": getattr(args, "constraint_routing_status", "off"),
                 }
 
                 entid_name = {}
@@ -646,7 +684,24 @@ if __name__ == '__main__':
                 pre_heads= [-1] * len(topic_entity)
                 flag_printed = False
                 for depth in range(1, args.depth+1):
+                    update_current_subobjective_idx(args, depth, sub_questions)
                     depth_record = new_depth_record(depth, topic_entity)
+                    depth_record["subobjective_idx"] = getattr(args, "current_subobjective_idx", 0)
+                    depth_record["active_constraints"] = select_search_constraints(
+                        args,
+                        getattr(args, "current_constraints", {}) or {},
+                        getattr(args, "current_subobjective_idx", 0),
+                    )
+                    if constraint_routing_mode(args) != "off":
+                        active = depth_record["active_constraints"]
+                        print(
+                            "constraint routing "
+                            f"depth={depth} sub_idx={args.current_subobjective_idx} "
+                            f"status={getattr(args, 'constraint_routing_status', '')} "
+                            f"entities={len(active.get('entity_constraints') or [])} "
+                            f"time={len(active.get('time_constraints') or [])} "
+                            f"order={len(active.get('order_constraints') or [])}"
+                        )
                     current_entity_relations_list = []
                     i=0
                     for entity in topic_entity:
@@ -678,17 +733,27 @@ if __name__ == '__main__':
                         if ent_rel['head']:
                             head_or_tail = 'head'
                             entity_candidates_id = entity_search_with_constraints(
-                                ent_rel['entity'], ent_rel['relation'], True, question, args
+                                ent_rel['entity'], ent_rel['relation'], True, question, args,
+                                subobjective_idx=getattr(args, "current_subobjective_idx", None),
                             )
                         else:
                             head_or_tail = 'tail'
                             entity_candidates_id = entity_search_with_constraints(
-                                ent_rel['entity'], ent_rel['relation'], False, question, args
+                                ent_rel['entity'], ent_rel['relation'], False, question, args,
+                                subobjective_idx=getattr(args, "current_subobjective_idx", None),
                             )
                         
                         if len(entity_candidates_id) == 0:
                             print('the relations without tail entity:', ent_rel)
                             continue
+
+                        max_candidates = int(getattr(args, "max_candidates_per_relation", 200))
+                        if max_candidates > 0 and len(entity_candidates_id) > max_candidates:
+                            print(
+                                f"[search] capping {ent_rel['relation']} candidates "
+                                f"{len(entity_candidates_id)} -> {max_candidates}"
+                            )
+                            entity_candidates_id = entity_candidates_id[:max_candidates]
 
                         entity_candidates, entity_candidates_id = provide_triple(entity_candidates_id, ent_rel['relation'])
 
@@ -711,7 +776,7 @@ if __name__ == '__main__':
                     depth_ent_rel_ent_dict[depth] = ent_rel_ent_dict
                     depth_record["before_entity_prune"] = serialize_name_dict(convert_dict_name(ent_rel_ent_dict, entid_name))
                     
-                    pprint.pprint(convert_dict_name(ent_rel_ent_dict, entid_name))
+                    pprint.pprint(summarize_name_dict(convert_dict_name(ent_rel_ent_dict, entid_name)))
 
                     if len(total_candidates) == 0:
                         depth_record["stop_reason"] = "no_candidates_after_relation_entity_search"
@@ -737,7 +802,7 @@ if __name__ == '__main__':
                     for kk in cur_token.keys():
                         all_t[kk] += cur_token[kk]
 
-                    pprint.pprint(convert_dict_name(new_ent_rel_ent_dict, entid_name))
+                    pprint.pprint(summarize_name_dict(convert_dict_name(new_ent_rel_ent_dict, entid_name)))
                     setattr(args, "current_entid_name", entid_name)
                     if flag:
                         call_num += 1
@@ -801,6 +866,8 @@ if __name__ == '__main__':
                             "sufficient": sufficient,
                             "stop": stop,
                             "answer_gate": gate_trace,
+                            "subobjective_progress": getattr(args, "last_subobjective_progress", None),
+                            "subobjective_idx": getattr(args, "current_subobjective_idx", 0),
                         }
 
                         if stop:
@@ -837,7 +904,7 @@ if __name__ == '__main__':
 
                                 add_ent_list, add_pre_relations, add_pre_heads, new_ent_rel_ent_dict = add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, entid_name, name_entid, args)
                                 pre_relations += add_pre_relations
-                                pprint.pprint(convert_dict_name(ent_rel_ent_dict, entid_name))
+                                pprint.pprint(summarize_name_dict(convert_dict_name(ent_rel_ent_dict, entid_name)))
                                 pre_heads += add_pre_heads
                                 entities_id += add_ent_list
 

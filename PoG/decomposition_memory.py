@@ -36,7 +36,18 @@ def parse_planning_steps(text: str) -> list[str]:
             try:
                 parsed = parser(candidate)
                 if isinstance(parsed, list):
-                    return [str(item).strip() for item in parsed if str(item).strip()]
+                    steps = []
+                    for item in parsed:
+                        if isinstance(item, dict):
+                            step = str(item.get("step") or item.get("subobjective") or "").strip()
+                            if step:
+                                steps.append(step)
+                            continue
+                        text_item = str(item).strip()
+                        if text_item:
+                            steps.append(text_item)
+                    if steps:
+                        return steps
             except Exception:
                 pass
 
@@ -87,6 +98,16 @@ def optional_prompt_section(title: str, value: Any) -> str:
     return f"\n{title}:\n{value}\n"
 
 
+def format_gold_relation_path(path: Any) -> str:
+    if not path:
+        return "None"
+    if isinstance(path, str):
+        return path
+    if isinstance(path, list):
+        return " -> ".join(str(item) for item in path if str(item).strip()) or "None"
+    return str(path)
+
+
 def build_gold_planning_prompt(episode: dict[str, Any]) -> str:
     optional_sections = "".join(
         [
@@ -95,22 +116,28 @@ def build_gold_planning_prompt(episode: dict[str, Any]) -> str:
             optional_prompt_section("Order", episode.get("order")),
         ]
     )
-    return f"""You are building high-quality planning memory for knowledge graph question answering.
+    gold_path = format_gold_relation_path(episode.get("gold_relation_path") or [])
+    return f"""You are building high-quality hop planning memory for knowledge graph question answering.
 
-Given a question and its gold SPARQL query, generate the correct planning steps needed to answer the question over the knowledge graph.
+Given a question, its gold SPARQL query, and the gold relation path, write executable graph hops. Each hop is one neighbor expansion along the gold relation path.
 
 Requirements:
-1. Each step should correspond to one KG retrieval action, filter condition, ranking/time/order constraint, or final answer selection.
-2. The steps should be concise and readable natural language.
-3. Preserve the logic of the SPARQL query, including relation hops, constraints, ordering, limits, and time conditions.
-4. Do not mention implementation details such as PREFIX lines.
-5. Output only a Python list of strings. Do not output explanations or markdown.
+1. Output a JSON list. Each element is {{"step": "From <start>, expand to <neighbors>", "constraints": ["entity:...", "time:...", "rank:..."] | []}}.
+2. One step per hop in Gold relation path. Step count should match the path length (typically 1-3).
+3. Fold SPARQL FILTER/BIND/time/order conditions into that hop's constraints. Do not write standalone Filter or Select steps.
+4. A rank:* key may be its own final comparison step after the path hops.
+5. Copy constraint keys from the Constraints/Time/Order sections when present. Topic entities are start nodes, not constraints.
+6. Do not mention implementation details such as PREFIX lines.
+7. Output only the JSON list. Do not output explanations or markdown.
 
 Question:
 {get_episode_question(episode)}
 
 Topic Entities:
 {format_topic_entities(episode.get("topic_entity", {}) or {})}
+
+Gold relation path:
+{gold_path}
 
 Gold SPARQL:
 {episode.get("sparql", "")}
@@ -167,7 +194,14 @@ def count_decomposition_memory(path: str) -> int:
 
 
 def should_use_decomposition_memory(args: Any) -> bool:
-    return getattr(args, "decomposition_memory_mode", "none") == "prompt"
+    if getattr(args, "decomposition_memory_mode", "none") != "prompt":
+        return False
+    from constraint_compiler import constraint_routing_mode
+    # Old Filter/Select memory fights hop few-shots. Skip it while routing is on.
+    # constraint_routing_mode is off in train, so gold-planning collection is unchanged.
+    if constraint_routing_mode(args) in {"auto", "on"}:
+        return False
+    return True
 
 
 def select_decomposition_memory_items(

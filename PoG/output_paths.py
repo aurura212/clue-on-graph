@@ -71,6 +71,7 @@ def build_run_meta_from_args(
         "gold_frontier_limit": getattr(args, "gold_frontier_limit", 50),
         "write_missed_positive": getattr(args, "write_missed_positive", 1),
         "constraint_pushdown": getattr(args, "constraint_pushdown", "off"),
+        "constraint_routing": getattr(args, "constraint_routing", "auto"),
         "constraint_asof_date": getattr(args, "constraint_asof_date", "2015-08-10"),
         "constraint_hub_threshold": getattr(args, "constraint_hub_threshold", 50),
         "constraint_prompt_stages": getattr(args, "constraint_prompt_stages", "relation,memory,reasoning,answer"),

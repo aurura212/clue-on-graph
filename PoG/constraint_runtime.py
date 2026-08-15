@@ -15,6 +15,7 @@ from constraint_compiler import (
     format_constraints_for_prompt,
     is_constraint_pushdown_enabled,
     normalize_text,
+    select_prompt_constraints,
 )
 
 
@@ -140,10 +141,18 @@ def answer_in_covering_set(answer: Any, covering_names: set[str]) -> bool:
     return False
 
 
-def constraint_prompt_suffix(args: Any, stage: str, covering_names: Optional[set[str]] = None) -> str:
+def constraint_prompt_suffix(
+    args: Any,
+    stage: str,
+    covering_names: Optional[set[str]] = None,
+    subobjective_idx: Optional[int] = None,
+) -> str:
     if not should_inject_constraint_prompt(args, stage):
         return ""
-    context = format_constraints_for_prompt(getattr(args, "current_constraints", {}) or {})
+    compiled = getattr(args, "current_constraints", {}) or {}
+    if subobjective_idx is not None:
+        compiled = select_prompt_constraints(args, compiled, subobjective_idx)
+    context = format_constraints_for_prompt(compiled)
     if not context:
         return ""
     parts = [
@@ -157,8 +166,16 @@ def constraint_prompt_suffix(args: Any, stage: str, covering_names: Optional[set
     return "\n".join(parts) + "\n"
 
 
-def append_constraint_prompt(prompt: str, args: Any, stage: str, covering_names: Optional[set[str]] = None) -> str:
-    suffix = constraint_prompt_suffix(args, stage, covering_names=covering_names)
+def append_constraint_prompt(
+    prompt: str,
+    args: Any,
+    stage: str,
+    covering_names: Optional[set[str]] = None,
+    subobjective_idx: Optional[int] = None,
+) -> str:
+    suffix = constraint_prompt_suffix(
+        args, stage, covering_names=covering_names, subobjective_idx=subobjective_idx,
+    )
     if not suffix:
         return prompt
     return prompt + suffix
@@ -281,6 +298,37 @@ def ground_subobjectives(steps: list[str], question: str, args: Any) -> tuple[li
         if updated != original:
             trace["kept_steps"].append({"before": original, "after": updated})
     return grounded or steps, trace
+
+
+def ground_subobjective_routing(
+    routing: list[dict[str, Any]],
+    question: str,
+    args: Any,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Strip ungrounded literals from hop plans. Do not drop Filter steps; normalize_hop_routing merges those keys."""
+    trace = {"stripped_literals": [], "dropped_steps": [], "kept_steps": []}
+    if not routing:
+        return routing, trace
+    if not is_constraint_pushdown_enabled(args) or not int(getattr(args, "decomposition_grounding_check", 1)):
+        return routing, trace
+    allowed = allowed_grounding_literals(question, args)
+    new_routing = []
+    for item in routing:
+        original = str(item.get("step") or "")
+        updated = original
+        for literal in quoted_literals(original):
+            if literal_is_grounded(literal, question, allowed) and not is_type_like_literal(literal):
+                continue
+            if is_type_like_literal(literal) or not literal_is_grounded(literal, question, allowed):
+                trace["stripped_literals"].append(literal)
+                updated = updated.replace(f'"{literal}"', "").replace(f"'{literal}'", "")
+        updated = re.sub(r"\s+", " ", updated).strip(" :-,").strip() or original
+        new_item = dict(item)
+        new_item["step"] = updated
+        if updated != original:
+            trace["kept_steps"].append({"before": original, "after": updated})
+        new_routing.append(new_item)
+    return new_routing, trace
 
 
 def mask_planning_steps(steps: list[str], topic_names: list[str]) -> list[str]:

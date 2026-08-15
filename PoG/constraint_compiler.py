@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+import time
 from typing import Any, Callable, Dict, List, Optional
 
 
@@ -176,12 +178,55 @@ def is_constraint_pushdown_enabled(args: Any) -> bool:
     return str(getattr(args, "constraint_pushdown", "off")).lower() == "on"
 
 
+def constraint_routing_mode(args: Any) -> str:
+    """Return off/auto/on. Train mode and disabled pushdown always yield off."""
+    if not is_constraint_pushdown_enabled(args):
+        return "off"
+    if str(getattr(args, "run_mode", "test")).lower() == "train":
+        return "off"
+    mode = str(getattr(args, "constraint_routing", "auto") or "auto").lower()
+    if mode not in {"off", "auto", "on"}:
+        return "auto"
+    return mode
+
+
+def is_constraint_routing_enabled(args: Any) -> bool:
+    return constraint_routing_mode(args) in {"auto", "on"}
+
+
+def lookup_constraint_trace(cache: Optional[dict], entity: str, relation: str, head: bool) -> dict:
+    """Prune-facing lookup: (entity, relation, head) only. Do not require routed_sig.
+
+    Search may still store a 4-tuple key for hop-specific memoization. Prefer the
+    exact 3-tuple, otherwise the last 4-tuple with the same prefix.
+    """
+    if not cache:
+        return {}
+    key3 = (entity, relation, bool(head))
+    hit = cache.get(key3)
+    if isinstance(hit, dict):
+        return hit
+    matches = []
+    for key, trace in cache.items():
+        if not isinstance(key, tuple) or len(key) < 3 or not isinstance(trace, dict):
+            continue
+        if key[0] == entity and key[1] == relation and bool(key[2]) == bool(head):
+            matches.append(trace)
+    return matches[-1] if matches else {}
+
+
 def normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).lower()
 
 
 def sparql_escape_literal(value: str) -> str:
     return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def sparql_literal_variants(mention: str) -> list[str]:
+    """Case variants that emulate LCASE matching while keeping the object index usable."""
+    variants = (mention, mention.lower(), mention.upper(), mention.title(), mention.capitalize())
+    return list(dict.fromkeys(variants))
 
 
 def normalize_mid(value: Any) -> str:
@@ -496,17 +541,15 @@ def extract_candidate_mentions(question: str, topic_entity: dict[str, str]) -> l
 
 
 def build_exact_match_query(mention: str, limit: int, source: str = "name") -> str:
-    literal = sparql_escape_literal(mention)
-    if source == "alias":
-        match_pattern = f'?entity ns:common.topic.alias ?matched .'
-    else:
-        match_pattern = f'?entity ns:type.object.name ?matched .'
+    predicate = "ns:common.topic.alias" if source == "alias" else "ns:type.object.name"
+    values = " ".join(
+        f'"{sparql_escape_literal(v)}"@en' for v in sparql_literal_variants(mention)
+    )
     return f"""PREFIX ns: <http://rdf.freebase.com/ns/>
 SELECT DISTINCT ?entity ?name
 WHERE {{
-  {match_pattern}
-  FILTER(LCASE(STR(?matched)) = LCASE("{literal}"))
-  FILTER(LANGMATCHES(LANG(?matched), "en"))
+  VALUES ?matched {{ {values} }}
+  ?entity {predicate} ?matched .
   ?entity ns:type.object.name ?name .
   FILTER(LANGMATCHES(LANG(?name), "en"))
 }}
@@ -610,10 +653,17 @@ def link_mention(
     last_error = None
     candidates: list[dict[str, Any]] = []
     for source in ("name", "alias"):
+        started = time.perf_counter()
         try:
             bindings = sparql_executor(build_exact_match_query(mention, limit, source=source))
         except Exception as exc:
+            elapsed = time.perf_counter() - started
             last_error = repr(exc)
+            print(
+                f"[constraint_link] mention={mention!r} source={source} "
+                f"failed after {elapsed:.1f}s: {last_error}",
+                file=sys.stderr,
+            )
             continue
         candidates = collect_candidates_from_bindings(bindings, mention, source)
         if candidates:
@@ -630,9 +680,23 @@ def link_mention(
     return best, candidates[: int(getattr(args, "constraint_link_top_k", 8))], None
 
 
-def format_constraints_for_prompt(compiled: dict[str, Any]) -> str:
+def format_constraints_for_prompt(
+    compiled: dict[str, Any],
+    subobjective_idx: Optional[int] = None,
+    resolved_routing: Optional[list[dict[str, Any]]] = None,
+) -> str:
     if not compiled:
         return ""
+    if subobjective_idx is not None:
+        routing = resolved_routing if resolved_routing is not None else compiled.get("resolved_routing")
+        if routing:
+            subset = get_constraints_for_subobjective(routing, subobjective_idx, compiled)
+            compiled = {
+                "entity_constraints": subset.get("entity_constraints") or [],
+                "time_constraints": subset.get("time_constraints") or [],
+                "order_constraints": subset.get("order_constraints") or [],
+                "unlinked_mentions": [],
+            }
     parts = []
     entities = [
         f'{item.get("mention")} -> {item.get("name")} ({item.get("mid")})'
@@ -692,6 +756,8 @@ def compile_question_constraints(
             "time_constraints": [],
             "order_constraints": [],
             "unlinked_mentions": [],
+            "constraint_key_map": {},
+            "resolved_routing": None,
             "trace": {"reason": "constraint_pushdown_off"},
         }
 
@@ -765,6 +831,7 @@ def compile_question_constraints(
         "time_constraints": time_constraints,
         "order_constraints": order_constraints,
         "unlinked_mentions": sorted(set(unlinked_mentions)),
+        "resolved_routing": None,
         "trace": {
             "extract_source": extract_source,
             "llm_extract_error": llm_extract.get("error"),
@@ -775,5 +842,563 @@ def compile_question_constraints(
             "prompt_context": "",
         },
     }
+    compiled["constraint_key_map"] = build_constraint_key_map(compiled)
     compiled["trace"]["prompt_context"] = format_constraints_for_prompt(compiled)
     return compiled
+
+
+def _empty_constraint_subset() -> dict[str, list]:
+    return {
+        "entity_constraints": [],
+        "time_constraints": [],
+        "order_constraints": [],
+    }
+
+
+def format_available_constraint_keys(compiled: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    compiled = compiled or {}
+    for item in compiled.get("entity_constraints") or []:
+        mention = str(item.get("mention") or item.get("name") or "").strip()
+        if mention:
+            keys.append("entity:" + mention)
+    for item in compiled.get("time_constraints") or []:
+        kind = str(item.get("kind") or item.get("raw_text") or "").strip()
+        if kind:
+            keys.append("time:" + kind)
+    for item in compiled.get("order_constraints") or []:
+        kind = str(item.get("kind") or "").strip()
+        if kind:
+            keys.append("rank:" + kind)
+    return keys
+
+
+def build_constraint_key_map(compiled: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Map prompt-facing keys (entity:Ohio, time:current, rank:min) to compiled items."""
+    key_map: dict[str, dict[str, Any]] = {}
+    compiled = compiled or {}
+    for item in compiled.get("entity_constraints") or []:
+        mention = str(item.get("mention") or item.get("name") or "").strip()
+        if mention:
+            key_map.setdefault("entity:" + mention, item)
+        name = str(item.get("name") or "").strip()
+        if name:
+            key_map.setdefault("entity:" + name, item)
+        mid = str(item.get("mid") or "").strip()
+        if mid:
+            key_map.setdefault("entity:" + mid, item)
+    for item in compiled.get("time_constraints") or []:
+        kind = str(item.get("kind") or "").strip()
+        if kind:
+            key_map.setdefault("time:" + kind, item)
+        raw = str(item.get("raw_text") or "").strip()
+        if raw:
+            key_map.setdefault("time:" + raw, item)
+    for item in compiled.get("order_constraints") or []:
+        kind = str(item.get("kind") or "").strip()
+        if kind:
+            key_map.setdefault("rank:" + kind, item)
+            key_map.setdefault("order:" + kind, item)
+        raw = str(item.get("raw_text") or "").strip()
+        if raw:
+            key_map.setdefault("rank:" + raw, item)
+    return key_map
+
+
+def parse_routing_key(key: str) -> tuple[str, str]:
+    text = str(key or "").strip()
+    if not text:
+        return "", ""
+    if ":" in text:
+        prefix, body = text.split(":", 1)
+        prefix = prefix.strip().lower()
+        body = body.strip()
+        if prefix in {"entity", "time", "rank", "order"}:
+            if prefix == "order":
+                prefix = "rank"
+            return prefix, body
+    return "", text
+
+
+def _partial_text_match(needle: str, haystack: str) -> bool:
+    needle = normalize_text(needle)
+    haystack = normalize_text(haystack)
+    if not needle or not haystack:
+        return False
+    if needle == haystack:
+        return True
+    if len(needle) < 2:
+        return False
+    return needle in haystack or haystack in needle
+
+
+def _match_entity_constraint(key_body: str, entity_constraints: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    needle = normalize_text(key_body)
+    if not needle:
+        return None
+    for item in entity_constraints or []:
+        if normalize_text(item.get("mention", "")) == needle:
+            return item
+    for item in entity_constraints or []:
+        if _partial_text_match(needle, item.get("name", "")) or _partial_text_match(needle, item.get("mention", "")):
+            return item
+        if normalize_text(item.get("mid", "")) == needle:
+            return item
+    return None
+
+
+def _match_time_constraint(key_body: str, time_constraints: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    needle = normalize_text(key_body)
+    if not needle:
+        return None
+    if needle in {"current", "currently", "now", "present", "asof"}:
+        for item in time_constraints or []:
+            if item.get("kind") == "current":
+                return item
+    for item in time_constraints or []:
+        if normalize_text(item.get("kind", "")) == needle:
+            return item
+    for item in time_constraints or []:
+        if (
+            _partial_text_match(needle, item.get("raw_text", ""))
+            or needle in normalize_text(item.get("start", ""))
+            or needle in normalize_text(item.get("asof_date", ""))
+        ):
+            return item
+    return None
+
+
+def _match_order_constraint(key_body: str, order_constraints: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    needle = normalize_text(key_body)
+    if not needle:
+        return None
+    if re.search(r"\b(max|largest|highest|most|maximum|latest|newest|last)\b", needle):
+        kind = "max"
+    elif re.search(r"\b(min|smallest|lowest|least|minimum|earliest|oldest|first)\b", needle):
+        kind = "min"
+    else:
+        kind = needle
+    for item in order_constraints or []:
+        if normalize_text(item.get("kind", "")) == kind:
+            return item
+        if _partial_text_match(needle, item.get("raw_text", "")):
+            return item
+    return None
+
+
+def resolve_constraint_keys(
+    routing_keys: Optional[list[Any]],
+    compiled_constraints: dict[str, Any],
+) -> dict[str, Any]:
+    """Map text keys such as entity:Ohio to a structured constraint subset.
+
+    Unmatched keys are omitted (no-match fallback) and recorded in unresolved_keys.
+    Matching is case-insensitive: exact mention first, then partial name/mention.
+    """
+    compiled = compiled_constraints or {}
+    entity_constraints = list(compiled.get("entity_constraints") or [])
+    time_constraints = list(compiled.get("time_constraints") or [])
+    order_constraints = list(compiled.get("order_constraints") or [])
+    key_map = compiled.get("constraint_key_map") or build_constraint_key_map(compiled)
+
+    matched_entity: list[dict[str, Any]] = []
+    matched_time: list[dict[str, Any]] = []
+    matched_order: list[dict[str, Any]] = []
+    unresolved: list[str] = []
+
+    for raw_key in routing_keys or []:
+        key = str(raw_key or "").strip()
+        if not key:
+            continue
+        prefix, body = parse_routing_key(key)
+        item = None
+        exact = key_map.get(key) or key_map.get(prefix + ":" + body if prefix else "")
+        if exact is None:
+            lowered = normalize_text(key)
+            for map_key, map_item in key_map.items():
+                if normalize_text(map_key) == lowered:
+                    exact = map_item
+                    break
+        if exact is not None:
+            item = exact
+            if not prefix:
+                if item in entity_constraints or item.get("mid"):
+                    prefix = "entity"
+                elif item.get("kind") in {"current", "year", "range"} or item.get("start") or item.get("asof_date"):
+                    prefix = "time"
+                else:
+                    prefix = "rank"
+        elif prefix == "entity" or (not prefix and body):
+            item = _match_entity_constraint(body or key, entity_constraints)
+            if item is not None:
+                prefix = "entity"
+        if item is None and prefix == "time":
+            item = _match_time_constraint(body, time_constraints)
+        if item is None and prefix == "rank":
+            item = _match_order_constraint(body, order_constraints)
+        if item is None and prefix == "entity":
+            item = _match_entity_constraint(body, entity_constraints)
+        if item is None and not prefix:
+            item = (
+                _match_entity_constraint(body or key, entity_constraints)
+                or _match_time_constraint(body or key, time_constraints)
+                or _match_order_constraint(body or key, order_constraints)
+            )
+            if item is not None:
+                if item in entity_constraints or item.get("mid"):
+                    prefix = "entity"
+                elif item.get("kind") in {"current", "year", "range"} or item.get("start") or item.get("asof_date"):
+                    prefix = "time"
+                else:
+                    prefix = "rank"
+
+        if item is None:
+            unresolved.append(key)
+            continue
+        if prefix == "entity":
+            matched_entity.append(item)
+        elif prefix == "time":
+            matched_time.append(item)
+        else:
+            matched_order.append(item)
+
+    return {
+        "entity_constraints": merge_unique_constraints(matched_entity),
+        "time_constraints": merge_unique_constraints(matched_time),
+        "order_constraints": merge_unique_constraints(matched_order),
+        "unresolved_keys": unresolved,
+    }
+
+
+def parse_subobjective_routing(text: str) -> Optional[list[dict[str, Any]]]:
+    """Parse [{step, constraints}, ...] from LLM output. None if the old string-list format."""
+    parsed = parse_json_list(text)
+    if not parsed:
+        return None
+    if not all(isinstance(item, dict) and (item.get("step") or item.get("subobjective")) for item in parsed):
+        return None
+    routing: list[dict[str, Any]] = []
+    for item in parsed:
+        step = str(item.get("step") or item.get("subobjective") or "").strip()
+        if not step:
+            continue
+        keys = item.get("constraints")
+        if keys is None:
+            keys = []
+        if isinstance(keys, str):
+            keys = [keys] if keys.strip() else []
+        if not isinstance(keys, list):
+            keys = []
+        routing.append({
+            "step": step,
+            "constraints": [str(key).strip() for key in keys if str(key).strip()],
+        })
+    return routing or None
+
+
+_HOP_EXPAND_RE = re.compile(r"\b(expand|retrieve|search|find)\b", flags=re.I)
+_HOP_FILTER_RE = re.compile(r"\b(filter(?:\s+(?:out|to|the))?|only include)\b", flags=re.I)
+_HOP_SELECT_RE = re.compile(
+    r"\b(select the distinct|select the answer|select answer|as the answer|final answer|select the entity)\b",
+    flags=re.I,
+)
+
+
+def _routing_keys(item: dict[str, Any]) -> list[str]:
+    keys = item.get("constraints") or item.get("keys") or []
+    if isinstance(keys, str):
+        return [keys] if keys.strip() else []
+    if not isinstance(keys, list):
+        return []
+    return [str(key).strip() for key in keys if str(key).strip()]
+
+
+def _is_rank_step(keys: list[str]) -> bool:
+    return any(normalize_text(key).startswith("rank:") for key in keys)
+
+
+def _is_select_step(step: str, keys: list[str]) -> bool:
+    if _is_rank_step(keys):
+        return False
+    text = str(step or "")
+    if _HOP_EXPAND_RE.search(text):
+        return False
+    if _HOP_SELECT_RE.search(text):
+        return True
+    return bool(re.match(r"^select\b", text, flags=re.I))
+
+
+def _is_pure_filter_step(step: str, keys: list[str]) -> bool:
+    if _is_rank_step(keys):
+        return False
+    text = str(step or "")
+    if not _HOP_FILTER_RE.search(text):
+        return False
+    if re.search(r"\bexpand\b", text, flags=re.I):
+        return False
+    return True
+
+
+def normalize_hop_routing(routing: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Drop standalone Filter/Select steps; merge their keys onto the previous hop."""
+    if not routing:
+        return []
+    hops: list[dict[str, Any]] = []
+    pending_keys: list[str] = []
+    for item in routing:
+        step = str(item.get("step") or "").strip()
+        keys = _routing_keys(item)
+        if not step:
+            pending_keys.extend(keys)
+            continue
+        if _is_select_step(step, keys) or _is_pure_filter_step(step, keys):
+            pending_keys.extend(keys)
+            continue
+        merged = list(keys)
+        if pending_keys:
+            merged = pending_keys + merged
+            pending_keys = []
+        hops.append({"step": step, "constraints": merged})
+    if pending_keys and hops:
+        hops[-1]["constraints"] = hops[-1].get("constraints") or []
+        hops[-1]["constraints"] = list(hops[-1]["constraints"]) + pending_keys
+    elif pending_keys and not hops:
+        hops = [{"step": str(routing[0].get("step") or "").strip(), "constraints": pending_keys}]
+        hops = [item for item in hops if item["step"]]
+    for item in hops:
+        seen = set()
+        unique = []
+        for key in item.get("constraints") or []:
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(key)
+        item["constraints"] = unique
+    return hops or list(routing)
+
+
+def resolve_subobjective_routing(
+    routing: Optional[list[dict[str, Any]]],
+    compiled_constraints: dict[str, Any],
+) -> list[dict[str, Any]]:
+    resolved: list[dict[str, Any]] = []
+    for item in routing or []:
+        keys = list(item.get("constraints") or item.get("keys") or [])
+        subset = resolve_constraint_keys(keys, compiled_constraints)
+        resolved.append({
+            "step": str(item.get("step") or ""),
+            "keys": keys,
+            "constraints": keys,
+            "entity_constraints": subset.get("entity_constraints") or [],
+            "time_constraints": subset.get("time_constraints") or [],
+            "order_constraints": subset.get("order_constraints") or [],
+            "unresolved_keys": subset.get("unresolved_keys") or [],
+            "resolved": True,
+        })
+    return resolved
+
+
+def get_constraints_for_subobjective(
+    resolved_routing: Optional[list[dict[str, Any]]],
+    sub_idx: Optional[int],
+    compiled_constraints: Optional[dict[str, Any]] = None,
+) -> dict[str, list]:
+    """Return {entity,time,order}_constraints for a 0-based subobjective index."""
+    empty = _empty_constraint_subset()
+    if not resolved_routing:
+        return empty
+    try:
+        idx = int(sub_idx) if sub_idx is not None else 0
+    except (TypeError, ValueError):
+        idx = 0
+    idx = max(0, min(idx, len(resolved_routing) - 1))
+    item = resolved_routing[idx]
+    if item.get("resolved"):
+        return {
+            "entity_constraints": list(item.get("entity_constraints") or []),
+            "time_constraints": list(item.get("time_constraints") or []),
+            "order_constraints": list(item.get("order_constraints") or []),
+        }
+    keys = item.get("constraints") or item.get("keys") or []
+    subset = resolve_constraint_keys(keys, compiled_constraints or {})
+    return {
+        "entity_constraints": subset.get("entity_constraints") or [],
+        "time_constraints": subset.get("time_constraints") or [],
+        "order_constraints": subset.get("order_constraints") or [],
+    }
+
+
+def _constraint_identity(item: dict[str, Any], kind: str) -> tuple:
+    if kind == "entity":
+        return ("entity", str(item.get("mid") or normalize_text(item.get("mention") or "")))
+    if kind == "time":
+        return ("time", str(item.get("kind") or ""), str(item.get("start") or ""), str(item.get("asof_date") or ""))
+    return ("rank", str(item.get("kind") or ""))
+
+
+def assigned_constraint_ids(resolved_routing: Optional[list[dict[str, Any]]]) -> set[tuple]:
+    assigned: set[tuple] = set()
+    for item in resolved_routing or []:
+        for entity in item.get("entity_constraints") or []:
+            assigned.add(_constraint_identity(entity, "entity"))
+        for time_item in item.get("time_constraints") or []:
+            assigned.add(_constraint_identity(time_item, "time"))
+        for order in item.get("order_constraints") or []:
+            assigned.add(_constraint_identity(order, "rank"))
+    return assigned
+
+
+def unassigned_compiled_constraints(
+    resolved_routing: Optional[list[dict[str, Any]]],
+    compiled_constraints: Optional[dict[str, Any]],
+) -> dict[str, list]:
+    """Compiled constraints the LLM never attached to any subobjective.
+
+    Those must stay active on every hop. Dropping them (e.g. forgetting
+    entity:Ohio) turns time-only pushdown into a hub explosion.
+    """
+    compiled = compiled_constraints or {}
+    assigned = assigned_constraint_ids(resolved_routing)
+    entities = [
+        item for item in (compiled.get("entity_constraints") or [])
+        if _constraint_identity(item, "entity") not in assigned
+    ]
+    times = [
+        item for item in (compiled.get("time_constraints") or [])
+        if _constraint_identity(item, "time") not in assigned
+    ]
+    orders = [
+        item for item in (compiled.get("order_constraints") or [])
+        if _constraint_identity(item, "rank") not in assigned
+    ]
+    return {
+        "entity_constraints": entities,
+        "time_constraints": times,
+        "order_constraints": orders,
+    }
+
+
+def merge_constraint_subsets(*subsets: dict[str, list]) -> dict[str, list]:
+    entities: list[dict[str, Any]] = []
+    times: list[dict[str, Any]] = []
+    orders: list[dict[str, Any]] = []
+    for subset in subsets:
+        if not subset:
+            continue
+        entities.extend(subset.get("entity_constraints") or [])
+        times.extend(subset.get("time_constraints") or [])
+        orders.extend(subset.get("order_constraints") or [])
+    return {
+        "entity_constraints": merge_unique_constraints(entities),
+        "time_constraints": merge_unique_constraints(times),
+        "order_constraints": merge_unique_constraints(orders),
+    }
+
+
+def get_pending_constraints(
+    resolved_routing: Optional[list[dict[str, Any]]],
+    sub_idx: Optional[int],
+    compiled_constraints: Optional[dict[str, Any]] = None,
+) -> dict[str, list]:
+    """Union constraints from the current subobjective through the last one.
+
+    Decomposition often puts entity/time filters on later 'filter' steps while
+    earlier steps are unconstrained retrieves. Applying only the current step
+    then leaves hub relations (e.g. governmental_body.members) unfiltered and
+    explodes the frontier. Pending/lookahead keeps those later filters active
+    until Subobjective_Progress advances past them.
+
+    Constraints the LLM never assigned to any step stay active on every hop.
+    """
+    empty = _empty_constraint_subset()
+    pending = empty
+    if resolved_routing:
+        try:
+            idx = int(sub_idx) if sub_idx is not None else 0
+        except (TypeError, ValueError):
+            idx = 0
+        idx = max(0, min(idx, len(resolved_routing) - 1))
+        entities: list[dict[str, Any]] = []
+        times: list[dict[str, Any]] = []
+        orders: list[dict[str, Any]] = []
+        for i in range(idx, len(resolved_routing)):
+            part = get_constraints_for_subobjective(resolved_routing, i, compiled_constraints)
+            entities.extend(part.get("entity_constraints") or [])
+            times.extend(part.get("time_constraints") or [])
+            orders.extend(part.get("order_constraints") or [])
+        pending = {
+            "entity_constraints": merge_unique_constraints(entities),
+            "time_constraints": merge_unique_constraints(times),
+            "order_constraints": merge_unique_constraints(orders),
+        }
+    unassigned = unassigned_compiled_constraints(resolved_routing, compiled_constraints)
+    return merge_constraint_subsets(pending, unassigned)
+
+
+def select_search_constraints(
+    args: Any,
+    compiled: Optional[dict[str, Any]] = None,
+    subobjective_idx: Optional[int] = None,
+) -> dict[str, list]:
+    """Constraint subset used for SPARQL pushdown at the current hop."""
+    compiled = compiled if compiled is not None else (getattr(args, "current_constraints", None) or {})
+    full = {
+        "entity_constraints": list(compiled.get("entity_constraints") or []),
+        "time_constraints": list(compiled.get("time_constraints") or []),
+        "order_constraints": list(compiled.get("order_constraints") or []),
+    }
+    mode = constraint_routing_mode(args)
+    if mode == "off":
+        return full
+    routing = getattr(args, "resolved_constraint_routing", None)
+    if routing is None:
+        routing = compiled.get("resolved_routing")
+    if not routing:
+        if mode == "on":
+            return _empty_constraint_subset()
+        return full
+    idx = subobjective_idx if subobjective_idx is not None else getattr(args, "current_subobjective_idx", 0)
+    pending = get_pending_constraints(routing, idx, compiled)
+    if pending["entity_constraints"] or pending["time_constraints"] or pending["order_constraints"]:
+        return pending
+    if mode == "auto" and (full["entity_constraints"] or full["time_constraints"] or full["order_constraints"]):
+        return full
+    return pending
+
+
+def select_prompt_constraints(
+    args: Any,
+    compiled: Optional[dict[str, Any]] = None,
+    subobjective_idx: Optional[int] = None,
+) -> dict[str, list]:
+    """Constraint subset injected into hop-local prompts.
+
+    Unlike SPARQL selection, `on` with missing routing still shows the full
+    compiled constraints as a reminder.
+    """
+    compiled = compiled if compiled is not None else (getattr(args, "current_constraints", None) or {})
+    full = {
+        "entity_constraints": list(compiled.get("entity_constraints") or []),
+        "time_constraints": list(compiled.get("time_constraints") or []),
+        "order_constraints": list(compiled.get("order_constraints") or []),
+        "unlinked_mentions": list(compiled.get("unlinked_mentions") or []),
+    }
+    mode = constraint_routing_mode(args)
+    if mode == "off":
+        return full
+    routing = getattr(args, "resolved_constraint_routing", None)
+    if routing is None:
+        routing = compiled.get("resolved_routing")
+    if not routing:
+        return full
+    idx = subobjective_idx if subobjective_idx is not None else getattr(args, "current_subobjective_idx", 0)
+    subset = get_pending_constraints(routing, idx, compiled)
+    if not (subset["entity_constraints"] or subset["time_constraints"] or subset["order_constraints"]):
+        subset = {
+            "entity_constraints": full["entity_constraints"],
+            "time_constraints": full["time_constraints"],
+            "order_constraints": full["order_constraints"],
+        }
+    subset["unlinked_mentions"] = []
+    return subset
+
