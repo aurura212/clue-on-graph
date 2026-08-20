@@ -649,13 +649,35 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
                         all_ent_set |= (set(e_list))
 
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
-    
+
+    from kg_memory_retrieval import retrieve_reflection_records, should_use_kg_memory_at_stage
+    from reflection_structural_memory import (
+        build_reflection_event,
+        compact_event_for_trace,
+        explored_relation_paths,
+        maybe_prepend_reflection_evidence,
+    )
+
+    frontier_names = list(set(sorted([entid_name[ent_i] for ent_i in new_lst])))
+    explored_paths = explored_relation_paths(depth_ent_rel_ent_dict)
+    entity_records_a = []
+    if should_use_kg_memory_at_stage(args, "reflection_judge") or should_use_kg_memory_at_stage(args, "reflection"):
+        entity_records_a = retrieve_reflection_records(args, list(new_lst))
+    event_a = build_reflection_event(
+        stage="reflection_a",
+        args=args,
+        candidate_frontier=frontier_names,
+        entity_records=entity_records_a,
+        already_explored_paths=explored_paths,
+    )
+
     prefix = (
         judge_reverse + question
         + '\nEntities set to be retrieved: ' + str(list(set(sorted([entid_name[ent_i] for ent_i in new_lst]))))
         + '\nMemory: ' + his_mem
         + '\nKnowledge Triplets:'
     )
+    prefix = maybe_prepend_reflection_evidence(prefix, event_a)
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="reverse")
     chain_prompt = truncate_knowledge_triplets_for_prompt(
         budget_prefix, chain_prompt, args.LLM_type, args.max_length,
@@ -668,13 +690,15 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         cur_token[kk] += token_num[kk]
 
     flag, reason = extract_add_and_reason(response)
-    frontier_names = list(set(sorted([entid_name[ent_i] for ent_i in new_lst])))
+    event_a["llm_decision"] = "continue" if flag else "stop"
+    event_a["selected_entity"] = None
     reflection_trace = {
         "decision_a": {
             "add": bool(flag),
             "reason": reason,
             "llm_raw_output": response,
             "frontier_entities": frontier_names,
+            "evidence": compact_event_for_trace(event_a),
         },
         "decision_b": {
             "invoked": False,
@@ -682,6 +706,15 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
             "selected_entities": [],
             "selected_entity_ids": [],
             "llm_raw_output": None,
+            "evidence": compact_event_for_trace(
+                build_reflection_event(
+                    stage="reflection_b",
+                    args=args,
+                    candidate_frontier=[],
+                    records=[],
+                    already_explored_paths=explored_paths,
+                )
+            ),
         },
     }
 
@@ -691,7 +724,21 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         
         print('filter already', [entid_name[ent_i] for ent_i in new_lst], [entid_name[ent_i] for ent_i in all_ent_set], other_entities_name)
 
+        entity_records_b = []
+        if should_use_kg_memory_at_stage(args, "reflection_select") or should_use_kg_memory_at_stage(args, "reflection"):
+            entity_records_b = retrieve_reflection_records(args, list(other_entities))
+        event_b = build_reflection_event(
+            stage="reflection_b",
+            args=args,
+            candidate_frontier=sorted(other_entities_name),
+            entity_records=[
+                (entid_name.get(eid, eid), record) for eid, record in entity_records_b
+            ],
+            already_explored_paths=explored_paths,
+        )
+
         prompt = add_ent_prompt+question+'\nReason: '+reason+'\nCandidate Entities: ' + format_capped_list(sorted(other_entities_name), 70)+'\nMemory: '+his_mem
+        prompt = maybe_prepend_reflection_evidence(prompt, event_b)
         prompt = maybe_prepend_reference_context(prompt, args, stage="add_entity")
 
         cur_call_time += 1
@@ -703,12 +750,15 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         add_ent_list = extract_add_ent(select_response)
         add_ent_list = [name_entid[ent_i] for ent_i in add_ent_list if ent_i in other_entities_name]
         add_ent_list = sorted(add_ent_list)
+        event_b["llm_decision"] = ",".join(entid_name[ent_i] for ent_i in add_ent_list) if add_ent_list else ""
+        event_b["selected_entity"] = entid_name[add_ent_list[0]] if add_ent_list else None
         reflection_trace["decision_b"] = {
             "invoked": True,
             "candidate_entities": sorted(other_entities_name),
             "selected_entities": [entid_name[ent_i] for ent_i in add_ent_list],
             "selected_entity_ids": list(add_ent_list),
             "llm_raw_output": select_response,
+            "evidence": compact_event_for_trace(event_b),
         }
         if add_ent_list:
             print('add reverse ent:', len(add_ent_list), [entid_name[ent_i] for ent_i in add_ent_list])

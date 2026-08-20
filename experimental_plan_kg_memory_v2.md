@@ -1,10 +1,10 @@
 # KG-Structural Memory for PoG：V2 实验计划
 
-> 版本：V2.0  
+> 版本：V2.1  
 > 制定日期：2026-08-20  
 > 适用项目：`SRP_2/clue_on_graph/PoG`  
 > 前一版本：`experimental_plan_kg_memory_from_gpt56.md`  
-> 变更依据：`experiment_log_kg_memory.md` 的 LOG-047 至 LOG-049
+> 变更依据：`experiment_log_kg_memory.md` 的 LOG-047 至 LOG-052
 
 ## 0. 版本定位
 
@@ -95,34 +95,71 @@ V2 不再把“first-hop gold relation recall 提升”作为 KG structural memo
 - 不将 memory evidence 注入最终 answer reasoning；
 - 不将当前问题的 ephemeral cache 直接晋升为全局 memory；
 - 不启动 self-play、在线经验演化或 LLM 微调；
-- 不在 hard150 上继续选择 fusion 超参数后再宣称最终泛化结果。
+- 不在 `hard150_v1` 上继续选择 fusion 超参数后再宣称最终泛化结果；
+- 不在方法冻结前对 `random150_v1` 跑 LLM。
 
 ## 4. 数据划分与评测协议
 
-### 4.1 hard150 的重新定位
+V2 使用两份已冻结的 WebQSP test 切片，**不得混用角色**：
 
-`hard150_v1.json` 已经被多次用于诊断、fusion 分析和阶段决策，因此从 V2 起只能定义为：
+| 切片 | 文件 | 角色 | 用途 | 能否当能力主结果 |
+|---|---|---|---|---|
+| `hard150_v1` | `PoG/eval_slices/hard150_v1.json` | `development_stress` | 选阈值、trace、难例压力测试 | **否** |
+| `random150_v1` | `PoG/eval_slices/random150_v1.json` | `capability_eval`（V2 的 `final_unseen`） | 改进后模型能力的主评估 | **是**（仅 V2-3 方法冻结后一次跑） |
 
-```text
-development stress slice
-```
+prefix150（WebQSP test 前 150 题）与 first-hop M1/M2 数字只作档案，不与上述两切片混比。
+
+### 4.1 `hard150_v1`：压力测试 / development stress
+
+| 项 | 值 |
+|---|---|
+| 路径 | `PoG/eval_slices/hard150_v1.json`、`hard150_v1.questions.txt` |
+| `role` | `development_stress` |
+| n | 150 |
+| 构建脚本 | `PoG/build_hard_eval_slice.py` |
+| 抽取规则 | original PoG 与 relation+decomp 记忆 **都错** 的 177 题，按 test index 排序后 `even_subsample` 到 150 |
+| `questions_sha256` | `09ad7d10f566b791056d8d524acfb7cfec989715040d31f6d9728f91e31fec09` |
+| 与 prefix150 重叠 | 13 |
+| 已记录 B0 EM（LOG-042） | 0.1733（难，不代表 WebQSP 总体） |
+
+该切片已被用于 first-hop 诊断、fusion 分析和阶段决策，因此从 V2 起只能定义为压力切片。
 
 它可以用于：
 
-- smoke test；
+- V2-2 smoke（切片内 `START=0 LIMIT=20`）与 development n=150；
 - trace 检查；
-- 选择 reflection 阈值；
-- 发现错误模式。
+- 选择 reflection 阈值、evidence top-k、prompt 压缩；
+- 发现错误模式、看难例会不会崩。
 
 它不能用于：
 
 - 最终论文主结果；
+- 改进后模型能力的主评估；
 - 在看过结果后冻结最终方法并继续报告为 test performance；
 - 支撑跨数据集泛化结论。
 
-### 4.2 新增 final unseen split
+### 4.2 `random150_v1`：能力评估 / final unseen
 
-V2 必须新增一份完全冻结的 `final_unseen` 切片。该切片在以下内容全部冻结后才能运行：
+难度应对齐 WebQSP test **总体**，而不是 hard150 那种双系统全错子集。已冻结文件：
+
+| 项 | 值 |
+|---|---|
+| 路径 | `PoG/eval_slices/random150_v1.json`、`random150_v1.questions.txt` |
+| `role` | `capability_eval` |
+| `v2_role` | `final_unseen` |
+| n | 150 |
+| 池 | WebQSP test 全量，`pool_n=1639`（`WebQSP.json`） |
+| 构建脚本 | `PoG/build_random_eval_slice.py` |
+| 抽取规则 | `uniform_random_webqsp_test`，`seed=42`，`random.sample` 后再按 test index 排序落盘 |
+| `questions_sha256` | `a033f485c941ca7041d7805d03d6a86e8100fce1855496cd5916b60c54d71ff2` |
+| index min / max | 13 / 1622 |
+| 与 `hard150_v1` 重叠 | 15（不剔除） |
+| 与 prefix150 重叠 | 13（不剔除） |
+| B0 / R 组 EM | **尚未跑**；方法冻结前禁止对该切片跑 LLM |
+
+抽取时不看 original PoG、supervised memory 或 KG-memory 的对错，也不按 both-wrong、去掉 hard/prefix 再均匀抽。重叠只记录、不剔除，以保持对 test 总体的无偏近似。
+
+该切片在以下内容全部冻结后才能运行（V2-3）：
 
 - memory build hash；
 - reflection evidence schema；
@@ -132,7 +169,7 @@ V2 必须新增一份完全冻结的 `final_unseen` 切片。该切片在以下�
 - timeout/retry policy；
 - 统计分析脚本。
 
-`final_unseen` 不参与阈值选择和错误案例驱动的代码修改。
+`random150_v1` 不参与阈值选择和错误案例驱动的代码修改。V2-2 只用 `hard150_v1` 做 development stress。V2-3 的一次性主结果跑在 `random150_v1` 上。hard150 上的 EM 不得替代、不得与 random150 混报为同一结论。
 
 ### 4.3 分母和异常处理
 
@@ -432,15 +469,15 @@ reflection evidence 必须明确发生在 `semantic_filter_relations()` 之前�
 
 任务：
 
-1. 将 hard150 标记为 `development_stress`；
-2. 准备并冻结 `final_unseen`；
+1. 将 `hard150_v1` 标记为 `development_stress`（**已完成，LOG-052**）；
+2. 构建并冻结 `random150_v1` 作为 capability / final unseen（**已完成，LOG-052**；方法冻结前不得跑 LLM）；
 3. 解释 150 与 143 两种分母；
 4. 统一 timeout/retry/max-token 配置；
 5. 检查 `semantic_filter_relations()` 与 reflection evidence 的顺序；
 6. 增加 Decision A/B 的 evidence trace schema；
 7. 校验 memory-off 与 B0 的行为等价性。
 
-验收：没有新增 first-hop 跑数；审计脚本和 trace checker 全部通过。
+验收：没有新增 first-hop 跑数；未对 `random150_v1` 跑 LLM；审计脚本和 trace checker 全部通过。
 
 ### V2-1：Reflection evidence 单元测试
 
@@ -460,20 +497,20 @@ reflection evidence 必须明确发生在 `semantic_filter_relations()` 之前�
 顺序固定为：
 
 ```text
-R0/R1/R2/RC1/RC2 smoke n=20
+R0/R1/R2/RC1/RC2 smoke：hard150_v1 内 START=0 LIMIT=20
     -> 修复协议错误
-    -> R0/R1/R2/RC1/RC2 hard150 development n=150
+    -> R0/R1/R2/RC1/RC2 hard150_v1 development n=150
 ```
 
-hard150 结果只能用于选择 confidence threshold、evidence top-k 和 prompt 压缩方式，不能作为最终论文主结果。
+`hard150_v1` 结果只能用于选择 confidence threshold、evidence top-k 和 prompt 压缩方式，不能作为最终论文主结果，也不能作为改进后模型能力的主评估。
 
-### V2-3：冻结 final unseen
+### V2-3：在 `random150_v1` 上一次性主评估
 
-仅当 V2-2 满足效果门槛后执行。冻结所有代码、memory hash、prompt、参数和分析脚本，然后在 `final_unseen` 上一次性运行 R0-R3 及必要的 RC1/RC2。
+仅当 V2-2 满足效果门槛后执行。冻结所有代码、memory hash、prompt、参数和分析脚本，然后在 **`random150_v1`** 上一次性运行 R0-R3 及必要的 RC1/RC2。`hard150_v1` 数字不得替代该主结果，也不得与之混报。
 
 ### V2-4：跨数据集和来源对照
 
-在 final unseen 上确认 reflection 分支有效后：
+在 `random150_v1` 上确认 reflection 分支有效后：
 
 1. 一次构建 Freebase KG memory；
 2. 冻结 memory 后分别迁移到 WebQSP、CWQ、GrailQA；
@@ -484,7 +521,7 @@ hard150 结果只能用于选择 confidence threshold、evidence top-k 和 promp
 
 只有在以下条件同时满足时才允许：
 
-- KG-only reflection evidence 在 final unseen 上优于 RC1/RC2；
+- KG-only reflection evidence 在 `random150_v1` 上优于 RC1/RC2；
 - Decision A 或 B 至少一个有阶段级正归因；
 - 效率没有因 memory 显著恶化；
 - provenance、witness replay 和 split 隔离完整。
@@ -493,12 +530,12 @@ Self-play 作为扩展实验，不作为 V2 的第一主贡献。
 
 ## 11. 阶段门槛与停止条件
 
-### 11.1 V2-2 进入 final unseen 的门槛
+### 11.1 V2-2 进入 `random150_v1` 主评估的门槛
 
-R1、R2 或 R3 至少满足以下一项，并且不出现明显 harmful intervention 增加：
+R1、R2 或 R3 至少满足以下一项，并且不出现明显 harmful intervention 增加。下列指标在 **`hard150_v1` development** 上判定，通过后才能对 `random150_v1` 跑一次：
 
 - reflection decision 指标稳定改善；
-- final EM/F1 在 development stress slice 上提升，且提升可由 Decision A/B 变化解释；
+- final EM/F1 在 `hard150_v1` 上提升，且提升可由 Decision A/B 变化解释（仍只是进门条件，不是论文主结果）；
 - final accuracy 持平但无效 continuation、无效 backtracking 或 entity expansion 明显下降；
 - real evidence 明显优于 RC1/RC2。
 
@@ -511,14 +548,14 @@ R1、R2 或 R3 至少满足以下一项，并且不出现明显 harmful interven
 - premature stop 与 wasteful continuation 同时上升；
 - memory 只增加 tokens/calls/latency，没有阶段级收益；
 - post-decision outcome 无法与 evidence intervention 对齐；
-- final unseen 之前出现阈值或 prompt 调整。
+- 对 `random150_v1` 跑 LLM 之前出现阈值或 prompt 调整。
 
 ### 11.3 研究方向停止条件
 
 只有在以下条件都满足时，才允许把结论升级为“KG structural memory 方向不成立”：
 
 1. first-hop relation branch 已失败；
-2. reflection-only branch 在独立 final unseen 上失败；
+2. reflection-only branch 在独立的 `random150_v1` 上失败；
 3. KG-only 与 trajectory-only/fusion 对照已完成；
 4. 失败不是由 coverage、timeout、分母或实现顺序问题造成。
 
@@ -528,6 +565,10 @@ R1、R2 或 R3 至少满足以下一项，并且不出现明显 harmful interven
 
 ```text
 clue_on_graph/PoG/
+├── eval_slices/hard150_v1.json          # development_stress（已冻结）
+├── eval_slices/random150_v1.json        # capability_eval / final_unseen（已冻结，未跑）
+├── build_hard_eval_slice.py
+├── build_random_eval_slice.py
 ├── reflection_structural_memory.py
 ├── analyze_reflection_memory_run.py
 ├── check_reflection_memory.py
@@ -557,7 +598,7 @@ clue_on_graph/PoG/
 
 如果 V2-3 成功，论文主张应限定为：
 
-> 经过独立 KG 探测和 held-out validation 的结构 evidence，可以在不改变 first-hop relation selection 的条件下，校准 PoG 的 reflection/frontier decision，并在未参与 memory 构建的评测切片上减少无效搜索。
+> 经过独立 KG 探测和 held-out validation 的结构 evidence，可以在不改变 first-hop relation selection 的条件下，校准 PoG 的 reflection/frontier decision，并在 `random150_v1`（WebQSP test 均匀随机 150 题）上减少无效搜索。
 
-如果 V2-3 失败，论文仍可以将 first-hop 和 reflection 两条分支整理为负结果或诊断性研究，但不能把 hard150 上 M1 的 +3 EM 作为结构 memory 的正向证据。
+如果 V2-3 失败，论文仍可以将 first-hop 和 reflection 两条分支整理为负结果或诊断性研究，但不能把 `hard150_v1` 上 M1 的 +3 EM 作为结构 memory 的正向证据，也不能把 hard150 压力测试成绩写成能力主结果。
 

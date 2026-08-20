@@ -1,6 +1,6 @@
 # KG-Structural Memory 实验日志
 
-对应方案：[`experimental_plan_kg_memory_from_gpt56.md`](experimental_plan_kg_memory_from_gpt56.md)
+对应方案：**执行依据** [`experimental_plan_kg_memory_v2.md`](experimental_plan_kg_memory_v2.md)。旧方案 [`experimental_plan_kg_memory_from_gpt56.md`](experimental_plan_kg_memory_from_gpt56.md) 仅解释 LOG-000–049。
 
 本文件是该实验的**唯一进度源**。后续实现、跑数、评测、是否进入下一阶段，一律以这里的「当前状态」和已记录结果为准，而不是凭对话记忆。
 
@@ -13,9 +13,9 @@
 3. 每次实验结束后（含失败、中断、smoke、构建、评测、仅改代码未跑数）必须追加一条记录，并更新「当前状态」。
 4. 验收未勾完 → 停留在当前 Phase。门槛未过 → `GATE_HOLD`，只做诊断，不扩大范围。
 5. 触发方案 §16.3 回退条件 → 记 `ROLLBACK`，回到只诊断的 retrieval，禁止进入 Phase 5。
-6. **校验切片（自 LOG-040 冻结）**：KG-memory 的 smoke / pilot / 门槛判定一律使用 `PoG/eval_slices/hard150_v1.json`，**禁止再用 WebQSP test 前 150 题（prefix150）**。prefix150 上 LOG-003–039 的数字只作档案，不得与 hard150 混比。smoke = 该切片内 `START=0 LIMIT=20`；pilot = 全 150 条。
+6. **切片角色（自 LOG-052）**：`hard150_v1` = `development_stress`（选阈值/压力测试，**不是**能力主结果）。`random150_v1` = `capability_eval` / V2 `final_unseen`（WebQSP test 均匀随机 150，seed=42）。方法冻结前不得对 `random150_v1` 跑 LLM。prefix150 与 first-hop M1/M2 数字只作档案。V2 跑数组 ID 为 `R0/R1/R2/R3/RC1/RC2/R4`。
 
-记录编号从 `LOG-000` 起递增。跑数组 ID 使用方案 §9 的 `B0/B1/B2/M1–M6/C1/C2`。
+记录编号从 `LOG-000` 起递增。
 
 ---
 
@@ -23,19 +23,19 @@
 
 | 字段 | 值 |
 |---|---|
-| 更新日期 | 2026-08-20 |
-| 总体状态 | **`PLAN_REVISION`：停止 first-hop rerank 分支，转入 V2 reflection-only 方案** |
-| 当前 Phase | `V2-0` |
-| 判定 | `PLAN_REVISION` |
-| 已通过验收的 Phase | Phase 0, Phase 1；Phase 2/3 的实现验收完成，但 first-hop 效果门槛在 hard150 上未通过 |
-| 已冻结的 inference / memory 配置 | 档案保留：M1 gated schema `schema_full_ee55ef9f17_20260818_114056`；path `path_full_1f16016919_20260819_134058`。二者均不得再用于扩大推理实验 |
-| **已冻结的校验切片** | **`PoG/eval_slices/hard150_v1.json`** |
-| 阻塞 | 旧 first-hop 分支已关闭；V2 reflection-only 尚未完成协议审计，不得直接跑正式评测 |
-| 禁止事项 | 不得 Self-Play。不得 M3。不得再开 first-hop 变体或改 fusion。不得把 hard150 作为最终测试集。V2-0 审计完成前不得启动 R1/R2/R3。 |
+| 更新日期 | 2026-08-21 |
+| 总体状态 | **V2 reflection 仍 `GATE_HOLD`。用户要求恢复原 PoG 栈（supervised relation memory + 约束编译），正在 hard150/random150 上复跑** |
+| 当前 Phase | `V2-3`（reflection 不变）+ **原栈切片复跑进行中** |
+| 判定 | `PLAN_REVISION`（仅开辟原栈评测；V2 reflection 变体仍停止扩大） |
+| 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过 |
+| 已冻结的 inference / memory 配置 | V2 R2 冻结配置不得再改去重跑。本次原栈：`run_PoG_test.sh`（relation_memory=prompt top2 hybrid stages=relation；constraint_pushdown=on；constraint_routing=auto；kg_memory=none） |
+| **已冻结的校验切片** | hard150 / random150 角色不变。本次是**另一方法**在同切片上评测，不得与 R2 混报 |
+| 阻塞 | 原栈两个切片跑数尚未完成 |
+| 禁止事项 | 不得把本次数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得 Self-Play。不得改 R2 后重跑 random150。hard150 由「orig PoG 与 20260814 rel+decomp 全错」构成，旧全量在其上 EM=0 是切片定义。 |
 
 ### 下一步（唯一允许的动作）
 
-执行 `experimental_plan_kg_memory_v2.md` 的 V2-0 协议审计：准备 `final_unseen`、统一 timeout/retry 和分母记录、检查 reflection evidence 与 `semantic_filter_relations()` 的顺序、补齐 Decision A/B trace。审计完成前不启动 R1/R2/R3，也不运行任何新的 first-hop 实验。
+等待原栈 hard150 / random150 跑完并写评测。V2 reflection 仍不得扩大。
 
 ---
 
@@ -183,7 +183,45 @@ Phase 0 冻结配置（2026-08-18 写入，之后只追加不改写）：
 
 **Phase 0 通过后才能进入 Phase 1。**
 
-**Phase 0 通过后才能进入 Phase 1。**
+### V2-0：协议审计与切片冻结
+
+- [x] `hard150_v1` 标记为 `development_stress`
+- [x] `random150_v1` 已构建并冻结（能力主评估 / final unseen；不跑评测）
+- [x] 分母 150 vs relation-valid 143 的说明写入日志（LOG-054：hard150 143/150；random150 149/150）
+- [x] timeout / retry / max-token / seed 统一并记录（180s / 5 / 4096 / 40 / seed=42）
+- [x] `semantic_filter_relations()` 与 reflection evidence 的顺序已确认（先 SPARQL+语义过滤，再 Decision A/B evidence）
+- [x] Decision A/B evidence trace schema 落地
+- [x] memory-off 与 B0 等价 checker 通过（`python check_v2_protocol.py` ALL CHECKS PASSED）
+
+**V2-0 未勾完不得启动 R1/R2/R3。** 本条已勾完；正式评测仍须先过 V2-2 smoke。
+
+### V2-1：Reflection evidence 单元测试
+
+- [x] 有 witness 的正例产生正向干预（LOG-055）
+- [x] 无 witness 归入 unknown，不干预
+- [x] 低 confidence 不产生正向干预
+- [x] 已探索路线不重复推荐
+- [x] branching penalty 与 evidence/utility score 边界
+- [x] shuffle/irrelevant 只改 evidence 内容，不改候选数和四段 prompt 结构
+- [x] schema / fallback / trace / B0 equivalence checker 通过（`python check_reflection_memory.py` ALL CHECKS PASSED）
+
+**V2-1 未勾完不得启动 V2-2 smoke。**
+
+### V2-2：Reflection smoke 与 development
+
+- [x] hard150 `START=0 LIMIT=20` R0/R1/R2/RC1/RC2 smoke 完成且协议 checker 通过（LOG-058）
+- [x] hard150 n=150 development 完成（LOG-060）
+- [x] 效果门槛在 hard150 development 上判定：R2 通过；R1 未通过；R3 未跑（LOG-060）
+
+**V2-2 已勾完。V2-3 只允许冻结后对 `random150_v1` 跑一次，禁止中途调参。**
+
+### V2-3：`random150_v1` 一次性主评估
+
+- [x] 冻结后一次性运行 R0 / R2 / RC1 / RC2（LOG-061 启动，LOG-062 完成）
+- [x] 主结果只报 `random150_v1`；hard150 不得替代、不得混报（LOG-062：R2 未过主评估）
+- [x] GATE_HOLD 离线诊断完成（LOG-063）：continue 上升、翻盘题、R2 vs RC1
+
+**V2-3 评测已完成。效果未过，判定 `GATE_HOLD`，不得进 V2-4。**
 
 ### Phase 1：Schema profile 构建
 
@@ -245,6 +283,13 @@ Phase 0 冻结配置（2026-08-18 写入，之后只追加不改写）：
 | M6 | M3+M4+M5 | 不启动 | LOG-049 | |
 | C1 | shuffled memory | prefix150 档案；hard150 M1-C1 完成 | LOG-013 / LOG-019 / LOG-026 / LOG-047 | hard150 schema C1 EM **0.1733** gold_sel 0.4685 |
 | C2 | irrelevant structural scores | prefix150 档案；hard150 M1-C2 完成 | LOG-014 / LOG-020 / LOG-026 / LOG-047 | hard150 schema C2 EM **0.1800** gold_sel 0.4615 |
+| R0 | B0，无 reflection memory | **V2-3 主基线完成** | LOG-054–062 | **random150 EM 0.8533（128/150）**；hard150 0.1800 只作进门 |
+| R1 | KG evidence → Decision A | hard150 完成，未进 V2-3 | LOG-055/058/060 | hard150 EM 0.1733，未过 §11.1 |
+| R2 | KG evidence → Decision B | **V2-3 主评估未过** | LOG-060/062 | **random150 EM 0.8067（121/150）< R0**；hard150 0.2000 不得当主结果 |
+| R3 | R1+R2 | 不跑 | LOG-060 | 无 development n=150 |
+| RC1 | shuffle reflection evidence | V2-3 完成 | LOG-060/062 | **random150 EM 0.8133（122/150）≥ R2** |
+| RC2 | irrelevant reflection evidence | V2-3 完成 | LOG-060/062 | random150 EM 0.7867（118/150） |
+| R4 | evidence + confidence gate | 不默认启动 | | 仅当 R1/R2 trace 证明 harmful intervention 后才开 |
 
 规模约定（方案 §12）：smoke 10–20 题不得用于结论；pilot 100–200 题只用于选超参；final test 一次冻结，禁止看 test 后调阈值。**自 LOG-040 起，上述题数都在 `hard150_v1` 切片内计数，不再用 WebQSP test 前 N 题。**
 
@@ -1194,5 +1239,325 @@ C1 选了 gold、M1 没选的 10 题里，列出的样例 depth1 top1 也与 C1 
 - 异常：无。本条没有新增实验数据。
 - 结论：接受 V2 方案变更。当前研究状态由“停止扩大旧 first-hop 实验”转为“完成 V2-0 审计后，独立评估 reflection-only structural evidence”。
 - 判定后状态：`V2-0` / `PLAN_REVISION` / 等待协议审计完成
+
+### LOG-051 — 2026-08-20 — 按 V2 决定下一步：先冻结切片，不启动 reflection 评测
+
+- 判定前状态：`V2-0` / `PLAN_REVISION`
+- 类型：`decision`
+- 对应方案：`experimental_plan_kg_memory_v2.md` §4、§10 V2-0。**不是 R1/R2/R3，不是 first-hop**
+- 代码：未改
+- 配置：沿用冻结推理（gpt-3.5-turbo-0125，temp 0.3/0.3，depth 4，`max_length` 4096）。first-hop rerank 保持关闭
+- 产物：无新 run
+- 结果：对照 V2 阶段顺序，当前唯一允许的下一步是 **V2-0 第一项**，不是 V2-1 单测，更不是 smoke。
+
+| 候选动作 | 判定 |
+|---|---|
+| 再开 M1/M2 first-hop | 禁止（V2 §1.1 / §3.2） |
+| 直接实现并跑 R1/R2 | 禁止（V2-0 未验收） |
+| 在 hard150 上选阈值当主结果 | 禁止（hard150 只是 development_stress） |
+| 先跑一遍 final_unseen 摸底 | 禁止（看过结果再冻方法） |
+| **冻结 `final_unseen_v1` + 标记 hard150 角色** | **唯一允许** |
+
+`final_unseen_v1` 抽取规则（实现时必须按此，不得改用 both-wrong / M1 错题）：
+
+1. 全集：WebQSP test（1639）
+2. 去掉 `hard150_v1` 的 150 题
+3. 去掉 prefix150（test[:150]）；二者重叠 13，并集约 287 题
+4. 剩余按 test index 排序后 `even_subsample` 到 150
+5. 不读取任何 KG-memory run 的对错；不读取 original PoG / rel+decomp 的 error 集合来偏向难/易
+6. 写入 `PoG/eval_slices/final_unseen_v1.json` 与 `.questions.txt`，记录 `questions_sha256`；`role=final_unseen`；**在 V2-3 方法冻结前不得对该切片跑 LLM**
+
+hard150 只加 `role=development_stress`，不改题目集合。
+
+V2-0 其余项（timeout/retry、143/150 分母、semantic_filter 顺序、Decision A/B trace、B0 等价）排在切片冻结之后，仍在 V2-0 内，不得跳到 R1。
+
+- 异常：无
+- 结论：按 V2，下一步实验是 **协议审计的切片冻结**，不是 reflection 注入跑数。判定 `CONTINUE_PHASE_V2_0`
+- 判定后状态：`V2-0` / `CONTINUE_PHASE_V2_0` / 构建并冻结 `final_unseen_v1`
+
+### LOG-052 — 2026-08-20 — 冻结 `random150_v1` 为能力主评估；hard150 只作压力测试
+
+- 判定前状态：`V2-0` / `CONTINUE_PHASE_V2_0`
+- 类型：`build` + `decision`
+- 对应方案：V2 §4 修订。用户要求：hard150 过难，能力评估改为 WebQSP 均匀随机 150 题
+- 代码：`PoG/build_random_eval_slice.py`；`eval_slices.py` 增加 `FROZEN_RANDOM150_V1`。未改推理，未跑 LLM
+- 配置：`seed=42`，从 `WebQSP.json` 全部 1639 题 `random.sample` 150，再按 test index 排序落盘。不看任何系统对错，不剔除 hard150 / prefix150
+- 产物：
+  - `PoG/eval_slices/random150_v1.json`（`questions_sha256=a033f485c941…`，index min=13 / max=1622）
+  - `PoG/eval_slices/random150_v1.questions.txt`
+  - `hard150_v1.json` 增加 `role=development_stress`，题目集合与 sha256 `09ad7d10f566b791…` 未改
+- 结果：与 hard150 重叠 **15**，与 prefix150 重叠 **13**（随机样本的期望重叠约 14，属正常）。LOG-051 的「去掉 hard+prefix 再均匀抽」作废，改由本条规则冻结
+- 异常：无评测。方法冻结前禁止对该切片跑 LLM
+- 结论：V2 主评估切片是 **`random150_v1`**；hard150 只用于 V2-2 选阈值与压力测试。判定 `CONTINUE_PHASE_V2_0`，下一步做 V2-0 剩余审计，不是 R1
+- 判定后状态：`V2-0` / `CONTINUE_PHASE_V2_0` / timeout-retry 与 trace schema 审计
+
+### LOG-053 — 2026-08-20 — 将 `hard150_v1` / `random150_v1` 写入 V2 实验计划
+
+- 判定前状态：`V2-0` / `CONTINUE_PHASE_V2_0`
+- 类型：`plan_change`
+- 对应方案：`experimental_plan_kg_memory_v2.md` 升为 V2.1，§4 / §10 / §11 / §12 / §13
+- 代码：未改推理。切片文件同 LOG-052
+- 结果：计划中两切片角色、sha256、seed=42、重叠 15/13、V2-2 只用 hard150、V2-3 只在 random150 上一次跑，已与日志对齐
+- 异常：无跑数
+- 结论：执行依据已同步。下一步仍是 V2-0 剩余审计，不对 `random150_v1` 跑 LLM
+- 判定后状态：`V2-0` / `CONTINUE_PHASE_V2_0` / timeout-retry 与 trace schema 审计
+
+### LOG-054 — 2026-08-20 — V2-0 协议审计通过：分母、timeout/retry、evidence 顺序、trace、B0 等价
+
+- 判定前状态：`V2-0` / `CONTINUE_PHASE_V2_0`
+- 类型：`code` + `eval`（离线 checker，无 LLM 跑数）
+- 对应方案：V2 §4.3 / §9 / §10 V2-0。**不是 R1/R2/R3，不是 random150 评测**
+- 代码：HEAD `b3ff1c0` 上工作树修改。新增 `PoG/v2_protocol.py`、`PoG/reflection_structural_memory.py`、`PoG/check_v2_protocol.py`；修改 `utils.py`（Decision A/B 接 evidence，mode=none 为 no-op）、`kg_memory_retrieval.py`（reflection stage gate、raw records、trace 回写）、`output_paths.py`（run_meta 写入 timeout/retry）、`main_freebase.py` / `freebase_func.py`（`relation_semantic_top_k` 默认改为冻结值 40，与 hard150 B0 脚本一致）
+- 配置：冻结 `max_length=4096`，`OPENAI_TIMEOUT=180`，`OPENAI_MAX_RETRIES=5`，temp 0.3/0.3，depth 4，`relation_semantic_top_k=40`，seed=42
+- 产物：`python check_v2_protocol.py` → ALL CHECKS PASSED。无新 run_dir
+- 结果：
+
+分母（WebQSP `InferentialChain` 第一跳；缺失是标注空缺，不是 memory bug）：
+
+| 切片 | n_all（EM/F1 分母） | n_relation_valid（first-hop recall 分母） | 缺 gold 第一跳 |
+|---|---|---|---|
+| `hard150_v1` | 150 | **143** | 7 |
+| `random150_v1` | 150 | **149** | 1 |
+
+hard150 缺 gold 第一跳的 7 题：`who plays blaine in batman?`；`which country was justin bieber born in?`；`what does wh smith stand for?`；`what state is barack obama from?`；`what did james k polk do before he was president?`；`what years did joe montana win super bowl?`；`what was franklin d roosevelt's job before president?`。random150 缺 1 题：`what was franklin d roosevelt's job before president?`（与 hard150 重叠）。
+
+顺序：`relation_search_prune` 先 `semantic_filter_relations` 再 `apply_relation_kg_memory`；`if_finish_list` 不调用语义过滤、不 rerank first-hop；reflection evidence 只在 Decision A/B 前附加。`mode=none` 时 prompt 与 B0 前缀相同；`mode=reflection` 不打开 relation 阶段。
+
+- 异常：无。未对 `random150_v1` 跑 LLM。`relation_semantic_top_k` argparse 默认从 20 改为 40，与已冻结 B0 脚本/run_meta 对齐，不改变已完成 hard150 数字
+- 结论：V2-0 验收全部通过。判定 `ACCEPT_PHASE_V2_0_AND_ADVANCE`。下一步是 V2-1 单测，不是 smoke
+- 判定后状态：`V2-1` / `ACCEPT_PHASE_V2_0_AND_ADVANCE` / 跑 reflection evidence 单元测试
+
+### LOG-055 — 2026-08-20 — V2-1 reflection evidence 单测通过
+
+- 判定前状态：`V2-1` / `ACCEPT_PHASE_V2_0_AND_ADVANCE`
+- 类型：`code` + `eval`（单元测试，无 LLM 跑数）
+- 对应方案：V2 §5.2 / §6 / §10 V2-1。**不是 V2-2 smoke，不是 R1 评测**
+- 代码：`PoG/check_reflection_memory.py`；复用 LOG-054 的 `reflection_structural_memory.py`。M1 checker `--skip_frozen 1` 仍 ALL CHECKS PASSED
+- 配置：product gate `confidence * applicability >= 0.36`；high-branching 阈值 8.0；seed=42。无 SPARQL / 无 LLM
+- 产物：`python check_reflection_memory.py` → ALL CHECKS PASSED
+- 结果：
+
+| 检查 | 结果 |
+|---|---|
+| 有 witness 的 validated 正例 | 正向干预，四段 summary，无 continue/stop/backtrack 结论句 |
+| 无 witness | 归入 unknown，prompt 回退 B0 |
+| 低 confidence（0.2） | 不通过 gate，不干预 |
+| 已探索 path | 不进入 validated_unexplored，不干预 |
+| evidence/utility score | `cov*conf*app`；branching 越大 utility 越低；≥8 进 high_cost |
+| shuffle / irrelevant | 候选数与 n_evidence_items 不变，四段标题不变；shuffle 打乱数值配对；irrelevant 只改 path/type |
+| memory-off fallback + trace | mode=none 不改 B0 前缀；evidence 写入 `kg_memory.reflection_judge/select` |
+
+- 异常：无。未跑 hard150，未对 `random150_v1` 跑 LLM
+- 结论：V2-1 验收通过。判定 `ACCEPT_PHASE_V2_1_AND_ADVANCE`。下一步是 V2-2 smoke（hard150 `START=0 LIMIT=20` 的 R0/R1/R2/RC1/RC2），不是主评估
+- 判定后状态：`V2-2` / `ACCEPT_PHASE_V2_1_AND_ADVANCE` / hard150 LIMIT=20 smoke
+
+### LOG-056 — 2026-08-20 — 启动 V2-2 smoke：hard150 LIMIT=20 五组并行
+
+- 判定前状态：`V2-2` / `ACCEPT_PHASE_V2_1_AND_ADVANCE`
+- 类型：`run`
+- 对应方案：V2 §10 V2-2 smoke。**不是 n=150，不是 random150，不是 R3 主评估**
+- 代码：`PoG/run_PoG_reflection_memory_v2.sh`；`analyze_reflection_memory_run.py`；`check_reflection_run.py`；reflection retrieval 每实体 top-24；run 目录 tag 区分 `a`/`b`/`a-b`
+- 配置：`QUESTIONS_FILE=eval_slices/hard150_v1.json`，`START=0 LIMIT=20`，`GPU_IDS=3`，`STAGGER_SEC=15`，五组 `R0 R1 R2 RC1 RC2`。LLM gpt-3.5-turbo-0125，temp 0.3/0.3，depth 4，max_length 4096，timeout 180，retries 5，semantic top-k 40，schema 库 `schema_full_ee55ef9f17_20260818_114056`。R1=`reflection_judge`，R2=`reflection_select`，RC1/RC2=A+B + shuffle/irrelevant
+- 产物：启动中；目录名应含 `_slice-hard150-v1_n20_`
+- 结果：待跑完。完成后先跑 `check_reflection_run.py` 与 `analyze_reflection_memory_run.py`，协议通过才允许 n=150
+- 异常：无（启动记录）。脚本拒绝未授权的 random150
+- 结论：按 V2-2 固定顺序先 smoke。判定 `CONTINUE_PHASE_V2_2`
+- 判定后状态：`V2-2` / `CONTINUE_PHASE_V2_2` / hard150 LIMIT=20 五组进行中
+
+### LOG-057 — 2026-08-20 — smoke 启动失败：bash 只读变量 `GROUPS` 被当成组名
+
+- 判定前状态：`V2-2` / `CONTINUE_PHASE_V2_2`
+- 类型：`incident`
+- 对应方案：V2-2 smoke。不是评测
+- 代码：`run_PoG_reflection_memory_v2.sh` 把循环变量从 `GROUPS` 改为 `GROUPS_LIST`/`V2_GROUPS`
+- 结果：父进程立刻 `GROUP must be R0... (got 10002)` 并退出。`GROUPS` 是 bash 只读数组（用户 GID），`for g in $GROUPS` 展开成 GID 而不是 R0/R1。无 run_dir，无 LLM 调用
+- 异常：协议未开始。已修复
+- 结论：自我修正后重跑同一 smoke。判定仍 `CONTINUE_PHASE_V2_2`
+- 判定后状态：`V2-2` / `CONTINUE_PHASE_V2_2` / 重跑 hard150 LIMIT=20 smoke
+
+### LOG-058 — 2026-08-20 — V2-2 smoke 完成：协议通过，阶段隔离成立
+
+- 判定前状态：`V2-2` / `CONTINUE_PHASE_V2_2`
+- 类型：`eval`
+- 对应方案：V2-2 smoke n=20。**不是门槛判定，不是 V2-3**
+- 代码：未再改推理。`python check_reflection_run.py` ALL CHECKS PASSED
+- 配置：同 LOG-056/057；GPU3 五组并行
+- 产物：
+  - R0 `..._slice-hard150-v1_n20_20260820_135845`
+  - R1 `..._kgmem-reflection_a_top6_slice-hard150-v1_n20_20260820_135859`
+  - R2 `..._kgmem-reflection_b_top6_slice-hard150-v1_n20_20260820_135914`
+  - RC1 `..._kgmem-reflection_a-b_top6_shuffle_slice-hard150-v1_n20_20260820_135929`
+  - RC2 `..._kgmem-reflection_a-b_top6_irrelevant_slice-hard150-v1_n20_20260820_135945`
+- 结果：五组均 n=20、exit 0、timeout 标记 0、first-hop `n_relation_order_changed=0`。
+
+| 组 | EM | F1 | calls | 秒/题 | tokens | A_vis | B_vis |
+|---|---|---|---|---|---|---|---|
+| R0 | 0.20 | 0.1969 | 15.30 | 48.14 | 10715 | 0/15 | 0/13 |
+| R1 | 0.15 | 0.1448 | 17.80 | 54.13 | 14913 | **17/20** | **0/14** |
+| R2 | **0.30** | 0.2767 | 13.75 | 46.20 | 10266 | **0/14** | **11/12** |
+| RC1 shuffle | 0.10 | 0.0868 | 15.15 | 49.88 | 13411 | 13/18 | 13/13 |
+| RC2 irrelevant | 0.20 | 0.1778 | 20.10 | 57.08 | 16016 | 15/22 | 15/15 |
+
+协议：R0 无可见 evidence；R1 只改 Decision A；R2 只改 Decision B；shuffle/irrelevant 有可见 evidence 且未动 first-hop。n=20 不得当门槛。
+
+- 异常：无协议错误。RC2 tokens 最高。不得用 smoke EM 进 V2-3
+- 结论：smoke 协议通过。判定 `CONTINUE_PHASE_V2_2`，下一步 hard150 n=150 development
+- 判定后状态：`V2-2` / `CONTINUE_PHASE_V2_2` / 启动 hard150 n=150
+
+### LOG-059 — 2026-08-20 — 启动 V2-2 development：hard150 n=150 五组并行
+
+- 判定前状态：`V2-2` / `CONTINUE_PHASE_V2_2`
+- 类型：`run`
+- 对应方案：V2-2 development n=150。**不是 random150 / V2-3**
+- 代码：同 LOG-058
+- 配置：`START=0 LIMIT=150`，其余同 smoke；`GPU_IDS=3`，`STAGGER_SEC=15`，R0/R1/R2/RC1/RC2
+- 产物：启动中；目录名应含 `_slice-hard150-v1_n150_`
+- 结果：待跑完后按 §11.1 判定。hard150 数字只作进门，不是能力主结果
+- 异常：无（启动记录）
+- 结论：协议已过，扩大到 development 切片全量。不对 `random150_v1` 跑 LLM
+- 判定后状态：`V2-2` / `CONTINUE_PHASE_V2_2` / hard150 n=150 五组进行中
+
+### LOG-060 — 2026-08-20 — V2-2 development 完成：R2 过 §11.1，冻结 R2 进 V2-3
+
+- 判定前状态：`V2-2` / `CONTINUE_PHASE_V2_2`
+- 类型：`eval` + `decision`
+- 对应方案：V2 §10 V2-2 development / §11.1。实验组 R0/R1/R2/RC1/RC2；规模 hard150 n=150。**hard150 只作进门，不是能力主结果**
+- 代码：HEAD `b3ff1c0` 脏工作树（V2-0/V2-1/V2-2 实现未提交）。未改推理、未改阈值、未改 prompt
+- 配置：同 LOG-056–059。GPU 3 五组并行。schema 库 `schema_full_ee55ef9f17_20260818_114056` hash `ee55ef9f175d`。timeout 180 / retries 5 / semantic top-k 40 / seed=42
+- 产物：`python check_reflection_run.py` ALL CHECKS PASSED；`analyze_reflection_memory_run.py` 已写 `reflection_decision_metrics.json`
+  - R0 `result/webqsp_gpt-3.5-turbo-0125_slice-hard150-v1_n150_20260820_142449`
+  - R1 `..._kgmem-reflection_a_top6_slice-hard150-v1_n150_20260820_142504`
+  - R2 `..._kgmem-reflection_b_top6_slice-hard150-v1_n150_20260820_142519`
+  - RC1 `..._kgmem-reflection_a-b_top6_shuffle_slice-hard150-v1_n150_20260820_142534`
+  - RC2 `..._kgmem-reflection_a-b_top6_irrelevant_slice-hard150-v1_n150_20260820_142549`
+- 结果：五组均 n=150、timeout 标记 0、first-hop `n_relation_order_changed=0`。阶段隔离成立（R1 只 A，R2 只 B，R0 无可见 evidence）。
+
+| 组 | EM | F1 | calls | 秒/题 | tokens | A_vis | B_vis | continue |
+|---|---|---|---|---|---|---|---|---|
+| R0 | 0.1800（27/150） | 0.1601 | 14.41 | 41.99 | 10289 | 0/114 | 0/85 | 0.7456 |
+| R1 | 0.1733（26/150） | 0.1664 | 16.57 | 54.11 | 12328 | **102/123** | **0/88** | 0.7154 |
+| R2 | **0.2000（30/150）** | **0.1792** | **12.81** | **36.34** | **9083** | **0/105** | **71/74** | 0.7048 |
+| RC1 shuffle | 0.1800（27/150） | 0.1613 | 17.77 | 55.22 | 13234 | 94/109 | 78/81 | 0.7431 |
+| RC2 irrelevant | 0.1733（26/150） | 0.1537 | 16.12 | 49.31 | 12295 | 108/119 | 87/96 | 0.8067 |
+
+相对 R0 净翻盘：R1 −1（12/13）；R2 **+3**（17/14）；RC1 0（12/12）；RC2 −1（14/15）。R2 vs RC1 净 +3；R2 vs RC2 净 +4。
+
+归因（不把 +3 EM 当机制证明）：17 道 R2 翻对中仅 **7** 题有 Decision B `prompt_visible_evidence`（另 10 题多为 depth-1，未走到 B）；14 道翻错中 5 题有 B 可见 evidence。在 R2 实际露出 B evidence 的 45 题子集上：R0/RC1/RC2 各对 10 题，R2 对 12 题（净 +2）。R1 翻对 12 / 翻错 13，其中 A 可见 6 vs 8，有害 ≥ 挽救。
+
+§11.1：R2 满足「real evidence 明显优于 RC1/RC2」（EM/F1 均更高，且 calls/tokens/时延更低）；效率也优于 R0，不属于「只加 token」。R1 不满足任一条。未出现明显 harmful 相对挽救率上升（B 可见子集 7 挽救 / 5 有害）。未改阈值/prompt。R3 不在 V2-2 正式矩阵，无 n=150，不冻结。
+
+- 异常：题级 EM 翻盘与 B 干预只部分对齐（与 T=0.3 及大量 depth-1 未触发 B 有关）。这削弱「EM +3 可由 Decision B 解释」，但不否定对照+效率条款。RC1/RC2 仍是 A+B 注入（与 runner 定义一致，冻结时不改成 B-only 对照，避免看完 development 后改设计）
+- 结论：判定 `ACCEPT_PHASE_V2_2_AND_ADVANCE`。冻结方法 = **R2**。V2-3 只跑 R0/R2/RC1/RC2。不跑 R1（未过门槛）、不跑 R3（无 development）。hard150 数字不得写入论文主结果
+- 判定后状态：`V2-3` / `ACCEPT_PHASE_V2_2_AND_ADVANCE` / 冻结后对 `random150_v1` 一次性跑 R0/R2/RC1/RC2
+
+### LOG-061 — 2026-08-20 — 启动 V2-3：冻结后 `random150_v1` 一次性主评估
+
+- 判定前状态：`V2-3` / `ACCEPT_PHASE_V2_2_AND_ADVANCE`
+- 类型：`run`
+- 对应方案：V2 §10 V2-3 / §11.1 通过后的一次性 `final_unseen`。实验组 **R0 / R2 / RC1 / RC2**（不跑 R1/R3，见 LOG-060）
+- 代码：与 LOG-060 相同冻结；未改阈值、prompt、memory hash、top_k
+- 配置：`V2_ALLOW_RANDOM150=1`，`QUESTIONS_FILE=eval_slices/random150_v1.json`（sha256 `a033f485c941…`），`START=0 LIMIT=150`，`GPU_IDS=6`（GPU 3 占用升高，改用空闲卡，不改推理），`STAGGER_SEC=15`，`V2_GROUPS="R0 R2 RC1 RC2"`。LLM/memory/timeout 与 V2-0 冻结一致
+- 产物：启动中；目录名含 `_slice-random150-v1_n150_`
+  - R0 `result/webqsp_gpt-3.5-turbo-0125_slice-random150-v1_n150_20260820_174057`
+  - R2 `..._kgmem-reflection_b_top6_slice-random150-v1_n150_20260820_174108`
+  - RC1 `..._kgmem-reflection_a-b_top6_shuffle_slice-random150-v1_n150_20260820_174123`
+  - RC2 `..._kgmem-reflection_a-b_top6_irrelevant_slice-random150-v1_n150_20260820_174138`
+  - 日志 `PoG/logs/v2_3_random150_n150_20260820.log`
+- 结果：待跑完后只报 random150 主结果。hard150 不得替代、不得混报
+- 异常：无（启动记录）。四组均已选中 150 题并开始跑
+- 结论：方法已冻结，禁止中途看数调参。判定保持 `ACCEPT_PHASE_V2_2_AND_ADVANCE`，当前动作是跑完 V2-3
+- 判定后状态：`V2-3` / `ACCEPT_PHASE_V2_2_AND_ADVANCE` / random150 R0/R2/RC1/RC2 进行中
+
+### LOG-062 — 2026-08-20 — V2-3 主评估完成：R2 低于 R0 且不优于 RC1
+
+- 判定前状态：`V2-3` / `ACCEPT_PHASE_V2_2_AND_ADVANCE`
+- 类型：`eval` + `decision`
+- 对应方案：V2 §10 V2-3 / §13。切片 `random150_v1`（sha256 `a033f485c941…`），n=150 / relation-valid 149。**这是能力主结果；hard150 不得替代、不得混报**
+- 代码：冻结与 LOG-060/061 相同，未改阈值/prompt
+- 配置：GPU 6；R0/R2/RC1/RC2 并行；约 17:40–19:26 CST；timeout 标记 0
+- 产物：`python check_reflection_run.py` ALL CHECKS PASSED；first-hop `n_relation_order_changed=0`
+  - R0 `result/webqsp_gpt-3.5-turbo-0125_slice-random150-v1_n150_20260820_174057`
+  - R2 `..._kgmem-reflection_b_top6_slice-random150-v1_n150_20260820_174108`
+  - RC1 `..._kgmem-reflection_a-b_top6_shuffle_slice-random150-v1_n150_20260820_174123`
+  - RC2 `..._kgmem-reflection_a-b_top6_irrelevant_slice-random150-v1_n150_20260820_174138`
+- 结果：
+
+| 组 | EM | F1 | calls | 秒/题 | tokens | A_vis | B_vis | continue |
+|---|---|---|---|---|---|---|---|---|
+| R0 | **0.8533（128/150）** | **0.7239** | 15.62 | 41.95 | 9709 | 0/72 | 0/43 | 0.5972 |
+| R2 | 0.8067（121/150） | 0.7032 | 15.79 | 42.00 | 10407 | 0/77 | 52/57 | 0.7403 |
+| RC1 shuffle | 0.8133（122/150） | 0.7028 | **10.21** | **31.03** | **7969** | 55/59 | 40/44 | 0.7458 |
+| RC2 irrelevant | 0.7867（118/150） | 0.6891 | 12.03 | 33.50 | 8331 | 57/62 | 48/50 | 0.8065 |
+
+R2 vs R0：净 **−7**（4 翻对 / 11 翻错）。RC1 vs R0 净 −6；RC2 vs R0 净 −10。R2 vs RC1 净 −1（8 翻对 / 9 翻错）。在 R2 露出 B evidence 的 30 题上：R0 21 / R2 16 / RC1 19 / RC2 18。翻对 4 题中仅 2 题有 B 可见 evidence；翻错 11 题中 7 题有。Decision A continue 率 R0 0.60 → R2 0.74（hard150 上曾下降，此处反向）。
+
+对照解读：真实 Decision B evidence 在独立随机切片上 **伤害准确率**，且 **不优于 shuffle**。hard150 上 R2 的 +3 EM / 更省 token **未复现**，不能当主结果。协议本身成立（阶段隔离、未动 first-hop、无 timeout）。
+
+- 异常：无协议错误、无泄漏、无中途调参。RC1 为 A+B shuffle（与冻结 runner 一致），效率好于 R2 不能解释为「真实 B 有效」。触发 §11.2：与 RC1 无实质正向差异；continue 上升同时 EM 下降；memory 未减少无效搜索
+- 结论：V2-3 **失败**。判定 `GATE_HOLD`。停止当前 reflection 变体扩大。不得进 V2-4 / Self-Play。不得把 hard150 R2 0.2000 写成能力结论。§11.3 全方向停止尚不成立（trajectory/fusion 未做）
+- 判定后状态：`V2-3` / `GATE_HOLD` / 只允许诊断或整理负结果，不得扩大
+
+### LOG-063 — 2026-08-21 — GATE_HOLD 离线诊断：B evidence 与问题无关，分数几乎不驱动选择
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`eval`（离线诊断，无 LLM）
+- 对应方案：V2 §11.2 回到诊断；H3/H4。切片 `random150_v1` 已有 R0/R2/RC1/RC2 trace；hard150 R0/R2 仅作对照，不是主结果
+- 代码：新增 `PoG/diagnose_v2_3_gate_hold.py`（只读 trace）。未改推理、未改阈值、未重跑
+- 配置：无
+- 产物：`PoG/result/v2_3_gate_hold_diagnosis_20260821.json`
+- 结果：
+
+**1. −7 EM 从哪来（同一 150 题划分）**
+
+| 子集 | n | R0 对 | R2 对 | 净差 |
+|---|---|---|---|---|
+| 双方都未进入 reverse | 101 | 92 | 90 | −2（无 A/B，T=0.3） |
+| 仅 R0 进入 reverse | 6 | 5 | 4 | −1 |
+| 仅 R2 进入 reverse | 10 | 8 | 7 | −1 |
+| 双方都进入 reverse | 33 | 23 | 20 | −3 |
+| 其中 R2 露出 B evidence | 30 | 21 | 16（RC1 19 / RC2 18） | **相对 R0 −5，相对 shuffle −3** |
+
+可归因伤害集中在 **30 道真正注入 Decision B evidence 的题**。101 道从未 reverse 的题上也有 −2，属温度噪声，不是 memory。
+
+**2. continue 率 0.60→0.74 的来源**
+
+R2 **不**向 Decision A 注入 evidence（A_vis=0）。首次 Decision A 分歧主要是 T=0.3：双方都有首次 A 的 33 题中 26 题一致（R0 停→R2 续 5；反向 2）。首次 A continue 率 0.51→0.63。**第二次及以后** Decision A continue 0.70→0.88：这才是 B 加实体之后的间接效应。R2 每题回溯加实体 0.74，R0 0.17，RC1 0.27。
+
+首次 A 一致的 26 题上 EM 打平（16/16）。其中双方都 continue 的 16 题 EM 仍打平（8/8），但 R2 加实体 5.75 vs R0 1.0——多搜了，没有多对。
+
+**3. 翻错题上的 evidence 内容**
+
+B 可见题上，prompt 里 top-8 路径与问句 token 重叠率 **0.008**（93.5% 的题重叠为 0）。RC2 为 0（设计如此）。翻错且 B 可见的高频路径是 `people.person.gender` / `date_of_birth` / `place_of_birth`、`location.location.geolocation` / `contains`——高覆盖通用 schema，不是 governor / marry / team / high school。例：`who is the governor of virginia 2011?` 选出 `Virginia`，证据是 geolocation/contains。21/30 道 B 可见题把 **topic 实体**加回去。
+
+每个 Decision B 事件平均 **866** 条 evidence_items（中位 24，最大 5790；候选实体均 45、最大 349）。prompt 只展示每段 top-8，但排序赢家是通用高覆盖关系。
+
+**4. R2 vs RC1：真实分数几乎不改变选择**
+
+双方首次 B 都选出实体的 13 题，选实体 Jaccard **0.77**，**10/13 完全相同**。shuffle 打乱 coverage/confidence/utility 后，LLM 仍选同一名字。H4 在机制层不成立：进入决策的是「多了一段结构证据 prompt + 更容易加实体」，不是校准过的结构分数。
+
+**5. 为何 hard150 曾像过门槛（对照，不是主结果）**
+
+hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7、R2 对 12。难切片上「多加实体 / 多搜」可能碰到 R0 搜不够的题；random150 上 R0 已是 0.8533，同样行为变成过搜。hard150 +3 EM **不能**解释为结构 evidence 校准了 Decision B。
+
+- 异常：无新协议错误。`n_positive_interventions` 把每实体 top-24 里过 gate 的记录全算进去，数值极大，不能当「有效干预次数」
+- 结论：当前 reflection 变体失败原因是 **问题无关的 schema 流行度被当成 Decision B 证据，分数不驱动选择，却增加加实体与后续 continue**。判定保持 `GATE_HOLD`。不得进 V2-4 / Self-Play，不得据此改 prompt 后重跑 random150
+- 判定后状态：`V2-3` / `GATE_HOLD` / 整理负结果或等待明确的 `PLAN_REVISION`，不得扩大当前变体
+
+### LOG-064 — 2026-08-21 — 用户要求恢复原 PoG 栈并在两切片上复跑（非 V2 reflection）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`decision` + `run`
+- 对应方案：用户显式要求，不是 V2-4 / 不是改 R2。方法 = `run_PoG_test.sh` 默认栈：supervised relation memory + constraint compilation。`kg_memory_mode=none`
+- 代码：`run_PoG_test.sh` 增加 `QUESTIONS_FILE` 与显式 `--kg_memory_mode none`。未改 V2 reflection 推理
+- 配置：LLM gpt-3.5-turbo-0125，temp 0.3/0.3，depth 4，max_length 4096，semantic top-k 40。`relation_memory_mode=prompt` top_k=2 hybrid stages=relation；库 `memory/webqsp_gpt-3.5-turbo-0125_train_n600_20260703_231525`。`constraint_pushdown=on`，`constraint_routing=auto`（routing auto 时 **不注入** 旧 decomposition memory）。`START=0 LIMIT=150`。GPU 4
+- 产物：启动中
+  - hard150 `result/webqsp_gpt-3.5-turbo-0125_mem-prompt_top2_hybrid_stages-relation_decompmem-prompt_top2_slice-hard150-v1_n150_20260821_002352`
+  - random150 `..._slice-random150-v1_n150_20260821_002358`
+  - 日志 `PoG/logs/orig_relmem_constraint_hard150_20260821.log`、`..._random150_20260821.log`
+  - 已加载 833 relation memory + 600 decomposition memory（routing=auto 时 decomp **不注入** prompt）
+- 结果：20260814 全量 n=1639（同一方法）在两切片上的**旧预测**子集评测（不是本次复跑）：random150 EM **0.8533（128/150）** F1 0.7417；hard150 EM **0.0000（0/150）** F1 0.0152。后者是切片定义：hard150 = orig PoG 与该 20260814 跑数 **都错** 的 150 题。全量该跑数 EM 0.8414（1379/1639）。本次复跑是当前代码 + 同配置的温度复现，不得与 V2 R0/R2 混报
+- 异常：无（启动记录）
+- 结论：判定 `PLAN_REVISION` 仅用于原栈切片评测。V2 reflection 仍 `GATE_HOLD`，不得扩大
+- 判定后状态：`V2-3` / `PLAN_REVISION` / 原栈 hard150+random150 进行中
 
 ---

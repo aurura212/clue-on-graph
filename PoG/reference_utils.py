@@ -376,10 +376,26 @@ def format_kg_memory_tag(args) -> str:
     if not mode or mode == "none":
         return ""
     ablation = getattr(args, "kg_memory_ablation", "none")
+    top_k = getattr(args, "kg_memory_top_k", 6)
+    if str(mode).strip().lower() == "reflection":
+        stages = str(getattr(args, "kg_memory_stages", "") or "")
+        mapped = (
+            stages.replace("reflection_judge", "a")
+            .replace("reflection_select", "b")
+            .replace("reflection_a", "a")
+            .replace("reflection_b", "b")
+            .replace("reflection", "ab")
+            .replace(",", "-")
+            .replace(" ", "")
+        )
+        parts = ["kgmem-reflection", mapped or "ab", f"top{top_k}"]
+        if ablation and ablation != "none":
+            parts.append(ablation)
+        return "_".join(parts)
     parts = [
         f"kgmem-{mode}",
         str(getattr(args, "kg_memory_strategy", "rerank")),
-        f"top{getattr(args, 'kg_memory_top_k', 6)}",
+        f"top{top_k}",
     ]
     if ablation and ablation != "none":
         parts.append(ablation)

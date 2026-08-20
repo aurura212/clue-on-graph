@@ -918,7 +918,7 @@ def semantic_filter_relations(question, total_relations, args, top_k=None):
     if model is None or not total_relations:
         return list(total_relations)
     if top_k is None:
-        top_k = int(getattr(args, "relation_semantic_top_k", 20))
+        top_k = int(getattr(args, "relation_semantic_top_k", 40))
     limit = min(max(1, top_k), len(total_relations))
     ranked, _ = retrieve_top_docs(question, total_relations, model, width=limit)
     return ranked
@@ -931,7 +931,7 @@ def prepare_cvt_neighbor_relations_for_llm(
 ) -> Tuple[List[str], List[str]]:
     """Deduplicate CVT neighbor relations and semantically filter before LLM selection."""
     unique_relations = sorted(relation_counts.keys())
-    semantic_top_k = int(getattr(args, "relation_semantic_top_k", 20))
+    semantic_top_k = int(getattr(args, "relation_semantic_top_k", 40))
     if len(unique_relations) > semantic_top_k:
         candidate_relations = semantic_filter_relations(
             question,
@@ -1128,7 +1128,7 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     total_relations.sort()  # make sure the order in prompt is always equal
 
     retrieved_relations = total_relations
-    semantic_top_k = int(getattr(args, "relation_semantic_top_k", 20))
+    semantic_top_k = int(getattr(args, "relation_semantic_top_k", 40))
     semantic_filter_applied = len(total_relations) > semantic_top_k
     if semantic_filter_applied:
         retrieved_relations = semantic_filter_relations(question, total_relations, args, top_k=semantic_top_k)

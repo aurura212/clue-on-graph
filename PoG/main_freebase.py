@@ -140,7 +140,7 @@ def add_relation_memory_args(parser):
     parser.add_argument("--write_missed_positive", type=int,
                         default=1, help="Write missed_positive memory items when gold relation is in candidates but not selected.")
     parser.add_argument("--relation_semantic_top_k", type=int,
-                        default=20, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value.")
+                        default=40, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value. Frozen V2/B0 value is 40.")
     parser.add_argument("--train_memory_family", type=str,
                         choices=["relation_choice", "decomposition", "all"],
                         default="relation_choice", help="Which memory family to build in train mode.")
@@ -194,11 +194,11 @@ def add_relation_memory_args(parser):
     parser.add_argument("--decomposition_repair", type=str, choices=["off", "on"],
                         default="off", help="Optionally re-plan once after repeated insufficient reasoning. Default off.")
     parser.add_argument("--kg_memory_mode", type=str, choices=["none", "relation", "reflection", "full"],
-                        default="none", help="KG structural memory injection. M1/M2 use relation. reflection/full unused until later phases.")
+                        default="none", help="KG structural memory injection. M1/M2 use relation. V2 R1/R2/R3 use reflection; full is both. reflection does not rerank first-hop.")
     parser.add_argument("--kg_memory_path", type=str, default="",
                         help="Path to kg_memory/<build_id>/ or kg_structural_memory.jsonl. M1=schema_full, M2=path_full.")
     parser.add_argument("--kg_memory_stages", type=str, default="relation",
-                        help="Stages that may use KG structural memory: relation, reflection_judge, reflection_select.")
+                        help="Stages that may use KG structural memory: relation, reflection_judge, reflection_select. mode=reflection with this default enables Decision A/B only.")
     parser.add_argument("--kg_memory_top_k", type=int, default=6,
                         help="Top-K schema_profile records for prompt evidence.")
     parser.add_argument("--kg_memory_strategy", type=str, choices=["prompt", "rerank"],
@@ -234,6 +234,12 @@ def load_kg_memory_into_args(args):
     setattr(args, "kg_memory_bank", None)
     mode = str(getattr(args, "kg_memory_mode", "none") or "none").strip().lower()
     path = str(getattr(args, "kg_memory_path", "") or "").strip()
+    if mode == "reflection":
+        from relation_memory import parse_list_arg
+
+        stages = [name.lower() for name in parse_list_arg(getattr(args, "kg_memory_stages", "relation"), ["relation"])]
+        if not any(name.startswith("reflection") or name in {"all", "reflection"} for name in stages):
+            args.kg_memory_stages = "reflection_judge,reflection_select"
     if mode in {"", "none"}:
         for key, value in kg_memory_runtime_meta(args).items():
             setattr(args, key, value)

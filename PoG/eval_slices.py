@@ -9,6 +9,7 @@ from typing import Any
 
 SLICE_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval_slices")
 FROZEN_HARD150_V1 = os.path.join(SLICE_ROOT, "hard150_v1.json")
+FROZEN_RANDOM150_V1 = os.path.join(SLICE_ROOT, "random150_v1.json")
 
 
 def even_subsample(items: list[Any], k: int) -> list[Any]:

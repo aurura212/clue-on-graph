@@ -93,6 +93,8 @@ class KGMemoryBank:
     type_cache: dict[str, list[str]] = field(default_factory=dict)
     variants: dict[str, list[SchemaRelStat]] = field(default_factory=dict)
     record_kinds: set[str] = field(default_factory=set)
+    raw_by_id: dict[str, dict[str, Any]] = field(default_factory=dict)
+    raw_by_type: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
     def eligible(self, stat: SchemaRelStat, min_confidence: float, validated_only: bool) -> bool:
         if validated_only and stat.status != "validated":
@@ -268,6 +270,8 @@ def bank_from_records(
     stats: dict[tuple[str, str, str], SchemaRelStat] = {}
     variants: dict[tuple[str, str, str], list[SchemaRelStat]] = {}
     by_type: dict[str, list[SchemaRelStat]] = {}
+    raw_by_id: dict[str, dict[str, Any]] = {}
+    raw_by_type: dict[str, list[dict[str, Any]]] = {}
     for record in records:
         stat = compact_stat(record)
         if stat is None:
@@ -275,6 +279,9 @@ def bank_from_records(
         key = (stat.source_type, stat.direction, stat.relation)
         stats[key] = _prefer_compact_stat(stats.get(key), stat)
         variants.setdefault(key, []).append(stat)
+        if stat.memory_id:
+            raw_by_id[stat.memory_id] = record
+        raw_by_type.setdefault(stat.source_type, []).append(record)
     for items in variants.values():
         items.sort(key=lambda item: (-item.hop_length, -item.confidence, -item.coverage, item.memory_id))
         for stat in items:
@@ -296,6 +303,8 @@ def bank_from_records(
         n_validated=sum(1 for item in stats.values() if item.status == "validated"),
         variants=variants,
         record_kinds={item.memory_kind for item in stats.values()},
+        raw_by_id=raw_by_id,
+        raw_by_type=raw_by_type,
     )
 
 
@@ -318,20 +327,47 @@ def load_kg_memory_bank(path: str) -> KGMemoryBank:
     return bank
 
 
+REFLECTION_STAGE_NAMES = {
+    "reflection",
+    "reflection_judge",
+    "reflection_select",
+    "reflection_a",
+    "reflection_b",
+}
+
+
+def _normalized_memory_stages(args: Any) -> list[str]:
+    stages = parse_list_arg(getattr(args, "kg_memory_stages", "relation"), ["relation"])
+    return [str(name).strip().lower() for name in stages if str(name).strip()]
+
+
 def should_use_kg_memory_at_stage(args: Any, stage: str) -> bool:
     mode = str(getattr(args, "kg_memory_mode", "none") or "none").strip().lower()
+    stage = str(stage or "").strip().lower()
     if mode in {"", "none"}:
         return False
-    if stage == "relation" and mode not in {"relation", "full"}:
-        return False
-    if stage.startswith("reflection") and mode not in {"reflection", "full"}:
-        return False
-    stages = parse_list_arg(getattr(args, "kg_memory_stages", "relation"), ["relation"])
-    stages = [name.lower() for name in stages]
+    stages = _normalized_memory_stages(args)
     if not stages or "none" in stages:
         return False
-    if "all" in stages:
-        return True
+    if stage == "relation":
+        if mode not in {"relation", "full"}:
+            return False
+        return "all" in stages or "relation" in stages
+    if stage.startswith("reflection") or stage in REFLECTION_STAGE_NAMES:
+        if mode not in {"reflection", "full"}:
+            return False
+        if "all" in stages or "reflection" in stages:
+            return True
+        reflection_requested = [name for name in stages if name in REFLECTION_STAGE_NAMES or name.startswith("reflection")]
+        if not reflection_requested:
+            # argparse default leftover: mode=reflection, stages=relation → enable A/B, not first-hop.
+            return mode == "reflection"
+        aliases = {stage}
+        if stage in {"reflection_a", "reflection_judge"}:
+            aliases.update({"reflection_a", "reflection_judge", "reflection"})
+        if stage in {"reflection_b", "reflection_select"}:
+            aliases.update({"reflection_b", "reflection_select", "reflection"})
+        return bool(set(stages) & aliases)
     return stage in stages
 
 
@@ -851,6 +887,55 @@ def apply_relation_kg_memory(
     return order_after, prompt_text, trace
 
 
+def _reflection_record_rank(record: dict[str, Any]) -> tuple[float, float, int]:
+    stats = record.get("statistics") or {}
+    return (
+        _as_float(stats.get("confidence")),
+        _as_float(stats.get("validation_coverage")),
+        _as_int(stats.get("validation_entity_support")),
+    )
+
+
+def retrieve_reflection_records(
+    args: Any,
+    entity_ids: list[str],
+    *,
+    types_by_entity: dict[str, list[str]] | None = None,
+) -> list[tuple[str, dict[str, Any]]]:
+    """Type-matched raw memory records for Decision A/B. Does not rerank relations.
+
+    Returns (entity_id, record) pairs. Skips SPARQL when types_by_entity is provided.
+    Caps per entity so reflection prompts stay bounded.
+    """
+    bank = getattr(args, "kg_memory_bank", None)
+    if bank is None or not entity_ids:
+        return []
+    max_per_entity = max(8, int(getattr(args, "kg_memory_top_k", 6)) * 4)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    seen: set[tuple[str, str]] = set()
+    raw_by_type = getattr(bank, "raw_by_type", None) or {}
+    for entity_id in entity_ids:
+        if types_by_entity is not None:
+            types = list(types_by_entity.get(entity_id) or [])
+        else:
+            types = lookup_entity_types(entity_id, args)
+        for source_type in types:
+            for record in raw_by_type.get(source_type) or []:
+                memory_id = str(record.get("memory_id") or "")
+                key = (entity_id, memory_id)
+                if memory_id and key in seen:
+                    continue
+                if memory_id:
+                    seen.add(key)
+                grouped.setdefault(entity_id, []).append(record)
+    pairs: list[tuple[str, dict[str, Any]]] = []
+    for entity_id, records in grouped.items():
+        records.sort(key=_reflection_record_rank, reverse=True)
+        for record in records[:max_per_entity]:
+            pairs.append((entity_id, record))
+    return pairs
+
+
 def attach_kg_memory_relation_events(depth_record: dict[str, Any]) -> None:
     events = []
     for rel_trace in depth_record.get("relation_prune") or []:
@@ -868,3 +953,12 @@ def attach_kg_memory_relation_events(depth_record: dict[str, Any]) -> None:
         ),
         "events": events,
     }
+    reverse = depth_record.get("reverse_retrieval") or {}
+    if not isinstance(reverse, dict):
+        reverse = {}
+    decision_a = reverse.get("decision_a") or {}
+    decision_b = reverse.get("decision_b") or {}
+    if isinstance(decision_a, dict) and decision_a.get("evidence"):
+        kg_memory["reflection_judge"] = decision_a.get("evidence")
+    if isinstance(decision_b, dict) and decision_b.get("evidence"):
+        kg_memory["reflection_select"] = decision_b.get("evidence")
