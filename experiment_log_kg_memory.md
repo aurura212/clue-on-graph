@@ -24,18 +24,18 @@
 | 字段 | 值 |
 |---|---|
 | 更新日期 | 2026-08-20 |
-| 总体状态 | **`STOP_DIRECTION`：hard150 上 first-hop 结构记忆无归因增益，停止扩大本实验** |
-| 当前 Phase | `3-M2` |
-| 判定 | `STOP_DIRECTION` |
-| 已通过验收的 Phase | Phase 0, Phase 1, Phase 2, Phase 3-M1 效果门槛（gated，**仅 prefix150 档案**） |
+| 总体状态 | **`PLAN_REVISION`：停止 first-hop rerank 分支，转入 V2 reflection-only 方案** |
+| 当前 Phase | `V2-0` |
+| 判定 | `PLAN_REVISION` |
+| 已通过验收的 Phase | Phase 0, Phase 1；Phase 2/3 的实现验收完成，但 first-hop 效果门槛在 hard150 上未通过 |
 | 已冻结的 inference / memory 配置 | 档案保留：M1 gated schema `schema_full_ee55ef9f17_20260818_114056`；path `path_full_1f16016919_20260819_134058`。二者均不得再用于扩大推理实验 |
 | **已冻结的校验切片** | **`PoG/eval_slices/hard150_v1.json`** |
-| 阻塞 | 方向已停止扩大。Phase 4/5 因 relation 记忆未在 hard150 上确认有效而不得启动 |
-| 禁止事项 | 不得 Self-Play。不得 M3。不得进 Phase 4。不得再开 first-hop 变体或改 fusion。不得用 n=20 / prefix150 推翻本条。 |
+| 阻塞 | 旧 first-hop 分支已关闭；V2 reflection-only 尚未完成协议审计，不得直接跑正式评测 |
+| 禁止事项 | 不得 Self-Play。不得 M3。不得再开 first-hop 变体或改 fusion。不得把 hard150 作为最终测试集。V2-0 审计完成前不得启动 R1/R2/R3。 |
 
 ### 下一步（唯一允许的动作）
 
-停止扩大。无下一组跑数。代码与记忆库保留作档案，不拆除 retrieval。禁止把 Phase 4 当成「换注入点再试一次」。
+执行 `experimental_plan_kg_memory_v2.md` 的 V2-0 协议审计：准备 `final_unseen`、统一 timeout/retry 和分母记录、检查 reflection evidence 与 `semantic_filter_relations()` 的顺序、补齐 Decision A/B trace。审计完成前不启动 R1/R2/R3，也不运行任何新的 first-hop 实验。
 
 ---
 
@@ -50,8 +50,9 @@
 | `GATE_HOLD` | 阶段验收过了，但效果门槛未过；只分析，不扩大 |
 | `ROLLBACK` | 触发 §16.3；回退到诊断-only retrieval |
 | `STOP_DIRECTION` | 结构记忆方向不成立，停止扩大范围 |
+| `PLAN_REVISION` | 根据已完成实验结果修订执行主线；旧分支冻结，新分支须先完成 V2-0 审计 |
 
-### 默认前进路径（方案 §18 最小闭环）
+### 旧方案前进路径（已归档）
 
 ```text
 pre
@@ -67,7 +68,24 @@ pre
   → 否则 GATE_HOLD / ROLLBACK，禁止 Phase 2 与 Phase 5
 ```
 
-完整 Phase 顺序（方案 §8）仍作为模块清单使用，但**推进决策以 §18 最小闭环为准**，避免过早实现 path template、reflection 注入和 Self-Play。
+上述路径仅用于解释 LOG-000 至 LOG-049 的历史推进，不再作为后续执行路径。
+
+### V2 默认前进路径
+
+```text
+LOG-050 PLAN_REVISION
+  → V2-0：协议审计、final_unseen 准备、timeout/retry/分母冻结
+  → V2-1：Decision A/B evidence gate 与 trace 单测
+  → V2-2：R0/R1/R2/R3/RC1/RC2 smoke
+  → V2-2：hard150 development stress pilot
+  → 若 reflection 阶段有可归因增益且优于 RC1/RC2
+        → V2-3：冻结 final_unseen 并一次性运行
+        → V2-4：跨数据集与 trajectory-memory 对照
+        → 满足独立门槛后才可评估 V2-5 Self-play
+  → 否则 GATE_HOLD / ROLLBACK，停止当前 reflection 变体
+```
+
+V2 不要求 first-hop relation memory 先通过；但 V2-0 审计未完成前，不得启动 R1/R2/R3 正式评测。
 
 ### 进入完整实验的门槛（方案 §16.1）
 
@@ -1127,5 +1145,54 @@ C1 选了 gold、M1 没选的 10 题里，列出的样例 depth1 top1 也与 C1 
 - 异常：无。不把 prefix150 EM≈0.85 的 M1 过门槛迁回 hard150
 - 结论：**判定 `STOP_DIRECTION`。** 结构记忆以 first-hop rerank 改善 PoG 的方向，在冻结难切片上不成立。停止扩大
 - 判定后状态：`3-M2` / `STOP_DIRECTION` / 无下一组跑数
+
+---
+
+### LOG-050 — 2026-08-20 — 修订实验计划：停止 first-hop rerank，转入 V2 reflection-only 分支
+
+- 判定前状态：`3-M2` / `STOP_DIRECTION`
+- 类型：`plan_change`
+- 对应方案：旧方案 §18、§16.1–§16.3；新方案 `experimental_plan_kg_memory_v2.md`
+- 代码：未改；本条只记录实验计划和推进门槛变更
+- 产物：
+  - 新实验计划：`clue_on_graph/experimental_plan_kg_memory_v2.md`
+  - 旧方案：`clue_on_graph/experimental_plan_kg_memory_from_gpt56.md`，保留为历史版本
+
+#### 变更依据
+
+1. hard150 上 M1 的 EM 相对 B0 有净 +3，但 M1 的 gold first-hop selected recall 为 61/143，低于 B0 的 64/143、C1 的 67/143 和 C2 的 66/143。
+2. M1 与 C1 的 EM 翻盘题中，27/27 道题的 depth1 top1 相同，M1 的 EM 差异不能归因于 first-hop relation rerank。
+3. M1 中 gold `struct=0` 为 88/130（68%），说明当前证据覆盖和无证据 fallback 仍不足。
+4. M2 的 EM 为 0.1467，低于 B0 的 0.1733；关闭 `tail_sem` 后 M2-notail 回到 B0 水平，但仍未优于真实对照，且高置信错误 first-hop 仍然存在。
+5. 当前实验没有测试 reflection Decision A/B，因此不能由 first-hop 分支失败推出 KG structural memory 的整体方向失败。
+
+#### 具体变更
+
+- 将旧结论的范围从 `STOP_DIRECTION` 收窄为：
+
+  ```text
+  STOP_FIRST_HOP_RERANK
+  ```
+
+- 关闭 M3、所有新的 M1/M2 first-hop fusion 变体、`tail_sem` 变体和 first-hop memory 扩库。
+- 不再要求 relation memory 先通过才能启动 reflection；relation selection 与 reflection 改为独立实验分支。
+- V2 的主线改为 reflection-only：不改变 first-hop relation 顺序，只在 Decision A/B 前提供 validated KG structural evidence。
+- 新增 R0/R1/R2/R3/RC1/RC2 实验矩阵，分别测试无 memory、Decision A、Decision B、联合 reflection、shuffle 和 irrelevant evidence。
+- hard150 从 V2 起只作为 `development_stress` 切片；必须新增并冻结 `final_unseen`，才可形成最终主结果。
+- V2-0 审计完成前，不得启动 R1/R2/R3，也不得进行新的正式评测。
+- Self-Play 仍然禁止，只有在 V2 reflection-only 在 `final_unseen` 上形成可归因正结果后才重新评估。
+
+#### V2-0 唯一允许的下一步
+
+1. 准备并冻结 `final_unseen`；
+2. 统一 timeout、retry、max-token、seed 和异常记录；
+3. 解释 relation-valid 分母 143 与全题分母 150；
+4. 检查 `semantic_filter_relations()` 与 reflection evidence 的先后顺序；
+5. 补齐 Decision A/B 的 evidence、decision、post-decision outcome trace；
+6. 通过 memory-off 与 B0 等价性、evidence gate 和 shuffle/irrelevant checker。
+
+- 异常：无。本条没有新增实验数据。
+- 结论：接受 V2 方案变更。当前研究状态由“停止扩大旧 first-hop 实验”转为“完成 V2-0 审计后，独立评估 reflection-only structural evidence”。
+- 判定后状态：`V2-0` / `PLAN_REVISION` / 等待协议审计完成
 
 ---
