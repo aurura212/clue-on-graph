@@ -668,6 +668,22 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         cur_token[kk] += token_num[kk]
 
     flag, reason = extract_add_and_reason(response)
+    frontier_names = list(set(sorted([entid_name[ent_i] for ent_i in new_lst])))
+    reflection_trace = {
+        "decision_a": {
+            "add": bool(flag),
+            "reason": reason,
+            "llm_raw_output": response,
+            "frontier_entities": frontier_names,
+        },
+        "decision_b": {
+            "invoked": False,
+            "candidate_entities": [],
+            "selected_entities": [],
+            "selected_entity_ids": [],
+            "llm_raw_output": None,
+        },
+    }
 
     if flag:
         other_entities = sorted(list(all_ent_set - set(new_lst)))
@@ -679,18 +695,25 @@ def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid
         prompt = maybe_prepend_reference_context(prompt, args, stage="add_entity")
 
         cur_call_time += 1
-        response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
+        select_response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
 
         for kk in token_num.keys():
             cur_token[kk] += token_num[kk]
 
-        add_ent_list = extract_add_ent(response)
+        add_ent_list = extract_add_ent(select_response)
         add_ent_list = [name_entid[ent_i] for ent_i in add_ent_list if ent_i in other_entities_name]
         add_ent_list = sorted(add_ent_list)
+        reflection_trace["decision_b"] = {
+            "invoked": True,
+            "candidate_entities": sorted(other_entities_name),
+            "selected_entities": [entid_name[ent_i] for ent_i in add_ent_list],
+            "selected_entity_ids": list(add_ent_list),
+            "llm_raw_output": select_response,
+        }
         if add_ent_list:
             print('add reverse ent:', len(add_ent_list), [entid_name[ent_i] for ent_i in add_ent_list])
-            return new_lst, add_ent_list, cur_call_time, cur_token
-    return new_lst, [], cur_call_time, cur_token
+            return new_lst, add_ent_list, cur_call_time, cur_token, reflection_trace
+    return new_lst, [], cur_call_time, cur_token, reflection_trace
 
     
 def prepare_dataset(dataset_name):

@@ -12,6 +12,7 @@ from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
 from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
+from kg_memory_retrieval import apply_relation_kg_memory, should_use_kg_memory_at_stage
 from constraint_compiler import (
     format_constraints_for_prompt,
     is_constraint_pushdown_enabled,
@@ -1075,6 +1076,9 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
                 "\nPrefer relations that can reach the answer or verify these entity, time, and ordering constraints."
             )
     prompt = maybe_prepend_reference_context(prompt, args, stage="relation")
+    kg_memory_context = str(getattr(args, "current_kg_memory_context", "") or "")
+    if kg_memory_context:
+        prompt = kg_memory_context + "\n\n" + prompt
     memory_context = ""
     if should_use_relation_memory_at_stage(args, "relation"):
         memory_context = relation_memory_context(
@@ -1089,6 +1093,7 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
         if memory_context:
             prompt = memory_context + "\n\n" + prompt
     setattr(args, "current_relation_memory_context", memory_context)
+    setattr(args, "current_kg_memory_context", kg_memory_context)
     setattr(args, "current_relation_constraint_context", constraint_context)
     return prompt
 
@@ -1109,6 +1114,9 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
         head_relations = [relation for relation in head_relations if not abandon_rels(relation)]
         tail_relations = [relation for relation in tail_relations if not abandon_rels(relation)]
 
+    head_relations_after_abandon = list(head_relations)
+    tail_relations_after_abandon = list(tail_relations)
+
     if pre_head:
         tail_relations = list(set(tail_relations) - set(pre_relations))
     else:
@@ -1121,8 +1129,23 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
 
     retrieved_relations = total_relations
     semantic_top_k = int(getattr(args, "relation_semantic_top_k", 20))
-    if len(total_relations) > semantic_top_k:
+    semantic_filter_applied = len(total_relations) > semantic_top_k
+    if semantic_filter_applied:
         retrieved_relations = semantic_filter_relations(question, total_relations, args, top_k=semantic_top_k)
+
+    kg_memory_trace = {}
+    setattr(args, "current_kg_memory_context", "")
+    if should_use_kg_memory_at_stage(args, "relation"):
+        retrieved_relations, kg_prompt, kg_memory_trace = apply_relation_kg_memory(
+            question=question,
+            entity_id=entity_id,
+            retrieved_relations=retrieved_relations,
+            head_relations=head_relations,
+            tail_relations=tail_relations,
+            pre_relations=pre_relations,
+            args=args,
+        )
+        setattr(args, "current_kg_memory_context", kg_prompt)
 
     prompt = construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, retrieved_relations, args)
     result, token_num = run_llm(prompt, args.temperature_exploration, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
@@ -1131,17 +1154,23 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     rel_trace = {
         "entity_id": entity_id,
         "entity_name": entity_name,
+        "pre_relations": list(pre_relations or []),
+        "pre_head": bool(pre_head),
         "head_relations_before_filter": sorted(head_relations_raw),
         "tail_relations_before_filter": sorted(tail_relations_raw),
+        "head_relations_after_abandon": sorted(head_relations_after_abandon),
+        "tail_relations_after_abandon": sorted(tail_relations_after_abandon),
         "candidate_relations": total_relations,
         "retrieved_relations": retrieved_relations,
         "candidate_relations_sent_to_llm": retrieved_relations,
+        "semantic_filter_applied": semantic_filter_applied,
         "selected_relations": [
             {"relation": r["relation"], "head": r["head"]} for r in (retrieve_relations if flag else [])
         ],
         "llm_raw_output": result,
         "selection_success": bool(flag),
         "relation_memory_context": getattr(args, "current_relation_memory_context", ""),
+        "kg_memory": kg_memory_trace,
         "constraint_context": getattr(args, "current_relation_constraint_context", ""),
     }
 

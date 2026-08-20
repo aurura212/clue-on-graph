@@ -371,6 +371,34 @@ def format_decomposition_memory_tag(args) -> str:
     )
 
 
+def format_kg_memory_tag(args) -> str:
+    mode = getattr(args, "kg_memory_mode", "none")
+    if not mode or mode == "none":
+        return ""
+    ablation = getattr(args, "kg_memory_ablation", "none")
+    parts = [
+        f"kgmem-{mode}",
+        str(getattr(args, "kg_memory_strategy", "rerank")),
+        f"top{getattr(args, 'kg_memory_top_k', 6)}",
+    ]
+    if ablation and ablation != "none":
+        parts.append(ablation)
+    fusion = str(getattr(args, "kg_memory_fusion", "additive") or "additive").strip().lower()
+    if fusion and fusion != "additive":
+        parts.append(fusion)
+    try:
+        from kg_memory_retrieval import kg_memory_kind_tag
+
+        kind_tag = kg_memory_kind_tag(args)
+    except Exception:
+        kind_tag = ""
+    if kind_tag:
+        parts.append(kind_tag)
+    if not int(getattr(args, "kg_memory_use_tail_sem", 1)):
+        parts.append("notail")
+    return "_".join(parts)
+
+
 def get_output_file_tag(args):
     tag = f"{args.dataset}_{args.LLM_type}"
     run_mode = getattr(args, "run_mode", "test")
@@ -385,4 +413,15 @@ def get_output_file_tag(args):
     decomposition_memory_tag = format_decomposition_memory_tag(args)
     if decomposition_memory_tag:
         tag += f"_{decomposition_memory_tag}"
+    kg_memory_tag = format_kg_memory_tag(args)
+    if kg_memory_tag:
+        tag += f"_{kg_memory_tag}"
+    try:
+        from eval_slices import format_eval_slice_tag
+
+        slice_tag = format_eval_slice_tag(args)
+    except Exception:
+        slice_tag = ""
+    if slice_tag:
+        tag += f"_{slice_tag}"
     return tag

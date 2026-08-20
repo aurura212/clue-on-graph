@@ -1,4 +1,5 @@
 ReasoningBank_阅读笔记.md
+experimental_plan_kg_memory_from_gpt56.md
 CoG.pdf
 SRP.pdf
 run_build_revolution_reference.sh
@@ -6,6 +7,7 @@ run_build_revolution_reference.sh
 run_*.sh
 eval.sh
 PoG*.jsonl
+/PoG/eval_slices/
 /msmarco-distilbert-base-tas-b
 /data/raw_train_set/
 /data/revolution_reference/
@@ -23,6 +25,7 @@ PoG*.jsonl
 /PoG/relation_memory/
 /PoG/decomposition_memory/
 /PoG/memory/
+/PoG/kg_memory/
 /mem_PoG
 /eval/__pycache__/
 /pog_diagnosis

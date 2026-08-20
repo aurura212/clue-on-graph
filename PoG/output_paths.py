@@ -38,6 +38,7 @@ def build_run_meta_from_args(
         "start": getattr(args, "start", 0),
         "limit": getattr(args, "limit", -1),
         "question": getattr(args, "question", ""),
+        "questions_file": getattr(args, "questions_file", ""),
         "max_length": getattr(args, "max_length", 4096),
         "temperature_exploration": getattr(args, "temperature_exploration", 0.3),
         "temperature_reasoning": getattr(args, "temperature_reasoning", 0.3),
@@ -81,6 +82,28 @@ def build_run_meta_from_args(
         "memory_conflict_policy": getattr(args, "memory_conflict_policy", "keep_both"),
         "constraint_frontier_bias": getattr(args, "constraint_frontier_bias", 1),
         "decomposition_repair": getattr(args, "decomposition_repair", "off"),
+        "kg_memory_mode": getattr(args, "kg_memory_mode", "none"),
+        "kg_memory_path": getattr(args, "kg_memory_path", ""),
+        "kg_memory_stages": getattr(args, "kg_memory_stages", "relation"),
+        "kg_memory_top_k": getattr(args, "kg_memory_top_k", 6),
+        "kg_memory_strategy": getattr(args, "kg_memory_strategy", "rerank"),
+        "kg_memory_min_confidence": getattr(args, "kg_memory_min_confidence", 0.6),
+        "kg_memory_prompt_token_budget": getattr(args, "kg_memory_prompt_token_budget", 600),
+        "kg_memory_online_verify": getattr(args, "kg_memory_online_verify", 0),
+        "kg_memory_online_query_budget": getattr(args, "kg_memory_online_query_budget", 0),
+        "kg_memory_ablation": getattr(args, "kg_memory_ablation", "none"),
+        "kg_memory_seed": getattr(args, "kg_memory_seed", 42),
+        "kg_memory_semantic_weight": getattr(args, "kg_memory_semantic_weight", 0.7),
+        "kg_memory_structure_weight": getattr(args, "kg_memory_structure_weight", 0.3),
+        "kg_memory_fusion": getattr(args, "kg_memory_fusion", "additive"),
+        "kg_memory_use_tail_sem": getattr(args, "kg_memory_use_tail_sem", 1),
+        "kg_memory_validated_only": getattr(args, "kg_memory_validated_only", 1),
+        "kg_memory_kind": getattr(args, "kg_memory_kind", ""),
+        "kg_memory_hash": getattr(args, "kg_memory_hash", ""),
+        "kg_memory_build_id": getattr(args, "kg_memory_build_id", ""),
+        "kg_memory_n_records": getattr(args, "kg_memory_n_records", 0),
+        "kg_memory_n_validated": getattr(args, "kg_memory_n_validated", 0),
+        "kg_memory_builder_version": getattr(args, "kg_memory_builder_version", ""),
         "run_dir": getattr(args, "run_dir", ""),
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "results_file": "results.jsonl",
@@ -226,6 +249,16 @@ def init_run_output(
         if not os.path.isdir(run_dir):
             raise FileNotFoundError(f"Run directory not found: {run_dir}")
         run_folder_name = os.path.basename(run_dir.rstrip("/"))
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        if os.path.isfile(meta_path):
+            with open(meta_path, "r", encoding="utf-8") as handle:
+                existing_meta = json.load(handle)
+            existing_hash = str(existing_meta.get("kg_memory_hash") or "")
+            new_hash = str(getattr(args, "kg_memory_hash", "") or "")
+            if existing_hash and new_hash and existing_hash != new_hash:
+                raise ValueError(
+                    f"Resume memory hash mismatch: run has {existing_hash} but args have {new_hash}"
+                )
     else:
         run_folder_name = build_run_folder_name(config_tag, planned_question_count)
         run_dir = os.path.join(RESULT_ROOT, run_folder_name)

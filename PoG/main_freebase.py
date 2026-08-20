@@ -9,7 +9,14 @@ from reference_utils import (
     set_current_decomposition_reference_context,
     set_current_reference_context,
 )
-from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
+from trace_utils import (
+    attach_reverse_rec,
+    finalize_depth_record,
+    flatten_chain_triples,
+    new_depth_record,
+    new_run_trace,
+    serialize_name_dict,
+)
 from output_paths import init_run_output, load_processed_questions, get_current_run, default_relation_memory_output_path, update_run_meta
 from output_paths import default_decomposition_memory_output_path, default_memory_output_dir
 from output_paths import load_parse_ids_from_jsonl, filter_jsonl_by_parse_id, load_progress, append_progress
@@ -73,13 +80,27 @@ def get_one_data(datas, question_string, question):
     return []
 
 
-def select_questions(datas, question_string, start, limit, question):
+def select_questions(datas, question_string, start, limit, question, questions_file=""):
     """Select a subset of questions for testing."""
     if question:
         selected = get_one_data(datas, question_string, question)
         if not selected:
             raise ValueError(f"Question not found in dataset: {question}")
         return selected
+
+    if questions_file:
+        from eval_slices import load_questions_file
+
+        slice_id, wanted = load_questions_file(questions_file)
+        by_q = {row[question_string]: row for row in datas}
+        missing = [q for q in wanted if q not in by_q]
+        if missing:
+            preview = missing[:5]
+            raise ValueError(
+                f"questions_file {questions_file} has {len(missing)} questions not in dataset "
+                f"(slice={slice_id}): {preview}"
+            )
+        datas = [by_q[q] for q in wanted]
 
     start = max(0, start)
     if limit >= 0:
@@ -172,6 +193,63 @@ def add_relation_memory_args(parser):
                         default=1, help="Prefer constraint-covering entities when building the next-hop frontier.")
     parser.add_argument("--decomposition_repair", type=str, choices=["off", "on"],
                         default="off", help="Optionally re-plan once after repeated insufficient reasoning. Default off.")
+    parser.add_argument("--kg_memory_mode", type=str, choices=["none", "relation", "reflection", "full"],
+                        default="none", help="KG structural memory injection. M1/M2 use relation. reflection/full unused until later phases.")
+    parser.add_argument("--kg_memory_path", type=str, default="",
+                        help="Path to kg_memory/<build_id>/ or kg_structural_memory.jsonl. M1=schema_full, M2=path_full.")
+    parser.add_argument("--kg_memory_stages", type=str, default="relation",
+                        help="Stages that may use KG structural memory: relation, reflection_judge, reflection_select.")
+    parser.add_argument("--kg_memory_top_k", type=int, default=6,
+                        help="Top-K schema_profile records for prompt evidence.")
+    parser.add_argument("--kg_memory_strategy", type=str, choices=["prompt", "rerank"],
+                        default="rerank", help="Soft use of schema_profile. Default rerank; no hard filter.")
+    parser.add_argument("--kg_memory_min_confidence", type=float, default=0.6,
+                        help="Minimum schema_profile confidence to use.")
+    parser.add_argument("--kg_memory_prompt_token_budget", type=int, default=600,
+                        help="Token budget for KG structural evidence in the relation prompt.")
+    parser.add_argument("--kg_memory_online_verify", type=int, default=0,
+                        help="Unused in M1. Inference-time SPARQL verify remains off.")
+    parser.add_argument("--kg_memory_online_query_budget", type=int, default=0,
+                        help="Unused in M1.")
+    parser.add_argument("--kg_memory_ablation", type=str, choices=["none", "shuffle", "irrelevant"],
+                        default="none", help="none=M1, shuffle=C1, irrelevant=C2.")
+    parser.add_argument("--kg_memory_seed", type=int, default=42,
+                        help="Seed for shuffle/irrelevant ablations.")
+    parser.add_argument("--kg_memory_semantic_weight", type=float, default=0.7,
+                        help="Question-semantic weight in fused rerank score.")
+    parser.add_argument("--kg_memory_structure_weight", type=float, default=0.3,
+                        help="Schema coverage/support weight in fused rerank score.")
+    parser.add_argument("--kg_memory_fusion", type=str, choices=["additive", "multiplicative", "gated"],
+                        default="additive",
+                        help="additive=logged M1; multiplicative=sem*(w_sem+w_str*struct); gated=additive plus no-hit protection.")
+    parser.add_argument("--kg_memory_use_tail_sem", type=int, default=1,
+                        help="If 1, path_template structural score is multiplied by question match on the second hop/target type. 0=M2-notail.")
+    parser.add_argument("--kg_memory_validated_only", type=int, default=1,
+                        help="If 1, only use validated schema_profile records.")
+
+
+def load_kg_memory_into_args(args):
+    from kg_memory_retrieval import load_kg_memory_bank, kg_memory_runtime_meta
+
+    setattr(args, "kg_memory_bank", None)
+    mode = str(getattr(args, "kg_memory_mode", "none") or "none").strip().lower()
+    path = str(getattr(args, "kg_memory_path", "") or "").strip()
+    if mode in {"", "none"}:
+        for key, value in kg_memory_runtime_meta(args).items():
+            setattr(args, key, value)
+        return None
+    if not path:
+        raise ValueError("--kg_memory_path is required when --kg_memory_mode is not none")
+    bank = load_kg_memory_bank(path)
+    setattr(args, "kg_memory_bank", bank)
+    meta = kg_memory_runtime_meta(args)
+    for key, value in meta.items():
+        setattr(args, key, value)
+    print(
+        f"Loaded KG structural memory {bank.memory_build_id or bank.path}: "
+        f"{bank.n_records} first-hop keys ({bank.n_validated} validated), hash={bank.build_config_hash[:12]}"
+    )
+    return bank
 
 
 def should_train_relation_memory(args):
@@ -478,6 +556,8 @@ if __name__ == '__main__':
                         help="Max number of questions to run. -1 means no limit.")
     parser.add_argument("--question", type=str, default="",
                         help="Run a single question by exact RawQuestion/question text. Overrides --start/--limit.")
+    parser.add_argument("--questions_file", type=str, default="",
+                        help="JSON/txt list of RawQuestions. Applied before --start/--limit. Use eval_slices/hard150_v1.json for KG-memory validation.")
     parser.add_argument("--run_dir", type=str, default="",
                         help="Resume an existing run under result/. Pass folder name (e.g. webqsp_..._n10_20250617_120000) or full path.")
     add_relation_memory_args(parser)
@@ -488,6 +568,7 @@ if __name__ == '__main__':
         os.environ["OPENAI_API_BASE"] = args.openai_api_base
     elif "OPENAI_API_BASE" not in os.environ:
         raise ValueError("OPENAI_API_BASE is required. Set it in the environment or pass --openai_api_base.")
+    load_kg_memory_into_args(args)
 
     while True:
         try:
@@ -503,6 +584,7 @@ if __name__ == '__main__':
                     args.start,
                     args.limit,
                     args.question.strip(),
+                    getattr(args, "questions_file", ""),
                 )
                 planned_question_count = len(selected_train_episodes)
                 run_output = init_run_output(
@@ -520,11 +602,22 @@ if __name__ == '__main__':
             datas, question_string = prepare_dataset(args.dataset)
             total_in_dataset = len(datas)
             datas = select_questions(
-                datas, question_string, args.start, args.limit, args.question.strip()
+                datas,
+                question_string,
+                args.start,
+                args.limit,
+                args.question.strip(),
+                getattr(args, "questions_file", ""),
             )
             planned_question_count = len(datas)
             if args.question.strip():
                 print(f"Selected 1 question by --question (dataset size={total_in_dataset}).")
+            elif getattr(args, "questions_file", ""):
+                print(
+                    f"Selected {planned_question_count} questions from questions_file="
+                    f"{args.questions_file} (start={args.start}, limit={args.limit}, "
+                    f"dataset size={total_in_dataset})."
+                )
             elif args.start > 0 or args.limit >= 0:
                 end = args.start + args.limit if args.limit >= 0 else total_in_dataset
                 print(
@@ -677,6 +770,7 @@ if __name__ == '__main__':
                         "method": "generate_without_explored_paths",
                         "llm_response": results,
                     }
+                    attach_reverse_rec(pog_trace, reverse_rec, entid_name)
                     save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                     continue
 
@@ -726,6 +820,7 @@ if __name__ == '__main__':
                     total_head = []
 
                     ent_rel_ent_dict = {} # e->head/tail->rel->ent
+                    depth_record["entity_search"] = []
                     for ent_rel in current_entity_relations_list:
                         if ent_rel['entity'] not in ent_rel_ent_dict.keys():
                             ent_rel_ent_dict[ent_rel['entity']] = {}
@@ -742,18 +837,32 @@ if __name__ == '__main__':
                                 ent_rel['entity'], ent_rel['relation'], False, question, args,
                                 subobjective_idx=getattr(args, "current_subobjective_idx", None),
                             )
-                        
-                        if len(entity_candidates_id) == 0:
+
+                        n_candidates = len(entity_candidates_id)
+                        search_event = {
+                            "entity_id": ent_rel['entity'],
+                            "relation": ent_rel['relation'],
+                            "direction": head_or_tail,
+                            "n_candidates": n_candidates,
+                            "n_candidates_after_cap": n_candidates,
+                            "capped": False,
+                            "dead_end": n_candidates == 0,
+                        }
+                        if n_candidates == 0:
                             print('the relations without tail entity:', ent_rel)
+                            depth_record["entity_search"].append(search_event)
                             continue
 
                         max_candidates = int(getattr(args, "max_candidates_per_relation", 200))
-                        if max_candidates > 0 and len(entity_candidates_id) > max_candidates:
+                        if max_candidates > 0 and n_candidates > max_candidates:
                             print(
                                 f"[search] capping {ent_rel['relation']} candidates "
-                                f"{len(entity_candidates_id)} -> {max_candidates}"
+                                f"{n_candidates} -> {max_candidates}"
                             )
                             entity_candidates_id = entity_candidates_id[:max_candidates]
+                            search_event["capped"] = True
+                            search_event["n_candidates_after_cap"] = len(entity_candidates_id)
+                        depth_record["entity_search"].append(search_event)
 
                         entity_candidates, entity_candidates_id = provide_triple(entity_candidates_id, ent_rel['relation'])
 
@@ -780,9 +889,11 @@ if __name__ == '__main__':
 
                     if len(total_candidates) == 0:
                         depth_record["stop_reason"] = "no_candidates_after_relation_entity_search"
+                        finalize_depth_record(depth_record)
                         pog_trace["depths"].append(depth_record)
                         new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                         reverse_rec['ent'] = new_e_rev_list
+                        attach_reverse_rec(pog_trace, reverse_rec, entid_name)
                         half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                         flag_printed = True
                         break
@@ -873,29 +984,44 @@ if __name__ == '__main__':
                         if stop:
                             print("PoG stoped at depth %d." % depth)
                             depth_record["stop_reason"] = "reasoning_sufficient"
+                            finalize_depth_record(depth_record)
                             pog_trace["depths"].append(depth_record)
                             pog_trace["final_stop_reason"] = "reasoning_sufficient"
                             pog_trace["final_stop_depth"] = depth
                             new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                             reverse_rec['ent'] = new_e_rev_list
+                            attach_reverse_rec(pog_trace, reverse_rec, entid_name)
                             save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time, pog_trace=pog_trace)
                             flag_printed = True
                             break
                         else:
                             print("depth %d still not find the answer." % depth)
                             add_ent_list = []
-                            reverse_trace = {"triggered": False, "add_entities": [], "judge_response": None, "select_response": None}
+                            reverse_trace = {
+                                "triggered": False,
+                                "add_entities": [],
+                                "judge_response": None,
+                                "select_response": None,
+                                "skipped": reverse_rec['time'] >= 5,
+                                "decision_a": None,
+                                "decision_b": None,
+                            }
                             if reverse_rec['time']<5:
-                                entities_id, add_ent_list, cur_call_time, cur_token = if_finish_list(question, entities_id, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path, results, cluster_chain_of_entities, args, model)
+                                entities_id, add_ent_list, cur_call_time, cur_token, reflection_trace = if_finish_list(question, entities_id, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path, results, cluster_chain_of_entities, args, model)
                                 call_num += cur_call_time
                                 for kk in cur_token.keys():
                                     all_t[kk] += cur_token[kk]
+                                reverse_trace["decision_a"] = reflection_trace.get("decision_a")
+                                reverse_trace["decision_b"] = reflection_trace.get("decision_b")
+                                reverse_trace["judge_response"] = (reflection_trace.get("decision_a") or {}).get("llm_raw_output")
+                                reverse_trace["select_response"] = (reflection_trace.get("decision_b") or {}).get("llm_raw_output")
                                 add_ent_list = [ent for ent in add_ent_list if ent not in reverse_rec['ent']]
                                 if add_ent_list:
                                     reverse_trace["triggered"] = True
                                     reverse_trace["add_entities"] = [entid_name.get(e, e) for e in add_ent_list]
 
                             depth_record["reverse_retrieval"] = reverse_trace
+                            finalize_depth_record(depth_record)
                             pog_trace["depths"].append(depth_record)
 
                             if add_ent_list:
@@ -911,6 +1037,7 @@ if __name__ == '__main__':
                             if not entities_id or depth>5:
                                 new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                                 reverse_rec['ent'] = new_e_rev_list
+                                attach_reverse_rec(pog_trace, reverse_rec, entid_name)
                                 half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                                 flag_printed = True
                                 break
@@ -925,9 +1052,11 @@ if __name__ == '__main__':
 
                     else:
                         depth_record["stop_reason"] = "entity_prune_failed"
+                        finalize_depth_record(depth_record)
                         pog_trace["depths"].append(depth_record)
                         new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                         reverse_rec['ent'] = new_e_rev_list
+                        attach_reverse_rec(pog_trace, reverse_rec, entid_name)
                         half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                         flag_printed = True
                         break
@@ -945,6 +1074,7 @@ if __name__ == '__main__':
                         "method": "generate_without_explored_paths",
                         "llm_response": results,
                     }
+                    attach_reverse_rec(pog_trace, reverse_rec, entid_name)
                     save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                 '''except:
                     continue'''

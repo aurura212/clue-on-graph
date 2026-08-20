@@ -1,0 +1,15 @@
+---
+description: KG-structural memory experiment — read the log first, record every run, advance phases only by the log's gates.
+globs: "**/*"
+alwaysApply: true
+---
+
+# KG Memory Experiment Log
+
+When working on this repo's PoG KG-structural memory experiment:
+
+1. **Read first**: `experiment_log_kg_memory.md` (「当前状态」+ latest `LOG-*`). Plan: `experimental_plan_kg_memory_from_gpt56.md`.
+2. **Do only the logged next action.** No phase skipping. No Protocol 1 / injection / Self-Play unless the log 判定 allows it.
+3. **After every experiment** (including failures): append `LOG-XXX` with the template, then update 「当前状态」, Phase checklist, and 实验组表.
+4. Advance only via the log 判定算法. Default path is plan §18.
+5. Historical supervised-memory WebQSP runs are not this experiment's B0.
