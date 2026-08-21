@@ -1560,4 +1560,15 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 结论：判定 `PLAN_REVISION` 仅用于原栈切片评测。V2 reflection 仍 `GATE_HOLD`，不得扩大
 - 判定后状态：`V2-3` / `PLAN_REVISION` / 原栈 hard150+random150 进行中
 
+### LOG-065 — 2026-08-21 — 原栈切片跑数被会话中止，已 nohup 续跑
+
+- 判定前状态：`V2-3` / `PLAN_REVISION`
+- 类型：`incident`
+- 对应方案：同 LOG-064，不是 V2 reflection
+- 代码：未改。用原 `RUN_DIR` 续跑
+- 结果：Cursor 任务 abort 杀掉 python。中止时 hard150 已写 **29/150**，random150 **52/150**。已 `nohup` 续跑同一目录（hard 余 121，random 余 98），GPU 4
+- 异常：无数据损坏；跳过已处理题
+- 结论：继续跑完。判定仍 `PLAN_REVISION`
+- 判定后状态：`V2-3` / `PLAN_REVISION` / 原栈 hard150+random150 续跑中
+
 ---
