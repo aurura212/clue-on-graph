@@ -24,18 +24,18 @@
 | 字段 | 值 |
 |---|---|
 | 更新日期 | 2026-08-21 |
-| 总体状态 | **V2 reflection 仍 `GATE_HOLD`。用户要求恢复原 PoG 栈（supervised relation memory + 约束编译），正在 hard150/random150 上复跑** |
-| 当前 Phase | `V2-3`（reflection 不变）+ **原栈切片复跑进行中** |
-| 判定 | `PLAN_REVISION`（仅开辟原栈评测；V2 reflection 变体仍停止扩大） |
-| 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过 |
-| 已冻结的 inference / memory 配置 | V2 R2 冻结配置不得再改去重跑。本次原栈：`run_PoG_test.sh`（relation_memory=prompt top2 hybrid stages=relation；constraint_pushdown=on；constraint_routing=auto；kg_memory=none） |
-| **已冻结的校验切片** | hard150 / random150 角色不变。本次是**另一方法**在同切片上评测，不得与 R2 混报 |
-| 阻塞 | 原栈两个切片跑数尚未完成 |
-| 禁止事项 | 不得把本次数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得 Self-Play。不得改 R2 后重跑 random150。hard150 由「orig PoG 与 20260814 rel+decomp 全错」构成，旧全量在其上 EM=0 是切片定义。 |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果） |
+| 当前 Phase | `V2-3` |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成 |
+| 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
+| 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
+| **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
+| 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得 Self-Play。不得改 R2 后重跑 random150。 |
 
 ### 下一步（唯一允许的动作）
 
-等待原栈 hard150 / random150 跑完并写评测。V2 reflection 仍不得扩大。
+V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。
 
 ---
 
@@ -1570,5 +1570,46 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 异常：无数据损坏；跳过已处理题
 - 结论：继续跑完。判定仍 `PLAN_REVISION`
 - 判定后状态：`V2-3` / `PLAN_REVISION` / 原栈 hard150+random150 续跑中
+
+### LOG-066 — 2026-08-21 — 原栈切片复跑完成，并与 V2 / 旧全量子集对照
+
+- 判定前状态：`V2-3` / `PLAN_REVISION`
+- 类型：`eval`
+- 对应方案：用户要求的原 PoG 栈（supervised relation memory + 约束编译），**不是** V2 reflection，不是 V2-3 重跑
+- 代码：同 LOG-064/065。进程已退出，n=150 评测写入 run_meta
+- 配置：relation_memory=prompt top2 hybrid stages=relation；constraint_pushdown=on；routing=auto；kg_memory=none；GPU 4
+- 产物：
+  - hard150 `result/..._slice-hard150-v1_n150_20260821_002352` EM **0.2200（33/150）** F1 0.1992 calls 15.38 tokens 11939 秒/题 32.22
+  - random150 `result/..._slice-random150-v1_n150_20260821_002358` EM **0.8933（134/150）** F1 0.7811 calls 7.27 tokens 5166 秒/题 15.55
+- 结果：
+
+`random150_v1`（能力主评估切片；各方法独立，不得混成同一系统）：
+
+| 方法 | EM | F1 | calls | tokens |
+|---|---|---|---|---|
+| **原栈 本次复跑** | **0.8933（134/150）** | **0.7811** | **7.27** | **5166** |
+| 原栈 20260814 全量子集 | 0.8533（128/150） | 0.7417 | 8.55 | 6068 |
+| V2 R0 无 memory | 0.8533（128/150） | 0.7239 | 15.62 | 9709 |
+| V2 R2 Decision B | 0.8067（121/150） | 0.7032 | 15.79 | 10407 |
+| V2 RC1 shuffle | 0.8133（122/150） | 0.7028 | 10.21 | 7969 |
+| V2 RC2 irrelevant | 0.7867（118/150） | 0.6891 | 12.03 | 8331 |
+
+`hard150_v1`（压力切片，**不是**能力主结果）：
+
+| 方法 | EM | F1 | calls | tokens |
+|---|---|---|---|---|
+| **原栈 本次复跑** | **0.2200（33/150）** | **0.1992** | 15.38 | 11939 |
+| 原栈 20260814 全量子集 | 0.0000（0/150） | 0.0152 | 9.19 | 6647 |
+| V2 R0 无 memory | 0.1800（27/150） | 0.1601 | 14.41 | 10289 |
+| V2 R2 Decision B | 0.2000（30/150） | 0.1792 | 12.81 | 9083 |
+| V2 R1 Decision A | 0.1733（26/150） | 0.1664 | 16.57 | 12328 |
+| V2 RC1 / RC2 | 0.1800 / 0.1733 | 0.1613 / 0.1537 | 17.77 / 16.12 | 13234 / 12295 |
+| 档案 M1 / 旧 B0 | 0.1933 / 0.1733 | — | — | — |
+
+20260814 子集在 hard150 上为 0 是切片定义（该跑数当时全错）。本次 T=0.3 复跑在难切片上对了 33 题，在 random150 上相对同切片 V2 R0 净 +6、calls/tokens 约减半。这支持「supervised relation memory + 约束编译」强于 V2 无记忆 R0 与失败的 R2，**不能**翻成 V2-3 reflection 有效。
+
+- 异常：无。进程已结束。不得与 R2 混报
+- 结论：原栈切片评测完成。V2 reflection 判定回到 `GATE_HOLD`。不得进 V2-4 / Self-Play
+- 判定后状态：`V2-3` / `GATE_HOLD` / 原栈评测已记，reflection 仍停止扩大
 
 ---
