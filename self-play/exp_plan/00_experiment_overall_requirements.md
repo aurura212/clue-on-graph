@@ -1,7 +1,7 @@
 # PoG Self-Play 经验记忆实验总体要求
 
 > 文档编号：SP-GENERAL  
-> 版本：1.15
+> 版本：1.16
 > 制定日期：2026-08-21  
 > 实验根目录：clue_on_graph/self-play/  
 > 状态：生效，后续每一步实验均须遵守
@@ -75,17 +75,19 @@ self-play/
 
 ## 2.5 当前实验阶段与阶段更新规则
 
-当前总体阶段为：**SP2-B 启动准备：无 Memory 的 LLM+KG 端到端基线（计划已登记，尚未运行）**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。
+当前总体阶段为：**阶段间等待：SP2-B 无 Self-Play Experience Memory 的 LLM+KG 端到端基线已 PASS 并收口，不启动 SP3**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。SP2-B 已于 2026-08-22 验收 PASS。
 
-- 对应计划文件：04_SP2B_llm_kg_baseline_rollout.md（已登记，尚未运行）
-- 主实验状态：SP2-A 基础 live KG 环境验证 PASS；补充实验已补齐真实非空 TAIL 正向语义和由第一跳真实返回驱动的动态两跳证据
-- 当前状态：SP2-A 含补充已 PASS 并收口；SP2-B 已完成启动登记但尚未运行。SP2-B 只建立无 Self-Play Experience Memory 的 LLM+KG 在线基线，不生成或注入 Self-Play 经验；原 PoG 题内 `pog_working_memory` 允许存在，但必须题内隔离、写入当前 Run 的 scratch 路径且不得跨题或跨 Run 复用；SP2-B 不运行 WebQSP 150/CWQ 50 正式效果对比
-- 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter + 已验证的 live KG Environment binding（含 TAIL-positive 与动态两跳）
-- 当前允许工作：执行 SP2-B 计划规定的启动前检查、代码实现和无 memory rollout；正式运行前必须冻结模型、prompt、预算、任务 registry、配置和审计规则
+- 对应计划文件：04_SP2B_llm_kg_baseline_rollout.md（已完成 PASS 并收口）
+- 主实验状态：SP2-B 无 Self-Play Experience Memory 的 LLM+live KG 端到端基线 PASS；B0/B1/B2 均可终止、轨迹完整、可重放
+- 当前状态：SP2-B 已 PASS 并收口。本阶段不生成或注入 Self-Play 经验，不报告 WebQSP 150/CWQ 50 正式效果对比，也不将 B2 smoke 的提交率写成 EM/F1。进入 SP3 前必须另行登记计划，不得在本收口中自动启动经验生成
+- 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter + 已验证的 live KG Environment + 已冻结的无 memory LLM+KG 在线运行协议
+- 当前允许工作：整理 SP2-B 报告与失败边界；不得启动 SP3、不得写入 candidate/promoted memory、不得根据 B2 调参
 - 冻结评测集：`artifacts/datasets/webqsp_smoke_20.jsonl`（20，仅冒烟）、`webqsp_model_compare_150.jsonl`（150）、`cwq_model_compare_50.jsonl`（50）；后续只校验哈希，不得重抽
 - SP2-A 有效 run：`sp2a-20260822T082704Z-28a5bc97`
 - SP2-A 补充有效 run：`sp2a-supp-20260822T111116Z-79aa8ea8`
 - SP2-A 报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
+- SP2-B 有效 run：`sp2b-20260822T131350Z-b70a898b`
+- SP2-B 报告：`reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`
 
 每个阶段的实验工作结束后，必须完成阶段收口。阶段收口的强制顺序为：
 
@@ -105,7 +107,7 @@ self-play/
 | SP1 | 2026-08-22 | 02_SP1_pog_adapter_and_environment_binding.md | 已完成 PASS（2026-08-22） | E1.1-E1.12 全部通过；有效 run `sp1-20260822T030044Z-8cb155e0`。报告：`reports/sp1/SP1_experiment_report.md` SHA-256 `5eebd53383e417a65a85dac8a42c1b2db494226bb7ab269bea7f878e51b9d333`。已完成阶段收口 |
 | SP2-A | 2026-08-22 | 03_SP2A_live_kg_environment_validation.md | 主实验已完成 PASS（2026-08-22） | E2A.1-E2A.7 全部通过；有效 run `sp2a-20260822T082704Z-28a5bc97`。报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`。基础实验已收口；TAIL/动态两跳由补充实验补齐 |
 | SP2-A-SUPPLEMENT | 2026-08-22 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） | S2A-S.1–S.4 与 replay 通过；有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`。报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`（第 13 节）。已完成重新收口；不启动 SP2-B |
-| SP2-B | 2026-08-22 | 04_SP2B_llm_kg_baseline_rollout.md | 已登记，启动准备中，尚未运行 | 首次正式使用 LLM+live KG；不读取或写入 Self-Play Experience Memory，但允许原 PoG 题内工作记忆；先执行 B0 少量人工核查，再执行 B1 独立开发任务，稳定后才允许 B2 WebQSP smoke 20 |
+| SP2-B | 2026-08-22 | 04_SP2B_llm_kg_baseline_rollout.md | 已完成 PASS（2026-08-22） | B0/B1/B2 均可终止且 replay 100%；有效 run `sp2b-20260822T131350Z-b70a898b`。报告：`reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`。不生成 Self-Play 经验，不以 B2 准确率为门槛；不启动 SP3 |
 
 ## 3. 实验核心思想
 
@@ -218,9 +220,9 @@ self-play/
 | SP1 | 原 PoG 决策点适配与最小环境绑定 | 02_SP1_pog_adapter_and_environment_binding.md | 已完成 PASS（2026-08-22） |
 | SP2-A | 真实 KG 环境验证 | 03_SP2A_live_kg_environment_validation.md | 主实验已完成 PASS（2026-08-22） |
 | SP2-A-SUPPLEMENT | SP2-A 补充：TAIL 正向语义与动态多跳验证 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） |
-| SP2-B | 无 Self-Play Experience Memory 的 LLM+KG 端到端基线 Rollout | 04_SP2B_llm_kg_baseline_rollout.md | 已登记，启动准备中，尚未运行 |
+| SP2-B | 无 Self-Play Experience Memory 的 LLM+KG 端到端基线 Rollout | 04_SP2B_llm_kg_baseline_rollout.md | 已完成 PASS（2026-08-22） |
 
-后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP2-A 主实验与补充实验均已 PASS 并收口；SP2-B 计划现已登记，但在完成启动前检查、配置和任务 registry 冻结前，不得进行正式 rollout。SP2-B 运行期间不得注入 memory，也不得运行 WebQSP 150/CWQ 50 正式效果评测。
+后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP2-B 已 PASS 并收口；在登记 SP3 计划并完成其启动前检查之前，不得生成或注入 Self-Play 经验，也不得运行 WebQSP 150/CWQ 50 正式效果评测。
 
 ## 9. 预期实验顺序与 LLM/KG 使用边界
 
@@ -319,3 +321,4 @@ CONDITIONAL PASS 只能用于不影响核心有效性、隔离性和复现性的
 | 2026-08-22 | 1.13 | SP2-A 补充实验验收 PASS 并完成重新收口；当前阶段改为阶段间等待，不启动 SP2-B | S2A-S.1–S.4 与 replay 通过；有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`；报告 `reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc` | SP2-A-SUPPLEMENT |
 | 2026-08-22 | 1.14 | 登记 SP2-B 无 Memory 的 LLM+KG 端到端基线计划，并将当前阶段切换为 SP2-B 启动准备 | SP2-A 主实验与补充实验均已 PASS 并收口；后续必须先建立可审计的无 memory 在线基线，再进入 SP3 经验生成 | SP2-B |
 | 2026-08-22 | 1.15 | 将 SP2-B 细化为启动检查、B0 人工核查、B1 独立开发任务、B2 WebQSP smoke 20 和阶段收口五步；区分原 PoG 题内工作记忆与 Self-Play Experience Memory | `main_freebase.py` 使用题内 `mem` 文件完成当前问题的工作状态，不能将其与待研究的跨题经验记忆混同；需要在保持原 PoG 行为的同时建立可审计的无 Self-Play Experience Memory 基线 | SP2-B |
+| 2026-08-22 | 1.16 | SP2-B 验收 PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP3 | B0/B1/B2 终止率与 replay 均为 100%；有效 run `sp2b-20260822T131350Z-b70a898b`；报告 `reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c` | SP2-B |

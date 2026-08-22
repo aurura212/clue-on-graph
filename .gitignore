@@ -34,3 +34,4 @@ PoG*.jsonl
 /PoG/gold_path_check*/
 /self-play/src/sp_memory/__pycache__/
 /self-play/tests/__pycache__/
+/self-play/runs/

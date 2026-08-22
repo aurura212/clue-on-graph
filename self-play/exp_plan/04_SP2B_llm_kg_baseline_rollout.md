@@ -3,12 +3,14 @@
 > 文档编号：SP2B-PLAN  
 > 版本：1.1  
 > 初始制定日期：2026-08-22  
-> 状态：已登记，尚未运行  
-> 当前阶段：SP2-B 启动准备  
-> 上位约束：`00_experiment_overall_requirements.md` v1.15  
+> 状态：已完成 PASS 并收口  
+> 当前阶段：SP2-B 阶段收口完成  
+> 上位约束：`00_experiment_overall_requirements.md` v1.16  
 > 前置计划：`01_SP0_protocol_workspace_and_data_contract.md`、`02_SP1_pog_adapter_and_environment_binding.md`、`03_SP2A_live_kg_environment_validation.md`、`03A_SP2A_supplement_tail_and_dynamic_multihop.md`  
 > 前置报告：`reports/sp2a/SP2A_experiment_report.md`  
-> 前置结论：SP0 PASS；SP1 PASS；SP2-A 主实验与补充实验均 PASS 并完成收口
+> 本阶段报告：`reports/sp2b/SP2B_experiment_report.md`  
+> 前置结论：SP0 PASS；SP1 PASS；SP2-A 主实验与补充实验均 PASS 并完成收口  
+> 本阶段结论：SP2-B PASS；有效 run `sp2b-20260822T131350Z-b70a898b`
 
 ## 1. 本步骤定位
 
@@ -303,7 +305,30 @@ self-play/artifacts/datasets/webqsp_smoke_20.jsonl
 
 ### 12.1 运行日志占位
 
-<!-- 在首次实现或运行后追加 LOG-SP2B-001。计划预注册内容不得无记录地覆盖。 -->
+### LOG-SP2B-001 — 2026-08-22 — 有效 run PASS
+
+- 日期：2026-08-22
+- Run ID：`sp2b-20260822T131350Z-b70a898b`（有效，manifest status=SUCCESS）
+- 计划版本：SP2B-PLAN 1.1；运行时 overall：SP-GENERAL 1.15（收口登记后 1.16）
+- 配置：`configs/sp2b_llm_kg_baseline_v1.json` SHA-256 `93723adadff56ab5c5fa340ed93b5df8e9175aca492c272b01284729e887124d`
+- Git：commit `577a8f946d25ef46adec96a0d9488b6a1df36ffc`，dirty
+- 模型：`gpt-3.5-turbo-0125`，provider openai_compatible，temperature 0.3/0.3，prompt `sp2b_actor_v1`
+- prompt inventory SHA-256：`9c55ecf7758da4805bf5e0d197ece9d21353d56281891c5a7eb8d77a16f6ffec`
+- B0 registry SHA-256：`7f4fc1634a62ce99730ac7757d328df1b5d4317c1c5f0c8ee2889fe6b2ea3bb7`
+- B1 registry SHA-256：`2ab618ceb7accee1ef217c52a4e9d0830260e3184585321baa872631e0464770`
+- B2：冻结 `webqsp_smoke_20.jsonl` SHA-256 `e8e6c393fecffcca9063b036c4802f50f0a86b0e0d1c219f50ca061e67585393`
+- endpoint/snapshot：`http://localhost:8890/sparql`（只读 POST）
+- 前置：SP2-A `sp2a-20260822T082704Z-28a5bc97`；补充 `sp2a-supp-20260822T111116Z-79aa8ea8`
+- 单元测试：75 通过
+- B0：n=4，terminated=1.0，replay=1.0，unclassified=0，真实 LLM=21
+- B1：n=20，trace_complete=1.0，replay=1.0，unclassified=0，真实 LLM=141
+- B2：n=20，terminated=1.0，replay=1.0，unclassified=0，真实 LLM=153；不以准确率为门槛
+- Self-Play Experience Memory 读写：0；`pog_working_memory` 按 task_id 隔离；Oracle 泄漏 0；secret_hits 0
+- baseline 未登记变化：0；`data/`、`cope_alias/` 只读快照不变
+- 失败分类：B0 `answer_extraction_failure` 1；B1 `answer_extraction_failure` 3 + `budget_insufficient` 1；B2 `answer_extraction_failure` 6 + `budget_insufficient` 3；无 `system_failure`、无未分类
+- 密钥：仅环境变量，未写入配置/日志/报告
+- 报告：`reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`
+- 结论：PASS。不启动 SP3，不生成 Self-Play 经验，不把本次写成 V2-5 或 KGQA 增益
 
 ### 12.2 计划变更记录
 

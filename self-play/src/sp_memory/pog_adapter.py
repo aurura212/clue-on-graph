@@ -236,9 +236,9 @@ class PoGAdapter:
         backtrack_state_policy: str = "unsupported",
         stage: str = "sp1",
     ) -> None:
-        if stage not in {"sp1", "sp2a"}:
+        if stage not in {"sp1", "sp2a", "sp2b"}:
             raise ProtocolError(ViolationCode.SCHEMA_ERROR, f"unsupported adapter stage {stage}")
-        if allow_llm:
+        if stage in {"sp1", "sp2a"} and allow_llm:
             raise ProtocolError(ViolationCode.SCHEMA_ERROR, f"{stage.upper()} adapter forbids allow_llm=true")
         env_is_live = bool(getattr(environment, "allow_live_kg", False)) if environment is not None else False
         if stage == "sp1":
@@ -246,16 +246,25 @@ class PoGAdapter:
                 raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP1 adapter forbids allow_live_kg=true")
             self.allow_live_kg = False
             self.environment = environment or EnvironmentBinding(allow_live_kg=False)
-        else:
+            self.allow_llm = False
+        elif stage == "sp2a":
             if not allow_live_kg:
                 raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP2-A adapter requires allow_live_kg=true")
             if environment is None:
                 raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP2-A adapter requires an explicit live environment")
             self.allow_live_kg = True
             self.environment = environment
+            self.allow_llm = False
+        else:
+            if not allow_live_kg:
+                raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP2-B adapter requires allow_live_kg=true")
+            if environment is None:
+                raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP2-B adapter requires an explicit live environment")
+            self.allow_live_kg = True
+            self.environment = environment
+            self.allow_llm = bool(allow_llm)
         self.stage = stage
         self.adapter_enabled = adapter_enabled
-        self.allow_llm = False
         self.backtrack_state_policy = backtrack_state_policy
         self.llm_calls_observed = 0
 
@@ -284,7 +293,8 @@ class PoGAdapter:
             relations.append(item)
         relations.sort(key=lambda item: (item.entity, item.relation, item.direction.value))
         snap.budget.used_frontier_size = len(frontier)
-        snap.budget.used_llm_calls = 0
+        if self.stage != "sp2b":
+            snap.budget.used_llm_calls = 0
         snap.budget.used_critic_rounds = 0
         remaining = remaining_budget_from(snap.budget, frontier)
         visible = {
@@ -361,7 +371,8 @@ class PoGAdapter:
                     applied.enumerated_relations.append(item)
                     seen.add(item.key())
         applied.budget.used_kg_calls += result.kg_call_delta
-        applied.budget.used_llm_calls = 0
+        if self.stage != "sp2b":
+            applied.budget.used_llm_calls = 0
         applied.budget.used_critic_rounds = 0
         return applied, result
 
@@ -464,8 +475,11 @@ class PoGAdapter:
         applied.budget.used_steps += 1
         if env_result is not None:
             applied.budget.used_kg_calls += env_result.kg_call_delta
-        applied.budget.used_llm_calls = 0
-        applied.budget.used_critic_rounds = 0
+        if self.stage != "sp2b":
+            applied.budget.used_llm_calls = 0
+            applied.budget.used_critic_rounds = 0
+        else:
+            applied.budget.used_critic_rounds = 0
         applied.budget.used_frontier_size = len(_unicode_sort(applied.frontier))
         applied.action_history_summary = list(applied.action_history_summary) + [
             self._history_item(action)
@@ -506,7 +520,8 @@ class PoGAdapter:
                     snapshot.frontier.append(node)
                     new_frontier.append(node)
         snapshot.observed_triples = sort_triples(snapshot.observed_triples)
-        snapshot.budget.used_depth += 1
+        if self.stage != "sp2b":
+            snapshot.budget.used_depth += 1
         return new_frontier
 
     def _reject_unsupported_backtrack(

@@ -1,0 +1,94 @@
+{
+  "protocol_version": "sp-protocol-v1",
+  "registry_version": "sp2b-b0-manual-v1",
+  "plan_version": "SP2B-PLAN 1.1",
+  "layer": "B0",
+  "source": "independently_authored_public_freebase_manual_checks",
+  "sampled_from_eval_sets": false,
+  "notes": [
+    "B0 checks the LLM+KG pipeline, not model accuracy.",
+    "Oracle fields live only under the top-level oracle object and are Verifier-only.",
+    "Actor loaders must call public_task_view and never copy oracle into prompts."
+  ],
+  "tasks": [
+    {
+      "task_id": "sp2b.b0.onehop.obama_birthplace",
+      "layer": "B0",
+      "usage_tags": ["one_hop", "entity_relation"],
+      "coverage": "one_hop_entity_relation",
+      "question": "Where was Barack Obama born?",
+      "source_entities": ["m.02mjmr"],
+      "source_entity_names": {"m.02mjmr": "Barack Obama"},
+      "topic_entity": {"m.02mjmr": "Barack Obama"},
+      "allow_multihop": false,
+      "max_depth": 2,
+      "answer_type": "entity"
+    },
+    {
+      "task_id": "sp2b.b0.twohop.obama_birth_containedby",
+      "layer": "B0",
+      "usage_tags": ["two_hop", "dynamic_state"],
+      "coverage": "two_hop_or_consecutive_state_update",
+      "question": "Which larger place contains the birthplace of Barack Obama?",
+      "source_entities": ["m.02mjmr"],
+      "source_entity_names": {"m.02mjmr": "Barack Obama"},
+      "topic_entity": {"m.02mjmr": "Barack Obama"},
+      "allow_multihop": true,
+      "max_depth": 3,
+      "answer_type": "entity"
+    },
+    {
+      "task_id": "sp2b.b0.literal.obama_birthdate",
+      "layer": "B0",
+      "usage_tags": ["literal", "answer_submission"],
+      "coverage": "literal_or_answer_submission",
+      "question": "On what date was Barack Obama born?",
+      "source_entities": ["m.02mjmr"],
+      "source_entity_names": {"m.02mjmr": "Barack Obama"},
+      "topic_entity": {"m.02mjmr": "Barack Obama"},
+      "allow_multihop": false,
+      "max_depth": 2,
+      "answer_type": "literal"
+    },
+    {
+      "task_id": "sp2b.b0.empty.obama_death",
+      "layer": "B0",
+      "usage_tags": ["empty_result", "early_stop"],
+      "coverage": "empty_result_or_early_stop",
+      "question": "On what date did Barack Obama die?",
+      "source_entities": ["m.02mjmr"],
+      "source_entity_names": {"m.02mjmr": "Barack Obama"},
+      "topic_entity": {"m.02mjmr": "Barack Obama"},
+      "allow_multihop": false,
+      "max_depth": 2,
+      "answer_type": "empty"
+    }
+  ],
+  "oracle": {
+    "sp2b.b0.onehop.obama_birthplace": {
+      "answer_entity_ids": ["m.02hrh0_"],
+      "normalized_answers": ["Honolulu"],
+      "verifier_rule": "exact_id_or_name",
+      "oracle_version": "sp2b-b0-v1"
+    },
+    "sp2b.b0.twohop.obama_birth_containedby": {
+      "answer_entity_ids": ["m.03gh4", "m.09c7w0"],
+      "normalized_answers": ["Hawaii", "United States of America", "United States"],
+      "verifier_rule": "observed_optional",
+      "oracle_version": "sp2b-b0-v1",
+      "notes": "Second-hop entity must come from hop-1 live results; Verifier does not feed this to Actor."
+    },
+    "sp2b.b0.literal.obama_birthdate": {
+      "answer_entity_ids": [],
+      "normalized_answers": ["1961-08-04"],
+      "verifier_rule": "literal_contains",
+      "oracle_version": "sp2b-b0-v1"
+    },
+    "sp2b.b0.empty.obama_death": {
+      "answer_entity_ids": [],
+      "normalized_answers": [],
+      "verifier_rule": "empty_or_abstain",
+      "oracle_version": "sp2b-b0-v1"
+    }
+  }
+}

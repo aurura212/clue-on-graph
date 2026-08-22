@@ -27,6 +27,8 @@ from .schemas import Direction
 FREEBASE_NS = "http://rdf.freebase.com/ns/"
 QUERY_KIND_ENTITY_SEARCH = "entity_search"
 QUERY_KIND_CONNECTIVITY = "connectivity"
+QUERY_KIND_RELATION_SEARCH = "relation_search"
+QUERY_KIND_NAME_LOOKUP = "name_lookup"
 HTTP_METHOD = "POST"
 
 # Exact copies of freebase_func.py templates used by entity_search.
@@ -49,6 +51,36 @@ SPARQL_CONNECTIVITY = (
     "SELECT ?tailEntity WHERE {\n"
     "  ns:m.02mjmr ns:type.object.name ?tailEntity .\n"
     "} LIMIT 5"
+)
+# Exact copies of freebase_func.py relation-list and name-lookup templates.
+SPARQL_HEAD_RELATIONS = (
+    "\nPREFIX ns: <http://rdf.freebase.com/ns/>\n"
+    "SELECT DISTINCT ?relation\n"
+    "WHERE {\n"
+    "  ns:%s ?relation ?x .\n"
+    "}"
+)
+SPARQL_TAIL_RELATIONS = (
+    "\nPREFIX ns: <http://rdf.freebase.com/ns/>\n"
+    "SELECT DISTINCT ?relation\n"
+    "WHERE {\n"
+    "  ?x ?relation ns:%s .\n"
+    "}"
+)
+SPARQL_ID = (
+    "PREFIX ns: <http://rdf.freebase.com/ns/>\n"
+    "SELECT DISTINCT ?tailEntity\n"
+    "WHERE {\n"
+    "  {\n"
+    "    ?entity ns:type.object.name ?tailEntity .\n"
+    "    FILTER(?entity = ns:%s)\n"
+    "  }\n"
+    "  UNION\n"
+    "  {\n"
+    "    ?entity <http://www.w3.org/2002/07/owl#sameAs> ?tailEntity .\n"
+    "    FILTER(?entity = ns:%s)\n"
+    "  }\n"
+    "}"
 )
 
 WRITE_SPARQL_RE = re.compile(
@@ -282,6 +314,89 @@ def build_connectivity_request(*, endpoint: str) -> BuiltRequest:
     )
 
 
+def build_relation_search_request(
+    entity: str,
+    direction: Direction | str,
+    *,
+    endpoint: str,
+) -> BuiltRequest:
+    parsed = Direction(direction) if not isinstance(direction, Direction) else direction
+    if parsed is Direction.HEAD:
+        sparql = SPARQL_HEAD_RELATIONS % (entity,)
+        head = True
+    elif parsed is Direction.TAIL:
+        sparql = SPARQL_TAIL_RELATIONS % (entity,)
+        head = False
+    else:
+        raise ProtocolError(ViolationCode.INVALID_DIRECTION, f"unsupported direction {direction!r}")
+    assert_readonly_sparql(sparql)
+    clean_endpoint = redact_endpoint(endpoint)
+    params = {
+        "entity": entity,
+        "relation": None,
+        "direction": parsed.value,
+        "head": head,
+        "variable": "relation",
+    }
+    payload = {
+        "endpoint": clean_endpoint,
+        "method": HTTP_METHOD,
+        "query_kind": QUERY_KIND_RELATION_SEARCH,
+        "entity": entity,
+        "relation": None,
+        "direction": parsed.value,
+        "head": head,
+        "sparql": sparql,
+    }
+    return BuiltRequest(
+        query_kind=QUERY_KIND_RELATION_SEARCH,
+        entity=entity,
+        relation=None,
+        direction=parsed.value,
+        head=head,
+        sparql=sparql,
+        endpoint=clean_endpoint,
+        method=HTTP_METHOD,
+        request_hash=hash_request(payload),
+        params_summary=params,
+    )
+
+
+def build_name_lookup_request(entity: str, *, endpoint: str) -> BuiltRequest:
+    sparql = SPARQL_ID % (entity, entity)
+    assert_readonly_sparql(sparql)
+    clean_endpoint = redact_endpoint(endpoint)
+    params = {
+        "entity": entity,
+        "relation": "type.object.name",
+        "direction": Direction.HEAD.value,
+        "head": True,
+        "variable": "tailEntity",
+    }
+    payload = {
+        "endpoint": clean_endpoint,
+        "method": HTTP_METHOD,
+        "query_kind": QUERY_KIND_NAME_LOOKUP,
+        "entity": entity,
+        "relation": "type.object.name",
+        "direction": Direction.HEAD.value,
+        "head": True,
+        "sparql": sparql,
+    }
+    return BuiltRequest(
+        query_kind=QUERY_KIND_NAME_LOOKUP,
+        entity=entity,
+        relation="type.object.name",
+        direction=Direction.HEAD.value,
+        head=True,
+        sparql=sparql,
+        endpoint=clean_endpoint,
+        method=HTTP_METHOD,
+        request_hash=hash_request(payload),
+        params_summary=params,
+    )
+
+
 def original_templates_from_source(source_text: str) -> Dict[str, str]:
     import ast
 
@@ -308,26 +423,28 @@ def templates_match_original(source_text: str) -> Dict[str, Any]:
     }
 
 
-def normalize_bindings(bindings: Any) -> List[NormalizedTarget]:
+def normalize_bindings(bindings: Any, variable: str = "tailEntity") -> List[NormalizedTarget]:
     if not isinstance(bindings, list):
         raise MalformedSparql("results.bindings is not a list")
+    if not variable:
+        raise MalformedSparql("binding variable is empty")
     targets: List[NormalizedTarget] = []
     for index, item in enumerate(bindings):
         if not isinstance(item, dict):
             raise MalformedSparql(f"binding {index} is not an object")
-        if "tailEntity" not in item:
-            raise MalformedSparql(f"binding {index} missing tailEntity")
-        node = item["tailEntity"]
+        if variable not in item:
+            raise MalformedSparql(f"binding {index} missing {variable}")
+        node = item[variable]
         if not isinstance(node, dict) or "value" not in node:
-            raise MalformedSparql(f"binding {index} tailEntity missing value")
+            raise MalformedSparql(f"binding {index} {variable} missing value")
         raw = node["value"]
         if not isinstance(raw, str) or not raw:
-            raise MalformedSparql(f"binding {index} tailEntity value is not a non-empty string")
+            raise MalformedSparql(f"binding {index} {variable} value is not a non-empty string")
         term_type = str(node.get("type") or "unknown")
         targets.append(
             NormalizedTarget(
                 value=strip_freebase_prefix(raw),
-                source_location=f"results.bindings[{index}].tailEntity.value",
+                source_location=f"results.bindings[{index}].{variable}.value",
                 binding_index=index,
                 term_type=term_type,
             )
@@ -529,7 +646,8 @@ class LiveSparqlClient:
             )
         try:
             bindings = parse_sparql_json(raw.body)
-            targets = normalize_bindings(bindings)
+            variable = str(request.params_summary.get("variable") or "tailEntity")
+            targets = normalize_bindings(bindings, variable=variable)
         except MalformedSparql as exc:
             return self._failed_exchange(
                 request,

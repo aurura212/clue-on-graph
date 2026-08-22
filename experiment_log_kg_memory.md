@@ -24,18 +24,18 @@
 | 字段 | 值 |
 |---|---|
 | 更新日期 | 2026-08-22 |
-| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0+SP1+SP2-A（含补充）已 PASS，**不是** V2-5 Self-Play |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0+SP1+SP2-A（含补充）+**SP2-B** 已 PASS，**不是** V2-5 Self-Play |
 | 当前 Phase | `V2-3` |
-| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A 含补充不改变本判定 |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A/SP2-B 不改变本判定 |
 | 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
 | 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
 | **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
 | 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
-| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A（含补充）PASS 不构成进入 V2-5 的许可，也不得未在 `self-play/exp_plan/` 登记就启动 SP2-B |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A/SP2-B PASS 不构成进入 V2-5 的许可，也不得未在 `self-play/exp_plan/` 登记就启动 SP3 |
 
 ### 下一步（唯一允许的动作）
 
-V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP2-A 含补充已 PASS 并收口；若继续该实验空间，下一步须先按 `self-play/exp_plan/` 登记 SP2-B，不得当作本日志的 V2-5。
+V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP2-B 已 PASS 并收口；若继续该实验空间，下一步须先按 `self-play/exp_plan/` 登记 SP3，不得当作本日志的 V2-5。
 
 ---
 
@@ -1685,6 +1685,22 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 结果：登记 SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc` 与仓库 LF 文件一致。另一值 `beb43d7a…` 是同一文件 CRLF 转写的哈希
 - 异常：无内容漂移
 - 结论：收口哈希有效，不重登。V2 判定不变。不得未登记启动 SP2-B
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-072 — 2026-08-22 — 独立 self-play/ SP2-B LLM+KG 基线 PASS（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.15（收口后 1.16）与 `04_SP2B_llm_kg_baseline_rollout.md`。**不是** V2 §16.2 / V2-5 Self-Play，也不是 KGQA/memory 增益实验
+- 代码：仅 `self-play/` 内 LLM wrapper、O0 prompt、动作解析、rollout、SP2-B checks、配置、registry 与产物；未改 V2 R2，未改原 PoG 基线文件，未改原栈推理配置。Git `577a8f946d25ef46adec96a0d9488b6a1df36ffc` dirty
+- 配置：`self-play/configs/sp2b_llm_kg_baseline_v1.json` SHA-256 `93723adadff56ab5c5fa340ed93b5df8e9175aca492c272b01284729e887124d`；模型 `gpt-3.5-turbo-0125`；endpoint `http://localhost:8890/sparql`；Self-Play Experience Memory 关闭；题内 `pog_working_memory` 隔离到当前 Run
+- 产物：有效 run `sp2b-20260822T131350Z-b70a898b`；未覆盖 SP2-A runs
+- 结果：B0 n=4 / B1 n=20 / B2 n=20 终止率与 replay 均为 100%，未分类 0。真实 LLM B0 21 + B1 141 + B2 153。Self-Play Experience Memory 读写 0。不以 B2 提交率作为 EM/F1
+- 报告：`self-play/reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`
+- 异常：多跳可能过早 STOP；空结果常落成 `answer_extraction_failure`；无信息关系可能耗尽 LLM 预算。均已分类，不掩盖
+- 结论：独立 SP2-B PASS 并收口。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 或 memory 有效。不得未登记就启动 SP3
 - 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---
