@@ -1,0 +1,12 @@
+[
+  {
+    "head": "e.alice",
+    "relation": "people.person.friend",
+    "tail": "e.bob"
+  },
+  {
+    "head": "e.bob",
+    "relation": "people.person.place_of_birth",
+    "tail": "e.paris"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "dataset": "webqsp",
+    "split": "test",
+    "task_id": "WebQTest-fixture-1",
+    "normalized_question_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "topic_entities": ["m.abc"],
+    "answer_entities": ["m.def"],
+    "exposure_source": "sp0_fixture",
+    "exposed_at": "2026-08-22T00:00:00Z",
+    "protocol_version": "sp-protocol-v1"
+  }
+]

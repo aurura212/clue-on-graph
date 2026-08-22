@@ -1,0 +1,9 @@
+python main_freebase.py \
+    --dataset webqsp \
+    --max_length 4096 \
+    --temperature_exploration 0.3 \
+    --temperature_reasoning 0.3 \
+    --depth 4 \
+    --remove_unnecessary_rel True \
+    --LLM_type gpt-3.5-turbo-0125 \
+    --opeani_api_keys sk-MkBT5fWL6211EE2Cb33aT3BLbkFJ69557aEb83f4492Ea869 \

@@ -1,0 +1,64 @@
+{
+  "round": "SP0",
+  "plan_version": "SP0-PLAN 1.4",
+  "protocol_version": "sp-protocol-v1",
+  "conclusion": "PASS",
+  "report_date": "2026-08-22",
+  "valid_run_ids": [
+    "sp0-20260821T163544Z-59a85acf",
+    "sp0-20260821T163555Z-fec2b10a"
+  ],
+  "git_commit": "1ac662cc15ceefde6614a416183f3a8aae6d0b49",
+  "git_dirty": true,
+  "config_sha256": "2b97a232b5fa43a3dc827c63a280355ed48ee64206aeefa5a74d49f5d40618e3",
+  "input_registry_content_hash": "e4626a77c6a1a8d19242e46c66039b4d1684ef3fe5d9892e6f324caa09b337b5",
+  "eval_set_manifest_hash": "f6dd56a5b9a2937ad5e1964a25570a410e9be8720254551c78ca7f69e28226be",
+  "eval_sampling_seed": 20260821,
+  "unit_tests": {
+    "tests_run": 33,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "metrics": {
+    "illegal_write_reject_rate": 1.0,
+    "shared_input_hash_changes": 0,
+    "legal_schema_action_accept_rate": 1.0,
+    "illegal_schema_action_reject_rate": 1.0,
+    "oracle_leak_detection_rate": 1.0,
+    "o0_sensitive_field_count": 0,
+    "same_input_replay_agreement": 1.0,
+    "registry_rebuild_agreement": 1.0,
+    "critical_check_pass_rate": 1.0,
+    "unclassified_exceptions": 0,
+    "webqsp_smoke_n": 20,
+    "webqsp_model_compare_n": 150,
+    "cwq_model_compare_n": 50
+  },
+  "frozen_eval_sets": {
+    "webqsp_smoke_20": {
+      "n": 20,
+      "file_sha256": "e8e6c393fecffcca9063b036c4802f50f0a86b0e0d1c219f50ca061e67585393",
+      "source_sha256": "3057f5b9cbdaf8580b0e971fbbf78000b4905670c92e5b6a38c9a59750bcf0d1"
+    },
+    "webqsp_model_compare_150": {
+      "n": 150,
+      "file_sha256": "37276867bb297991e83c335a6d4bb4f5657642fae2c77fb16eeac56eb310628c",
+      "source_sha256": "3057f5b9cbdaf8580b0e971fbbf78000b4905670c92e5b6a38c9a59750bcf0d1"
+    },
+    "cwq_model_compare_50": {
+      "n": 50,
+      "file_sha256": "fa5f957de02ac804253d722fc1cc1a22652450a0480a1b5b4bd582ab4c5cb25b",
+      "source_sha256": "147e7e1ee5f73c1d9ceba7a031c23b27a1ecddd57c55efff4541f74da41e97df"
+    }
+  },
+  "experiments": {
+    "E0.1": "PASS",
+    "E0.2": "PASS",
+    "E0.3": "PASS",
+    "E0.4": "PASS",
+    "E0.5": "PASS",
+    "E0.6": "PASS",
+    "E0.7": "PASS"
+  }
+}

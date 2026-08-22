@@ -1,0 +1,117 @@
+{
+  "protocol_version": "sp-protocol-v1",
+  "plan_version": "SP0-PLAN 1.4",
+  "workspace_policy": {
+    "write_root": "self-play",
+    "read_only_input_roots": ["../data", "../cope_alias"]
+  },
+  "oracle_policy": {
+    "online_actor_level": "O0",
+    "online_critic_level": "O0",
+    "verifier_level": "O4",
+    "offline_feedback_levels": ["O1", "O2", "O3"]
+  },
+  "budgets": {
+    "max_depth": 4,
+    "max_steps": 12,
+    "max_kg_calls": 16,
+    "max_llm_calls": 8,
+    "max_critic_rounds": 2,
+    "max_frontier_size": 80
+  },
+  "eval_sampling": {
+    "seed": 20260821,
+    "method": "shuffle_then_slice_without_replacement",
+    "webqsp_source": "WebQSP.json",
+    "cwq_source": "cwq.json",
+    "notes": [
+      "Seed is used only when building the frozen eval sets for the first time.",
+      "WebQSP smoke uses shuffled ids [0:20]; model-compare uses [20:170]; the two slices are disjoint.",
+      "CWQ model-compare uses shuffled ids [0:50] from a separate population."
+    ]
+  },
+  "input_registry": {
+    "include": [
+      {
+        "root": "data",
+        "relpath": "WebQSP.json",
+        "usage_tag": "webqsp_source",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["eval_sampling", "exclusion"]
+      },
+      {
+        "root": "data",
+        "relpath": "cwq.json",
+        "usage_tag": "cwq_source",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["eval_sampling", "exclusion"]
+      },
+      {
+        "root": "data",
+        "relpath": "datasets/webqsp_test_for_abs.json",
+        "usage_tag": "webqsp_related_split",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["exclusion"]
+      },
+      {
+        "root": "data",
+        "relpath": "datasets/cwq_test_for_abs.json",
+        "usage_tag": "cwq_related_split",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["exclusion"]
+      },
+      {
+        "root": "data",
+        "relpath": "datasets/webqsp_split.jsonl",
+        "usage_tag": "webqsp_related_split",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["exclusion"]
+      },
+      {
+        "root": "data",
+        "relpath": "datasets/cwq_split.json",
+        "usage_tag": "cwq_related_split",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["exclusion"]
+      },
+      {
+        "root": "cope_alias",
+        "relpath": "WQSP_aliase_data.json",
+        "usage_tag": "webqsp_alias",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["eval_alias", "exclusion"]
+      },
+      {
+        "root": "cope_alias",
+        "relpath": "CWQ_aliase_data31158.json",
+        "usage_tag": "cwq_alias",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["eval_alias", "exclusion"]
+      },
+      {
+        "root": "cope_alias",
+        "relpath": "cwq_aname_dict.json",
+        "usage_tag": "cwq_alias",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["eval_alias", "exclusion"]
+      },
+      {
+        "root": "cope_alias",
+        "relpath": "ComplexWebQuestions_test_wans.json",
+        "usage_tag": "cwq_related",
+        "contains_benchmark_question_answer_or_alias": true,
+        "allowed_uses": ["exclusion"]
+      }
+    ],
+    "exclude": [
+      {"root": "data", "relpath": "grailqa.json", "reason": "GrailQA is outside SP0 WebQSP/CWQ eval freeze"},
+      {"root": "data", "relpath": "datasets/grailqa.json", "reason": "GrailQA is outside SP0 WebQSP/CWQ eval freeze"},
+      {"root": "data", "relpath": "datasets/tableqa/wikisql_test.json", "reason": "table QA, unrelated and large"},
+      {"root": "data", "relpath": "datasets/tableqa/wikitq_test.json", "reason": "table QA, unrelated and large"},
+      {"root": "data", "relpath": "datasets/metaQA/kb.txt", "reason": "MetaQA KB, unrelated and large"},
+      {"root": "data", "relpath": "contriever_fb_relation/freebase_contriever_index/index", "reason": "retrieval index binary, not a question file"},
+      {"root": "data", "relpath": "raw_train_set/WebQSP.train.json", "reason": "train split reserved; SP0 eval freeze uses WebQSP.json"},
+      {"root": "data", "relpath": "raw_train_set/ComplexWebQuestions_train.json", "reason": "train split reserved; SP0 eval freeze uses cwq.json"}
+    ]
+  }
+}

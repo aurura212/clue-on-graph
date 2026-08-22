@@ -23,19 +23,19 @@
 
 | 字段 | 值 |
 |---|---|
-| 更新日期 | 2026-08-21 |
-| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果） |
+| 更新日期 | 2026-08-22 |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：用户要求的独立 `self-play/` SP0 协议冻结已 PASS，**不是** V2-5 Self-Play |
 | 当前 Phase | `V2-3` |
-| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成 |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0 不改变本判定 |
 | 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
 | 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
 | **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
 | 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
-| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得 Self-Play。不得改 R2 后重跑 random150。 |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0 PASS 不构成进入 V2-5 的许可 |
 
 ### 下一步（唯一允许的动作）
 
-V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。
+V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP0 已 PASS，其下一步 SP1 只在该实验空间内按 `self-play/exp_plan/` 推进，不得当作本日志的 V2-5。
 
 ---
 
@@ -1611,5 +1611,19 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 异常：无。进程已结束。不得与 R2 混报
 - 结论：原栈切片评测完成。V2 reflection 判定回到 `GATE_HOLD`。不得进 V2-4 / Self-Play
 - 判定后状态：`V2-3` / `GATE_HOLD` / 原栈评测已记，reflection 仍停止扩大
+
+---
+
+### LOG-067 — 2026-08-22 — 独立 self-play/ SP0 协议冻结 PASS（不是 V2-5）
+
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` 与 `01_SP0_protocol_workspace_and_data_contract.md`。**不是** V2 §16.2 / V2-5 Self-Play
+- 代码：仅新增 `self-play/src/sp_memory/`、`self-play/scripts/`、`self-play/tests/`、配置与产物；未改 V2 R2，未改原栈推理配置
+- 命令：`python3 self-play/scripts/run_sp0_checks.py` 两次
+- 有效 run：`sp0-20260821T163544Z-59a85acf`、`sp0-20260821T163555Z-fec2b10a`
+- 结果：E0.1-E0.7 PASS。冻结 WebQSP smoke 20 / model-compare 150 / CWQ 50。无 LLM、无 EM/F1、无 memory 注入
+- 报告：`self-play/reports/sp0/SP0_experiment_report.md`
+- 异常：无
+- 结论：独立 SP0 PASS。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 已开始
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---

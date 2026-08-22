@@ -1,0 +1,14 @@
+{
+  "protocol_version": "sp-protocol-v1",
+  "plan_version": "SP0-PLAN 1.4",
+  "frozen_at": "2026-08-22",
+  "conclusion": "PASS",
+  "config_path": "configs/sp0_protocol_v1.json",
+  "config_sha256": "2b97a232b5fa43a3dc827c63a280355ed48ee64206aeefa5a74d49f5d40618e3",
+  "eval_sampling_seed": 20260821,
+  "eval_set_manifest": "artifacts/datasets/eval_set_manifest_v1.json",
+  "eval_set_manifest_hash": "f6dd56a5b9a2937ad5e1964a25570a410e9be8720254551c78ca7f69e28226be",
+  "input_registry": "artifacts/registries/input_registry_v1.json",
+  "input_registry_content_hash": "e4626a77c6a1a8d19242e46c66039b4d1684ef3fe5d9892e6f324caa09b337b5",
+  "report": "reports/sp0/SP0_experiment_report.md"
+}

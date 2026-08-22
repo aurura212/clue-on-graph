@@ -3,7 +3,7 @@
 > 文档编号：SP0-PLAN  
 > 版本：1.4  
 > 制定日期：2026-08-21  
-> 状态：待实施  
+> 状态：已完成 PASS  
 > 前置必读：00_experiment_overall_requirements.md
 
 ## 1. 本步骤定位
@@ -412,7 +412,10 @@ SP0 通过后，尚不能直接开始下一阶段实现，也不能直接向现�
 
 | 日志 ID | 日期时间 | 类型 | Run ID/Commit | 状态 | 简述 |
 |---|---|---|---|---|---|
-| 待填写 | 待填写 | 实现/测试/变更/验收 | 待填写 | 待填写 | 待填写 |
+| SP0-LOG-001 | 2026-08-22 | 实现 | commit `1ac662cc` dirty | SUCCESS | 落地 sp-protocol-v1 代码、测试、配置与脚本 |
+| SP0-LOG-002 | 2026-08-22 | 测试 | `sp0-20260821T163544Z-59a85acf` | SUCCESS | 首次一键检查；构建 20/150/50 固定评测集 |
+| SP0-LOG-003 | 2026-08-22 | 测试 | `sp0-20260821T163555Z-fec2b10a` | SUCCESS | 第二次一键检查只校验、不重抽；build 模式拒绝覆盖 |
+| SP0-LOG-004 | 2026-08-22 | 验收 | 同上两次有效 run | SUCCESS | E0.1-E0.7 PASS；写入报告 `reports/sp0/` |
 
 ### 11.2 单次实现或运行记录模板
 
@@ -445,26 +448,29 @@ SP0 通过后，尚不能直接开始下一阶段实现，也不能直接向现�
 
 | 指标 | 目标 | 实际结果 | 证据文件 | 是否通过 |
 |---|---:|---:|---|---|
-| 越界写入拒绝率 | 100% | 待填写 | 待填写 | 待判断 |
-| 共享输入文件哈希变化数 | 0 | 待填写 | 待填写 | 待判断 |
-| 合法 Schema/动作接受率 | 100% | 待填写 | 待填写 | 待判断 |
-| 非法 Schema/动作拒绝率 | 100% | 待填写 | 待填写 | 待判断 |
-| Oracle 泄漏检测率 | 100% | 待填写 | 待填写 | 待判断 |
-| O0 view 敏感字段数 | 0 | 待填写 | 待填写 | 待判断 |
-| 同输入 replay 一致率 | 100% | 待填写 | 待填写 | 待判断 |
-| Registry 重建一致率 | 100% | 待填写 | 待填写 | 待判断 |
-| 关键检查通过率 | 100% | 待填写 | 待填写 | 待判断 |
-| 未分类异常数 | 0 | 待填写 | 待填写 | 待判断 |
-| WebQSP 冒烟样本量 | 20 | 待填写 | 待填写 | 待判断 |
-| WebQSP 模型对比样本量 | 150 | 待填写 | 待填写 | 待判断 |
-| CWQ 模型对比样本量 | 50 | 待填写 | 待填写 | 待判断 |
-| 抽样清单重建一致率 | 100% | 待填写 | 待填写 | 待判断 |
+| 越界写入拒绝率 | 100% | 100% | `runs/sp0-20260821T163555Z-fec2b10a/sp0_check_result.json` E0.1 | 通过 |
+| 共享输入文件哈希变化数 | 0 | 0 | 同上；input registry live mismatch=0 | 通过 |
+| 合法 Schema/动作接受率 | 100% | 100%（12/12） | 同上 E0.2 | 通过 |
+| 非法 Schema/动作拒绝率 | 100% | 100%（13/13） | 同上 E0.2 | 通过 |
+| Oracle 泄漏检测率 | 100% | 100%（8/8） | 同上 E0.3 | 通过 |
+| O0 view 敏感字段数 | 0 | 0 | 同上 E0.3 / E0.5 | 通过 |
+| 同输入 replay 一致率 | 100% | 100% | 同上 E0.5 | 通过 |
+| Registry 重建一致率 | 100% | 100% | 同上 E0.4；`artifacts/registries/input_registry_v1.json` | 通过 |
+| 关键检查通过率 | 100% | 100%（E0.1-E0.7） | 同上 | 通过 |
+| 未分类异常数 | 0 | 0 | 同上 | 通过 |
+| WebQSP 冒烟样本量 | 20 | 20 | `artifacts/datasets/webqsp_smoke_20.jsonl` | 通过 |
+| WebQSP 模型对比样本量 | 150 | 150 | `artifacts/datasets/webqsp_model_compare_150.jsonl` | 通过 |
+| CWQ 模型对比样本量 | 50 | 50 | `artifacts/datasets/cwq_model_compare_50.jsonl` | 通过 |
+| 抽样清单重建一致率 | 100% | 100% | 两次 run 后三文件哈希不变；`--mode build` 退出码 2 | 通过 |
 
 ### 11.4 问题与风险清单
 
 | ID | 发现时间 | 问题/风险 | 严重性 | 当前状态 | 处理或接受理由 |
 |---|---|---|---|---|---|
-| 待填写 | 待填写 | 待填写 | 高/中/低 | Open/Resolved/Accepted | 待填写 |
+| SP0-R1 | 2026-08-22 | Replay 仅为 fixture 图，未接 Freebase | 低 | Accepted | SP0 计划明确不要求完整 KG；不能当作 memory 证据 |
+| SP0-R2 | 2026-08-22 | Exclusion registry 仅 fixture 验证 | 中 | Accepted | 计划规定 SP0 只验证结构，不宣称正式 benchmark 隔离 |
+| SP0-R3 | 2026-08-22 | 工作树 dirty，代码尚未提交 | 低 | Open | 以报告中的文件哈希复现；提交需用户明确要求 |
+| SP0-R4 | 2026-08-22 | `pog_w.sh` 含 API key | 中 | Accepted | 只原地哈希，不复制进 run/报告正文 |
 
 ### 11.5 计划变更记录
 
@@ -476,16 +482,119 @@ SP0 通过后，尚不能直接开始下一阶段实现，也不能直接向现�
 
 ### 11.6 SP0 最终验收记录
 
-- **验收日期：** 待填写
+- **验收日期：** 2026-08-22
 - **计划版本：** SP0-PLAN 1.4
-- **协议版本与哈希：** 待填写
-- **代码 commit：** 待填写
-- **有效 Run ID：** 待填写
-- **E0.1-E0.7 结论：** 待填写
-- **未解决问题：** 待填写
-- **结论：** PASS / CONDITIONAL PASS / FAIL
-- **结论依据：** 待填写
-- **是否允许准备下一步计划：** 待判断
-- **下一步计划文件名称：** 通过后先生成并登记，当前不预设
-- **WebQSP/CWQ 抽样协议验收：** 待填写
-- **是否已更新总体文件当前阶段：** 待填写
+- **协议版本与哈希：** `sp-protocol-v1`；配置 SHA-256 `2b97a232b5fa43a3dc827c63a280355ed48ee64206aeefa5a74d49f5d40618e3`
+- **代码 commit：** `1ac662cc15ceefde6614a416183f3a8aae6d0b49`（dirty）
+- **有效 Run ID：** `sp0-20260821T163544Z-59a85acf`，`sp0-20260821T163555Z-fec2b10a`
+- **E0.1-E0.7 结论：** 全部 PASS
+- **未解决问题：** 见 SP0-R1 至 SP0-R4；均不构成 FAIL 条件
+- **结论：** PASS
+- **结论依据：** 单元测试 33/33；E0.1-E0.7 指标均达门槛；`data/` 与 `cope_alias/` 登记文件哈希无变化；越界写入 100% 拒绝；固定评测集 20/150/50 已冻结且第二次运行不改变哈希；报告见 `reports/sp0/SP0_experiment_report.md`
+- **是否允许准备下一步计划：** 是
+- **下一步计划文件名称：** `02_SP1_pog_adapter_and_environment_binding.md`
+- **WebQSP/CWQ 抽样协议验收：** PASS。seed=20260821；smoke 与 WebQSP model-compare 不相交；后续只校验不重抽
+- **是否已更新总体文件当前阶段：** 是（00 文件版本 1.6）
+
+### 11.7 追加运行记录
+
+#### [SP0-LOG-001] 实现 sp-protocol-v1
+
+- **日期时间：** 2026-08-22
+- **记录人：** Cursor Grok 4.6
+- **类型：** 实现
+- **状态：** SUCCESS
+- **Run ID：** 无（代码落地）
+- **Git commit 与 dirty status：** `1ac662cc15ceefde6614a416183f3a8aae6d0b49` dirty
+- **对应计划版本：** SP0-PLAN 1.4
+- **目标：** 按第 5 节实现路径边界、schema、可见性、动作校验、replay、registry、抽样和一键检查
+- **已阅读：** 00_experiment_overall_requirements.md、01_SP0_protocol_workspace_and_data_contract.md
+- **修改或新增文件：** `src/sp_memory/*`、`configs/sp0_protocol_v1.json`、`scripts/*.py`、`tests/*`。原 PoG 基线文件未改。相对计划额外拆分 `errors.py`、`hashing.py`、`config.py`、`registry.py`、`baseline.py`、`checks.py`
+- **实际命令：** 实现阶段无正式 run
+- **输入文件与哈希：** 只读使用 `data/WebQSP.json`、`data/cwq.json` 及 registry 列出的 alias/split 文件
+- **配置与哈希：** `configs/sp0_protocol_v1.json` SHA-256 `2b97a232b5fa43a3dc827c63a280355ed48ee64206aeefa5a74d49f5d40618e3`
+- **输出产物与哈希：** 代码与测试；尚无冻结评测集
+- **关键结果/指标：** 单元测试随后在 LOG-002 中 33/33 通过
+- **预期与实际差异：** 无目标偏离；仅文件拆分
+- **异常和失败样例：** 开发中非法动作 builder 曾不终止导致测试挂起，已改为拒绝即 `PROTOCOL_VIOLATION` 终止
+- **原因分析：** 非法动作不消耗预算且 builder 持续返回动作
+- **采取的修复：** `replay.py` 拒绝后终止；非法 builder 只发一步
+- **是否需要修改计划：** 否
+- **是否影响已有结果可比性：** 无已有正式结果
+- **下一行动：** 运行 `scripts/run_sp0_checks.py`
+
+#### [SP0-LOG-002] 首次一键检查并冻结评测集
+
+- **日期时间：** 2026-08-21T16:35:44Z
+- **记录人：** Cursor Grok 4.6
+- **类型：** 测试
+- **状态：** SUCCESS
+- **Run ID：** `sp0-20260821T163544Z-59a85acf`
+- **Git commit 与 dirty status：** `1ac662cc15ceefde6614a416183f3a8aae6d0b49` dirty
+- **对应计划版本：** SP0-PLAN 1.4
+- **目标：** 执行 E0.1-E0.7；一次性构建固定评测集
+- **已阅读：** 00、01
+- **修改或新增文件：** `artifacts/datasets/*`、`artifacts/registries/*`、`artifacts/protocol/*`、`runs/sp0-20260821T163544Z-59a85acf/`
+- **实际命令：** `python3 scripts/run_sp0_checks.py`
+- **输入文件与哈希：** WebQSP.json `3057f5b9cbdaf8580b0e971fbbf78000b4905670c92e5b6a38c9a59750bcf0d1`；cwq.json `147e7e1ee5f73c1d9ceba7a031c23b27a1ecddd57c55efff4541f74da41e97df`
+- **配置与哈希：** `2b97a232b5fa43a3dc827c63a280355ed48ee64206aeefa5a74d49f5d40618e3`
+- **输出产物与哈希：** smoke `e8e6c393fecffcca9063b036c4802f50f0a86b0e0d1c219f50ca061e67585393`；webqsp150 `37276867bb297991e83c335a6d4bb4f5657642fae2c77fb16eeac56eb310628c`；cwq50 `fa5f957de02ac804253d722fc1cc1a22652450a0480a1b5b4bd582ab4c5cb25b`
+- **关键结果/指标：** 退出码 0；E0.1-E0.7 PASS；E0.6 first_status=built；n=20/150/50
+- **预期与实际差异：** 无
+- **异常和失败样例：** 无
+- **原因分析：** 无
+- **采取的修复：** 无
+- **是否需要修改计划：** 否
+- **是否影响已有结果可比性：** 否
+- **下一行动：** 再跑一次检查，确认不重抽
+
+#### [SP0-LOG-003] 第二次一键检查，验证冻结
+
+- **日期时间：** 2026-08-21T16:35:55Z
+- **记录人：** Cursor Grok 4.6
+- **类型：** 测试
+- **状态：** SUCCESS
+- **Run ID：** `sp0-20260821T163555Z-fec2b10a`
+- **Git commit 与 dirty status：** `1ac662cc15ceefde6614a416183f3a8aae6d0b49` dirty
+- **对应计划版本：** SP0-PLAN 1.4
+- **目标：** 重复检查不改变固定集；失败 fixture 不覆盖成功 run；build 拒绝重建
+- **已阅读：** 00、01
+- **修改或新增文件：** 仅新 run 目录；三个 jsonl 与 manifest 哈希不变
+- **实际命令：** `python3 scripts/run_sp0_checks.py`；`python3 scripts/sample_eval_sets.py --mode build`（退出码 2）；`--mode verify`（退出码 0）
+- **输入文件与哈希：** 同 LOG-002
+- **配置与哈希：** 同 LOG-002
+- **输出产物与哈希：** 三固定集哈希与 LOG-002 完全相同
+- **关键结果/指标：** E0.6 first_status=ok；WebQSP smoke∩compare=∅；独立 run 目录未覆盖第一次成功结果
+- **预期与实际差异：** 无
+- **异常和失败样例：** 无
+- **原因分析：** 无
+- **采取的修复：** 无
+- **是否需要修改计划：** 否
+- **是否影响已有结果可比性：** 否；冻结集保持不变
+- **下一行动：** 写验收结论与独立报告目录
+
+#### [SP0-LOG-004] SP0 验收 PASS 并登记 SP1 计划
+
+- **日期时间：** 2026-08-22
+- **记录人：** Cursor Grok 4.6
+- **类型：** 验收
+- **状态：** SUCCESS
+- **Run ID：** LOG-002 与 LOG-003
+- **Git commit 与 dirty status：** `1ac662cc15ceefde6614a416183f3a8aae6d0b49` dirty
+- **对应计划版本：** SP0-PLAN 1.4
+- **目标：** 按第 9 节验收；生成报告；登记下一步计划但不实施
+- **已阅读：** 00、01
+- **修改或新增文件：** `reports/sp0/`、`exp_plan/02_SP1_pog_adapter_and_environment_binding.md`、总体文件升至 1.6
+- **实际命令：** 无额外检查命令
+- **输入文件与哈希：** 同前
+- **配置与哈希：** 同前
+- **输出产物与哈希：** 见 `reports/sp0/metrics.json`
+- **关键结果/指标：** 结论 PASS；允许准备 SP1，不允许注入 memory 或跑效果评测
+- **预期与实际差异：** 无
+- **异常和失败样例：** 无
+- **原因分析：** 无
+- **采取的修复：** 无
+- **是否需要修改计划：** 否
+- **是否影响已有结果可比性：** 否
+- **下一行动：** 等待用户要求后再实施 SP1
+

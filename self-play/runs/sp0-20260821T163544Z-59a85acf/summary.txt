@@ -1,0 +1,24 @@
+SP0 checks status=PASS
+run_id=sp0-20260821T163544Z-59a85acf
+protocol=sp-protocol-v1
+config_sha256=2b97a232b5fa43a3dc827c63a280355ed48ee64206aeefa5a74d49f5d40618e3
+E0.1: PASS
+E0.2: PASS
+E0.3: PASS
+E0.4: PASS
+E0.5: PASS
+E0.6: PASS
+E0.7: PASS
+illegal_write_reject_rate=1.0
+shared_input_hash_changes=0
+legal_schema_action_accept_rate=1.0
+illegal_schema_action_reject_rate=1.0
+oracle_leak_detection_rate=1.0
+o0_sensitive_field_count=0
+same_input_replay_agreement=1.0
+registry_rebuild_agreement=1.0
+critical_check_pass_rate=1.0
+unclassified_exceptions=0
+webqsp_smoke_n=20
+webqsp_model_compare_n=150
+cwq_model_compare_n=50
