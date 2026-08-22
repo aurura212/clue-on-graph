@@ -612,7 +612,10 @@ def experiment_e04(config: Dict[str, Any], workspace: Workspace) -> Dict[str, An
         },
     ]
     exclusion = validate_exclusion_registry(fixture_records)
-    exclusion_path = write_exclusion_registry(exclusion, workspace)
+    exclusion["record_scope"] = "fixture_only"
+    exclusion_path = write_exclusion_registry(
+        exclusion, workspace, filename="benchmark_exclusion_fixture_only_v1.json"
+    )
     duplicate_rejected = False
     try:
         validate_exclusion_registry(fixture_records + fixture_records[:1])

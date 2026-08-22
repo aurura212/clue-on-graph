@@ -1,0 +1,44 @@
+{
+  "plan_version": "SP1-PLAN 1.3",
+  "protocol_version": "sp-protocol-v1",
+  "overall_version": "SP-GENERAL 1.8",
+  "adapter_enabled_default": false,
+  "allow_llm": false,
+  "allow_live_kg": false,
+  "backtrack_state_policy": "unsupported",
+  "direction_semantics": "current_entity_role",
+  "answer_submission_requires_observed": true,
+  "canonicalization_version": "sp1-canonical-v1",
+  "question_normalization_version": "sp1-question-normalization-v1",
+  "failure_class_version": "sp0-failure-class-v1",
+  "eval_manifest_hash": "f6dd56a5b9a2937ad5e1964a25570a410e9be8720254551c78ca7f69e28226be",
+  "expected_exclusion_records": 220,
+  "test_seed": 20260822,
+  "sp0_config": "configs/sp0_protocol_v1.json",
+  "budgets": {
+    "max_depth": 4,
+    "max_steps": 12,
+    "max_kg_calls": 16,
+    "max_llm_calls": 8,
+    "max_critic_rounds": 2,
+    "max_frontier_size": 80
+  },
+  "expected_eval_file_hashes": {
+    "webqsp_smoke_20": "e8e6c393fecffcca9063b036c4802f50f0a86b0e0d1c219f50ca061e67585393",
+    "webqsp_model_compare_150": "37276867bb297991e83c335a6d4bb4f5657642fae2c77fb16eeac56eb310628c",
+    "cwq_model_compare_50": "fa5f957de02ac804253d722fc1cc1a22652450a0480a1b5b4bd582ab4c5cb25b"
+  },
+  "expected_baseline_hashes": {
+    "main_freebase.py": "5e7e19083ffc774ee725a16686d28b519f67ab0fe05022062dc0c172bd3a5e16",
+    "freebase_func.py": "b2e780762def28f0c68d71d9b41e61c9c015e7511810415a17a96169464ba31c",
+    "utils.py": "78bdcccd2f5dc41fff61c04a947a52c0e9881eb91e67d6d45230ec0b717ddc81",
+    "prompt_list.py": "2dfe1bd1ba8e3a978114d215f22da97a485251dba4219ddf6001eaa54b304841",
+    "data_split.py": "f8087dacf4c70ad2461444b83d32d1f3879596ca135314d51058b303f1b9156f",
+    "pog_w.sh": "952a06dd87836b760b93af71ada312b2cde8cfa0ab524032f5d4e41a2f814452"
+  },
+  "fixtures": {
+    "normalization_vectors": "tests/fixtures/sp1/normalization_vectors.json",
+    "io_records": "tests/fixtures/sp1/io_records.json",
+    "sp0_exclusion_fixture_only": "tests/fixtures/exclusion_records_sp0.json"
+  }
+}

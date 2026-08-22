@@ -1,0 +1,33 @@
+SP1 checks status=PASS
+run_id=sp1-20260822T030044Z-8cb155e0
+protocol=sp-protocol-v1
+config_sha256=955d38383901e02e4c97d3ff6d4b7830ec5dd65dca9656f7a3161a77f6164266
+E1.1: PASS
+E1.2: PASS
+E1.3: PASS
+E1.4: PASS
+E1.5: PASS
+E1.6: PASS
+E1.7: PASS
+E1.8: PASS
+E1.9: PASS
+E1.10: PASS
+E1.11: PASS
+E1.12: PASS
+e1_pass_rate=1.0
+real_llm_calls=0
+sp1_live_kg_calls=0
+adapter_disabled_equivalence_rate=1.0
+o0_leak_detection_rate=1.0
+webqsp_smoke_actor_critic_sensitive_fields=0
+head_tail_mapping_rate=1.0
+direction_reversals=0
+unobserved_or_ambiguous_accepted=0
+unsupported_backtrack_false_success=0
+budget_delta_correct_rate=1.0
+replay_agreement=1.0
+normalization_vector_pass_rate=1.0
+exclusion_record_count=220
+fixed_eval_hash_changes=0
+unclassified_exceptions=0
+unregistered_baseline_hash_changes=0

@@ -4,9 +4,9 @@
 > 版本：1.3  
 > 初始制定日期：2026-08-22  
 > 本次修订日期：2026-08-22  
-> 状态：计划已完善，待实施  
-> 当前阶段：SP1  
-> 上位约束：`00_experiment_overall_requirements.md` v1.8  
+> 状态：已完成 PASS（2026-08-22）  
+> 当前阶段：SP1（已收口）  
+> 上位约束：`00_experiment_overall_requirements.md` v1.9（运行时为 v1.8；收口后升级）  
 > 前置必读：`00_experiment_overall_requirements.md`、`01_SP0_protocol_workspace_and_data_contract.md`、`reports/sp0/SP0_experiment_report.md`  
 > 前置结论：SP0 PASS，协议 `sp-protocol-v1` 与固定评测集已经冻结
 
@@ -483,6 +483,11 @@ SP1 PASS 后仍不得直接调用 LLM、生成 memory 或运行 150/50 效果对
 | SP1-LOG-001 | 2026-08-22 | 计划变更 | N/A | SUCCESS | 根据 SP1 评估和 overall v1.7 将计划从 v1.0 完善为 v1.1，尚未实施代码或运行实验 |
 | SP1-LOG-002 | 2026-08-22 | 计划变更 | N/A | SUCCESS | 将计划更新为 v1.2：冻结问题归一化算法，并明确 2 条 SP0 fixture 不计入正式 220 条 exclusion registry；未实施代码或运行实验 |
 | SP1-LOG-003 | 2026-08-22 | 计划变更 | N/A | SUCCESS | 根据 overall v1.8 将计划更新为 v1.3：要求 SP1 结束后生成阶段报告，并取消生成下一阶段计划的强制要求；未实施代码或运行实验 |
+| SP1-LOG-004 | 2026-08-22 | 实现 | `81943fed` dirty | SUCCESS | 实现适配层、Environment binding、答案提交、归一化、E1.1–E1.12 与 `run_sp1_checks.py`；未改原 PoG 基线文件 |
+| SP1-LOG-005 | 2026-08-22 | 测试 | `sp1-20260822T025810Z-13c293aa` | INVALID | 首次一键运行因 smoke 题 `Crimean War`/`Crimea` 子串误报后 KeyError 失败；未覆盖后续成功产物 |
+| SP1-LOG-006 | 2026-08-22 | 测试 | `sp1-20260822T030044Z-8cb155e0` | SUCCESS | 单元测试 49/49；E1.1–E1.12 PASS；真实 LLM=0；live KG=0；正式 exclusion 220 |
+| SP1-LOG-007 | 2026-08-22 | 测试 | `sp1-20260822T030056Z-a37d9e5a` | SUCCESS | `--fail-fixture` 退出 1，成功 run 目录完整 |
+| SP1-LOG-008 | 2026-08-22 | 验收 | `sp1-20260822T030044Z-8cb155e0` | SUCCESS | SP1 PASS 并生成阶段报告 |
 
 ### 12.2 单次实现或运行记录模板
 
@@ -507,35 +512,96 @@ SP1 PASS 后仍不得直接调用 LLM、生成 memory 或运行 150/50 效果对
 - **结论：**
 - **下一行动：**
 
+#### [SP1-LOG-004] 实现适配层与检查入口
+
+- **日期时间：** 2026-08-22
+- **类型：** 实现
+- **计划版本：** SP1-PLAN 1.3
+- **协议版本：** `sp-protocol-v1`
+- **Run ID：** N/A
+- **Git commit / dirty：** `81943feddfe2b2f89dc05cae457998596099a7cc` / dirty
+- **目标：** 按 v1.3 实现 PoG snapshot 投影、Environment EXPAND、答案提交、独立预算、exclusion 220 与 E1.1–E1.12
+- **实际命令：** 代码实现；随后 `python3 -m unittest discover -s tests`
+- **是否调用真实 LLM / live KG：** 否
+- **代码或文件变化：** 新增 `pog_adapter.py`、`environment_binding.py`、`answer_submission.py`、`question_normalization.py`、`llm_guard.py`、`sp1_checks.py`、`scripts/run_sp1_checks.py`、`configs/sp1_adapter_v1.json` 及 SP1 测试/fixture。`registry.py` 增加正式 exclusion 构建。`action_validator.py` 观察字段增加 subject/object。`visibility.py` 允许公开字段真子串。`checks.py` E0.4 改为写入 fixture_only 文件。未改原 PoG 基线文件。
+- **有效性：** VALID
+- **结论：** 实现完成，进入检查运行
+- **下一行动：** 运行 `scripts/run_sp1_checks.py`
+
+#### [SP1-LOG-005] 首次一键运行 INVALID
+
+- **日期时间：** 2026-08-22T03:00:00Z 左右
+- **类型：** 测试 / 排错
+- **Run ID：** `sp1-20260822T025810Z-13c293aa`
+- **是否调用真实 LLM / live KG：** 否
+- **关键结果与指标：** E1.5 对 WebQTest-1921 主题名 `Crimean War` 与答案 `Crimea` 的子串匹配误报；`summarize_metrics` KeyError
+- **有效性：** INVALID
+- **结论：** 不作为验收证据。随后收紧“独立敏感值”判定并加固 summarize
+- **下一行动：** 修复后重跑
+
+#### [SP1-LOG-006] 正式成功运行
+
+- **日期时间：** 2026-08-22T03:00:44Z
+- **类型：** 测试
+- **Run ID：** `sp1-20260822T030044Z-8cb155e0`
+- **Git commit / dirty：** `81943feddfe2b2f89dc05cae457998596099a7cc` / dirty
+- **实际命令：** `python3 scripts/run_sp1_checks.py`
+- **配置与 SHA-256：** `configs/sp1_adapter_v1.json` / `955d38383901e02e4c97d3ff6d4b7830ec5dd65dca9656f7a3161a77f6164266`
+- **是否调用真实 LLM / live KG：** 否 / 否
+- **关键结果与指标：** 单元测试 49/49；E1.1–E1.12 PASS；exclusion `content_hash=228a3372453fabf632f88da83acfa3e371411572d7bc9dbdfd6947dc0f80062f`，记录数 220
+- **产物路径：** `runs/sp1-20260822T030044Z-8cb155e0/`；`artifacts/protocol/sp1_check_result.json`；`artifacts/registries/benchmark_exclusion_registry_v1.json`；`artifacts/protocol/pog_decision_map_v1.json`
+- **有效性：** VALID
+- **结论：** 全部强制检查达到门槛，退出码 0
+- **下一行动：** 跑失败 fixture 并写报告
+
+#### [SP1-LOG-007] 预期失败 fixture
+
+- **日期时间：** 2026-08-22T03:00:56Z
+- **类型：** 测试
+- **Run ID：** `sp1-20260822T030056Z-a37d9e5a`
+- **实际命令：** `python3 scripts/run_sp1_checks.py --fail-fixture`
+- **关键结果与指标：** 退出码 1；成功 run `sp1-20260822T030044Z-8cb155e0` 仍完整
+- **有效性：** VALID（预期失败）
+- **结论：** 失败不覆盖成功产物
+- **下一行动：** 验收与阶段报告
+
+#### [SP1-LOG-008] SP1 验收 PASS
+
+- **日期时间：** 2026-08-22
+- **类型：** 验收
+- **Run ID：** `sp1-20260822T030044Z-8cb155e0`
+- **结论：** PASS。报告 `reports/sp1/SP1_experiment_report.md` SHA-256 `c0af7b13024768189844764ffb2a44dfede6a3371d2e1a946545950a9e8a0c7a`
+- **下一行动：** 更新 overall 收口；不自动启动 SP2-A
+
 ### 12.3 SP1 指标汇总表
 
 | 指标 | 目标 | 实际 | 证据路径 | 结论 |
 |---|---:|---:|---|---|
-| E1.1-E1.12 通过率 | 100% | 待填写 | 待填写 | 待判断 |
-| 真实 LLM 调用数 | 0 | 待填写 | 待填写 | 待判断 |
-| SP1 正式 live KG 调用数 | 0 | 待填写 | 待填写 | 待判断 |
-| adapter-disabled 行为等价率 | 100% | 待填写 | 待填写 | 待判断 |
-| O0 泄漏检测率 | 100% | 待填写 | 待填写 | 待判断 |
-| HEAD/TAIL 映射正确率 | 100% | 待填写 | 待填写 | 待判断 |
-| STOP 非法候选接受数 | 0 | 待填写 | 待填写 | 待判断 |
-| unsupported backtrack 误成功数 | 0 | 待填写 | 待填写 | 待判断 |
-| budget delta 正确率 | 100% | 待填写 | 待填写 | 待判断 |
-| replay 一致率 | 100% | 待填写 | 待填写 | 待判断 |
-| question normalization regression vectors 通过率 | 100% | 待填写 | 待填写 | 待判断 |
-| exclusion registry 记录数 | 220 | 待填写 | 待填写 | 待判断 |
-| 固定数据 hash 变化数 | 0 | 待填写 | 待填写 | 待判断 |
-| 未分类异常数 | 0 | 待填写 | 待填写 | 待判断 |
+| E1.1-E1.12 通过率 | 100% | 100% | `runs/sp1-20260822T030044Z-8cb155e0/sp1_check_result.json` | PASS |
+| 真实 LLM 调用数 | 0 | 0 | 同上 `metrics.real_llm_calls` | PASS |
+| SP1 正式 live KG 调用数 | 0 | 0 | 同上 `metrics.sp1_live_kg_calls` | PASS |
+| adapter-disabled 行为等价率 | 100% | 100% | E1.1 | PASS |
+| O0 泄漏检测率 | 100% | 100% | E1.5 | PASS |
+| HEAD/TAIL 映射正确率 | 100% | 100% | E1.6 | PASS |
+| STOP 非法候选接受数 | 0 | 0 | E1.7 | PASS |
+| unsupported backtrack 误成功数 | 0 | 0 | E1.8 | PASS |
+| budget delta 正确率 | 100% | 100% | E1.9 | PASS |
+| replay 一致率 | 100% | 100% | E1.11 | PASS |
+| question normalization regression vectors 通过率 | 100% | 100% | E1.12 | PASS |
+| exclusion registry 记录数 | 220 | 220 | `artifacts/registries/benchmark_exclusion_registry_v1.json` | PASS |
+| 固定数据 hash 变化数 | 0 | 0 | E1.12 | PASS |
+| 未分类异常数 | 0 | 0 | E1.10 | PASS |
 
 ### 12.4 问题与风险清单
 
 | 风险 ID | 风险 | 当前状态 | SP1 处理 | 后续责任阶段 |
 |---|---|---|---|---|
 | R1 | fixture replay 不能代表真实 Freebase | 已知 | SP1 只验证接口和确定性，不夸大证据 | SP2-A live KG |
-| R2 | 原 PoG 决策函数混合 LLM 和 KG | 已知 | 拆分三层边界并使用 LLM fail-fast guard | SP1 |
+| R2 | 原 PoG 决策函数混合 LLM 和 KG | 已在 SP1 处理 | 拆分三层边界并使用 LLM fail-fast guard | SP1 |
 | R3 | 原 PoG 没有真正 state backtrack | 已知 | SP1 只支持 `SELECT_FRONTIER`，state backtrack 明确 unsupported | 后续单独计划 |
 | R4 | 自由文本答案到 observed ID 可能歧义 | 已知 | 独立答案提交契约，歧义时拒绝 | SP1、SP2-B |
 | R5 | CWQ 50 含混合 `WebQTrn` / `WebQTest` ID | 已知 | 保持冻结并表述为实验对比子集，不称标准 test benchmark | 后续正式报告 |
-| R6 | 当前 exclusion registry 只有 2 条 fixture，可能被误并入正式计数 | 待解决 | fixture 保留为 `fixture_only`；SP1 仅由三个冻结文件构造严格 220 条正式 registry，并冻结 normalization/version/content hash | SP1 |
+| R6 | 当前 exclusion registry 只有 2 条 fixture，可能被误并入正式计数 | 已解决 | fixture 保留为 `fixture_only`；正式 registry 严格 220 条，`content_hash=228a3372453fabf632f88da83acfa3e371411572d7bc9dbdfd6947dc0f80062f` | SP1 完成 |
 | R7 | 工作树 dirty 影响复现 | 已知 | 每次 run 记录 commit、dirty 和输入 hash | 全阶段 |
 | R8 | `pog_w.sh` 含 API key | 已知 | 不复制、不写入配置或 run 产物；SP1 不调用 LLM | 全阶段 |
 
@@ -549,16 +615,16 @@ SP1 PASS 后仍不得直接调用 LLM、生成 memory 或运行 150/50 效果对
 
 ### 12.6 SP1 最终验收记录
 
-- **验收日期：** 待填写
-- **计划版本与 SHA-256：** 待填写
-- **配置版本与 SHA-256：** 待填写
-- **有效 Run ID：** 待填写
-- **Git commit / dirty：** 待填写
-- **E1.1-E1.12 结论：** 待填写
-- **基线行为等价：** 待填写
-- **O0 泄漏结论：** 待填写
-- **固定数据与 exclusion registry hash：** 待填写
-- **未解决风险：** 待填写
-- **最终结论：** PASS / CONDITIONAL PASS / FAIL / 待判断
-- **实验报告路径与 SHA-256：** 待填写
-- **是否完成 SP1 阶段收口：** 是 / 否 / 待判断
+- **验收日期：** 2026-08-22
+- **计划版本与 SHA-256：** SP1-PLAN 1.3（日志追加后文件会变；验收以本记录与报告为准）
+- **配置版本与 SHA-256：** `configs/sp1_adapter_v1.json` / `955d38383901e02e4c97d3ff6d4b7830ec5dd65dca9656f7a3161a77f6164266`
+- **有效 Run ID：** `sp1-20260822T030044Z-8cb155e0`
+- **Git commit / dirty：** `81943feddfe2b2f89dc05cae457998596099a7cc` / dirty
+- **E1.1-E1.12 结论：** 全部 PASS
+- **基线行为等价：** PASS；原 PoG 六文件哈希无非预注册变化
+- **O0 泄漏结论：** PASS；smoke 20 Actor/Critic 敏感字段 0
+- **固定数据与 exclusion registry hash：** 20/150/50 与 SP0 冻结一致；exclusion `content_hash=228a3372453fabf632f88da83acfa3e371411572d7bc9dbdfd6947dc0f80062f`，n=220
+- **未解决风险：** R1（无 live Freebase recorded I/O，交 SP2-A）；R3/R5/R7/R8 仍记录
+- **最终结论：** PASS
+- **实验报告路径与 SHA-256：** `reports/sp1/SP1_experiment_report.md` / `c0af7b13024768189844764ffb2a44dfede6a3371d2e1a946545950a9e8a0c7a`
+- **是否完成 SP1 阶段收口：** 是

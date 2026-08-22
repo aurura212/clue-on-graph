@@ -135,6 +135,8 @@ def find_sensitive_values(
     for secret in secrets.answer_entity_ids + secrets.normalized_answers + secrets.future_neighbors:
         if not secret or secret in allowed:
             continue
+        if any(item and len(item) > len(secret) and secret in item for item in allowed):
+            continue
         if secret in blob:
             hits.append(secret)
     return sorted(set(hits))

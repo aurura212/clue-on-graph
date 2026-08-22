@@ -24,18 +24,18 @@
 | 字段 | 值 |
 |---|---|
 | 更新日期 | 2026-08-22 |
-| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：用户要求的独立 `self-play/` SP0 协议冻结已 PASS，**不是** V2-5 Self-Play |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0+SP1 已 PASS，**不是** V2-5 Self-Play |
 | 当前 Phase | `V2-3` |
-| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0 不改变本判定 |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1 不改变本判定 |
 | 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
 | 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
 | **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
 | 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
-| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0 PASS 不构成进入 V2-5 的许可 |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1 PASS 不构成进入 V2-5 的许可 |
 
 ### 下一步（唯一允许的动作）
 
-V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP0 已 PASS，其下一步 SP1 只在该实验空间内按 `self-play/exp_plan/` 推进，不得当作本日志的 V2-5。
+V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP1 已 PASS 并收口；若继续该实验空间，下一步须先按 `self-play/exp_plan/` 登记 SP2-A，不得当作本日志的 V2-5。
 
 ---
 
@@ -1624,6 +1624,21 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 报告：`self-play/reports/sp0/SP0_experiment_report.md`
 - 异常：无
 - 结论：独立 SP0 PASS。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 已开始
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-068 — 2026-08-22 — 独立 self-play/ SP1 适配层 PASS（不是 V2-5）
+
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.9 与 `02_SP1_pog_adapter_and_environment_binding.md`。**不是** V2 §16.2 / V2-5 Self-Play
+- 代码：仅新增/修改 `self-play/src/sp_memory/`、`self-play/scripts/run_sp1_checks.py`、配置、测试与产物；未改 V2 R2，未改原 PoG 基线文件，未改原栈推理配置
+- 命令：`python3 self-play/scripts/run_sp1_checks.py`；预期失败 `python3 self-play/scripts/run_sp1_checks.py --fail-fixture`
+- 有效 run：`sp1-20260822T030044Z-8cb155e0`
+- 无效 run：`sp1-20260822T025810Z-13c293aa`（子串误报后 KeyError，已修）
+- 结果：E1.1–E1.12 PASS。真实 LLM=0，live KG=0，无 memory 注入，无 EM/F1。正式 exclusion 220 条
+- 报告：`self-play/reports/sp1/SP1_experiment_report.md` SHA-256 `c0af7b13024768189844764ffb2a44dfede6a3371d2e1a946545950a9e8a0c7a`
+- 异常：无有效运行异常。尚未验证 live Freebase（R1，交后续 SP2-A）
+- 结论：独立 SP1 PASS 并收口。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 已开始
 - 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---

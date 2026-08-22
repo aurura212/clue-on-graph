@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/data/zhujiajun/Freebase-setup/clue-on-graph/self-play/scripts/run_sp1_checks.py", line 110, in main
+    result = run_all_sp1_experiments(config, workspace)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/zhujiajun/Freebase-setup/clue-on-graph/self-play/src/sp_memory/sp1_checks.py", line 1058, in run_all_sp1_experiments
+    metrics = summarize_metrics(experiments) if len(experiments) == 12 else {}
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/zhujiajun/Freebase-setup/clue-on-graph/self-play/src/sp_memory/sp1_checks.py", line 993, in summarize_metrics
+    "o0_leak_detection_rate": e15["leak_injection_detection_rate"],
+                              ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'leak_injection_detection_rate'

@@ -1,0 +1,95 @@
+{
+  "records": [
+    {
+      "record_id": "fix-expand-head-001",
+      "source_type": "hand_fixture",
+      "source_function": "entity_search",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"entity": "m.alice", "relation": "people.person.friend", "head": true},
+      "raw_output": ["m.bob"],
+      "canonical_output": [{"subject": "m.alice", "relation": "people.person.friend", "object": "m.bob"}],
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": false,
+      "allowed_uses": ["sp1_interface_test"],
+      "record_scope": "fixture_only"
+    },
+    {
+      "record_id": "fix-expand-tail-001",
+      "source_type": "hand_fixture",
+      "source_function": "entity_search",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"entity": "m.bob", "relation": "people.person.friend", "head": false},
+      "raw_output": ["m.alice"],
+      "canonical_output": [{"subject": "m.alice", "relation": "people.person.friend", "object": "m.bob"}],
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": false,
+      "allowed_uses": ["sp1_interface_test"],
+      "record_scope": "fixture_only"
+    },
+    {
+      "record_id": "fix-expand-empty-001",
+      "source_type": "hand_fixture",
+      "source_function": "entity_search",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"entity": "m.alice", "relation": "people.person.missing", "head": true},
+      "raw_output": [],
+      "canonical_output": [],
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": false,
+      "allowed_uses": ["sp1_interface_test"],
+      "record_scope": "fixture_only"
+    },
+    {
+      "record_id": "fix-expand-literal-001",
+      "source_type": "hand_fixture",
+      "source_function": "entity_search",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"entity": "m.bob", "relation": "people.person.date_of_birth", "head": true},
+      "raw_output": ["1950-01-02"],
+      "canonical_output": [{"subject": "m.bob", "relation": "people.person.date_of_birth", "object": "1950-01-02"}],
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": false,
+      "allowed_uses": ["sp1_interface_test"],
+      "record_scope": "fixture_only"
+    },
+    {
+      "record_id": "fix-expand-finish-001",
+      "source_type": "hand_fixture",
+      "source_function": "entity_search",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"entity": "m.alice", "relation": "people.person.dead_end", "head": true},
+      "raw_output": ["[FINISH_ID]"],
+      "canonical_output": [],
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": false,
+      "allowed_uses": ["sp1_interface_test"],
+      "record_scope": "fixture_only"
+    },
+    {
+      "record_id": "fix-expand-dup-001",
+      "source_type": "hand_fixture",
+      "source_function": "entity_search",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"entity": "m.alice", "relation": "people.person.friend", "head": true},
+      "raw_output": ["m.bob", "m.bob"],
+      "canonical_output": [{"subject": "m.alice", "relation": "people.person.friend", "object": "m.bob"}],
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": false,
+      "allowed_uses": ["sp1_interface_test"],
+      "record_scope": "fixture_only"
+    },
+    {
+      "record_id": "oracle-only-001",
+      "source_type": "hand_fixture",
+      "source_function": "verifier_only",
+      "constructed_at": "2026-08-22T00:00:00Z",
+      "query_or_params": {"task_id": "sp1.fixture.001"},
+      "raw_output": {"answer_entity_ids": ["m.paris"], "logical_query": "SELECT ?x WHERE { ?s ?p ?x }"},
+      "canonical_output": {"answer_entity_ids": ["m.paris"]},
+      "endpoint_or_snapshot_id": "hand-fixture-v1",
+      "contains_oracle_fields": true,
+      "allowed_uses": ["verifier_only"],
+      "record_scope": "fixture_only"
+    }
+  ]
+}

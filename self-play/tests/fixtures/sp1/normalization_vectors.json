@@ -1,0 +1,53 @@
+{
+  "algorithm_version": "sp1-question-normalization-v1",
+  "vectors": [
+    {
+      "id": "ascii_case",
+      "raw": "Who Is The Governor?",
+      "expected_normalized": "who is the governor?",
+      "expected_sha256": "49fe0d2916496527277a878a92a0b1916cf5aeb3c73135bbd0dbedf373e5933a"
+    },
+    {
+      "id": "fullwidth",
+      "raw": "Ｗｈｏ　ｉｓ　ｔｈｅ　ｇｏｖｅｒｎｏｒ？",
+      "expected_normalized": "who is the governor?",
+      "expected_sha256": "49fe0d2916496527277a878a92a0b1916cf5aeb3c73135bbd0dbedf373e5933a"
+    },
+    {
+      "id": "composed",
+      "raw": "café governor",
+      "expected_normalized": "café governor",
+      "expected_sha256": "25dc49181ea86bc1180d164f4177145d9b82f8855e04cd193618daccc4664761"
+    },
+    {
+      "id": "decomposed",
+      "raw": "cafe\u0301 governor",
+      "expected_normalized": "café governor",
+      "expected_sha256": "25dc49181ea86bc1180d164f4177145d9b82f8855e04cd193618daccc4664761"
+    },
+    {
+      "id": "eszett",
+      "raw": "straße in München",
+      "expected_normalized": "strasse in münchen",
+      "expected_sha256": "ddc39b83f3b53a62cf93694d1501084dfd9868ca09c9c59801aec3164891e48a"
+    },
+    {
+      "id": "whitespace",
+      "raw": "  who\tis\nthe\u00a0governor  \n",
+      "expected_normalized": "who is the governor",
+      "expected_sha256": "846bd03107953524732a00b3d22f5793f137f974482b8faa93677bd296d05fb1"
+    },
+    {
+      "id": "punctuation",
+      "raw": "who is the governor of arizona 2009?",
+      "expected_normalized": "who is the governor of arizona 2009?",
+      "expected_sha256": "9e500c43414fee29a0b1513a2f29667c896df92e8d5355d7af0c3b28061a8e67"
+    },
+    {
+      "id": "nbsp_tabs",
+      "raw": "who\t\t\u00a0\nis",
+      "expected_normalized": "who is",
+      "expected_sha256": "28913dd60ac28ee99bae2a22376579b1d0c453e70ac1e1649cc08b6e59ff5213"
+    }
+  ]
+}

@@ -29,7 +29,7 @@ def _relation_keys(state: VisibleState) -> Set[Tuple[str, str, str]]:
 def _observed_entities(state: VisibleState) -> Set[str]:
     observed = set(state.visible_entities)
     for triple in state.observed_triples_or_summaries:
-        for key in ("head", "tail", "entity"):
+        for key in ("head", "tail", "entity", "subject", "object"):
             if key in triple:
                 observed.add(triple[key])
     return observed

@@ -1,7 +1,7 @@
 # PoG Self-Play 经验记忆实验总体要求
 
 > 文档编号：SP-GENERAL  
-> 版本：1.8  
+> 版本：1.9  
 > 制定日期：2026-08-21  
 > 实验根目录：clue_on_graph/self-play/  
 > 状态：生效，后续每一步实验均须遵守
@@ -75,13 +75,14 @@ self-play/
 
 ## 2.5 当前实验阶段与阶段更新规则
 
-当前总体阶段为：**SP1：原 PoG 决策点适配与最小环境绑定（计划已登记，尚未实施）**。SP0 已于 2026-08-22 验收 PASS。
+当前总体阶段为：**SP1 已完成 PASS，停留在阶段间（尚未启动 SP2-A）**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。
 
 - 对应计划文件：02_SP1_pog_adapter_and_environment_binding.md
-- 当前状态：SP0 已通过；SP1 计划已建立，待实施
-- 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1`
-- 当前目标：把协议接到原 PoG 的 relation / continue-stop / backtrack 决策点；仍不注入 memory，仍不跑模型对比
+- 当前状态：SP1 已收口；未启动 SP2-A，不调用 LLM，不注入 memory，不跑 20/150/50 效果评测
+- 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter（默认关闭）
+- 当前目标：阶段间等待后续研究安排；若启动下一步，应为 SP2-A 预制合法动作接入 live KG
 - 冻结评测集：`artifacts/datasets/webqsp_smoke_20.jsonl`（20，仅冒烟）、`webqsp_model_compare_150.jsonl`（150）、`cwq_model_compare_50.jsonl`（50）；后续只校验哈希，不得重抽
+- SP1 报告：`reports/sp1/SP1_experiment_report.md` SHA-256 `c0af7b13024768189844764ffb2a44dfede6a3371d2e1a946545950a9e8a0c7a`
 
 每个阶段的实验工作结束后，必须完成阶段收口。阶段收口的强制顺序为：
 
@@ -98,7 +99,7 @@ self-play/
 | 阶段 | 进入日期 | 计划文件 | 状态 | 阶段结论/切换依据 |
 |---|---|---|---|---|
 | SP0 | 2026-08-21 | 01_SP0_protocol_workspace_and_data_contract.md | 已完成 PASS（2026-08-22） | E0.1-E0.7 全部通过；协议 `sp-protocol-v1` 与 WebQSP/CWQ 固定评测集已冻结。报告：`reports/sp0/SP0_experiment_report.md` |
-| SP1 | 2026-08-22 | 02_SP1_pog_adapter_and_environment_binding.md | 当前，待实施 | SP0 PASS 后登记。只做原 PoG 决策点适配与最小环境绑定，不注入 memory，不跑效果评测 |
+| SP1 | 2026-08-22 | 02_SP1_pog_adapter_and_environment_binding.md | 已完成 PASS（2026-08-22） | E1.1-E1.12 全部通过；有效 run `sp1-20260822T030044Z-8cb155e0`。报告：`reports/sp1/SP1_experiment_report.md` SHA-256 `c0af7b13024768189844764ffb2a44dfede6a3371d2e1a946545950a9e8a0c7a`。停留阶段间，未启动 SP2-A |
 
 ## 3. 实验核心思想
 
@@ -208,9 +209,9 @@ self-play/
 | 步骤 | 名称 | 必读计划文件 | 当前状态 |
 |---|---|---|---|
 | SP0 | 实验空间、协议与数据契约冻结 | 01_SP0_protocol_workspace_and_data_contract.md | 已完成 PASS（2026-08-22） |
-| SP1 | 原 PoG 决策点适配与最小环境绑定 | 02_SP1_pog_adapter_and_environment_binding.md | 当前阶段，计划已制定，待实施 |
+| SP1 | 原 PoG 决策点适配与最小环境绑定 | 02_SP1_pog_adapter_and_environment_binding.md | 已完成 PASS（2026-08-22） |
 
-后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP1 完成前不得注入 memory，也不得运行 20/150/50 效果评测。
+后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP1 已完成；在启动 SP2-A 并完成登记前，不得注入 memory，也不得运行 20/150/50 效果评测。
 
 ## 9. 预期实验顺序与 LLM/KG 使用边界
 
@@ -302,3 +303,4 @@ CONDITIONAL PASS 只能用于不影响核心有效性、隔离性和复现性的
 | 2026-08-22 | 1.6 | SP0 验收 PASS；登记 SP1 计划文件并切换当前阶段 | 完成协议与固定评测集冻结后，按当时第 9 节（现第 10 节）强制流程进入下一步计划，但暂不实施 SP1 代码 | SP0、SP1 |
 | 2026-08-22 | 1.7 | 增加预期实验顺序与 LLM/KG 使用边界，规定 SP2-A 首次接入 live KG、SP2-B 首次进行无 memory 的 LLM+KG rollout、SP3 生成候选经验、SP4 验证蒸馏与 promotion、SP5 使用冻结 memory 正式评测 | 防止接口验证、在线基线、经验生成和效果评测混在同一阶段，并明确 WebQSP 20/150 与 CWQ 50 的允许使用时机 | SP1 及后续步骤 |
 | 2026-08-22 | 1.8 | 要求每个阶段实验结束后在 `reports/<stage-id-lower>/` 生成主实验报告并登记路径/hash；取消把生成下一阶段计划作为上一阶段验收、报告或收口条件 | 将阶段结果沉淀与后续研究规划解耦，保证每阶段先形成可审计报告，同时避免在尚未决定启动下一阶段时被迫提前制定计划 | SP1 及后续步骤 |
+| 2026-08-22 | 1.9 | SP1 验收 PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP2-A | E1.1–E1.12 通过；报告 `reports/sp1/SP1_experiment_report.md` | SP1 |

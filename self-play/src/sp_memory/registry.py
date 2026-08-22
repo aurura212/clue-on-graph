@@ -133,6 +133,77 @@ def validate_exclusion_registry(records: Sequence[Mapping[str, Any]]) -> Dict[st
     return payload
 
 
+def infer_split(task_id: str) -> str:
+    if task_id.startswith("WebQTest"):
+        return "test"
+    if task_id.startswith("WebQTrn"):
+        return "train"
+    return "unknown"
+
+
+def build_formal_exclusion_registry(
+    workspace: Workspace,
+    *,
+    exposed_at: str = "2026-08-22T00:00:00Z",
+    question_normalization_version: str = "sp1-question-normalization-v1",
+) -> Dict[str, Any]:
+    from .question_normalization import QUESTION_NORMALIZATION_VERSION, normalized_question_hash
+    from .sampling import eval_set_paths
+
+    if question_normalization_version != QUESTION_NORMALIZATION_VERSION:
+        raise ProtocolError(
+            ViolationCode.REGISTRY_ERROR,
+            "unexpected question_normalization_version",
+            {"got": question_normalization_version, "expected": QUESTION_NORMALIZATION_VERSION},
+        )
+    paths = eval_set_paths(workspace)
+    expected_files = [
+        ("webqsp_smoke_20", "webqsp", "smoke"),
+        ("webqsp_model_compare_150", "webqsp", "model_compare"),
+        ("cwq_model_compare_50", "cwq", "model_compare"),
+    ]
+    records = []
+    for name, dataset, usage in expected_files:
+        path = paths[name]
+        if not path.exists():
+            raise ProtocolError(ViolationCode.REGISTRY_ERROR, f"frozen eval file missing: {path}")
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            records.append(
+                {
+                    "dataset": dataset,
+                    "split": infer_split(str(row["task_id"])),
+                    "task_id": str(row["task_id"]),
+                    "normalized_question_hash": normalized_question_hash(str(row["question"])),
+                    "topic_entities": list(row.get("source_entities") or []),
+                    "answer_entities": list(row.get("answer_entity_ids") or []),
+                    "exposure_source": name,
+                    "exposed_at": exposed_at,
+                    "protocol_version": PROTOCOL_VERSION,
+                }
+            )
+    payload = validate_exclusion_registry(records)
+    if payload["count"] != 220:
+        raise ProtocolError(
+            ViolationCode.REGISTRY_ERROR,
+            f"formal exclusion registry must contain 220 records, got {payload['count']}",
+        )
+    fixture_ids = {"WebQTest-fixture-1", "CWQ-fixture-1"}
+    leaked_fixtures = [item["task_id"] for item in payload["records"] if item["task_id"] in fixture_ids]
+    if leaked_fixtures:
+        raise ProtocolError(
+            ViolationCode.REGISTRY_ERROR,
+            "SP0 fixture records leaked into formal exclusion registry",
+            {"task_ids": leaked_fixtures},
+        )
+    payload["record_scope"] = "formal_benchmark"
+    payload["question_normalization_version"] = QUESTION_NORMALIZATION_VERSION
+    payload["source_eval_sets"] = [item[0] for item in expected_files]
+    return payload
+
+
 def write_exclusion_registry(
     payload: Mapping[str, Any],
     workspace: Workspace,
