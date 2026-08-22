@@ -1,0 +1,28 @@
+SP2-A supplement checks status=PASS
+run_id=sp2a-supp-20260822T111116Z-79aa8ea8
+protocol=sp-protocol-v1
+config_sha256=288c5799a39438b4074ad27ce188f5b3bc48ccafb8a10d9d38f5f302c3fa9c02
+endpoint=http://localhost:8890/sparql
+S2A-S.1: PASS
+S2A-S.2: PASS
+S2A-S.3: PASS
+S2A-S.4: PASS
+S2A-S.replay: PASS
+real_llm_calls=0
+memory_reads=0
+memory_writes=0
+oracle_label_in_action=0
+eval_set_trajectory_uses=0
+tail_positive_cases=1
+tail_nonempty_rate=1.0
+tail_direction_canonical_rate=1.0
+hop2_entity_from_hop1_rate=1.0
+dynamic_twohop_transition_rate=1.0
+dynamic_twohop_replay_agreement=1.0
+empty_hop1_hop2_physical=0
+budget_boundary_correct_rate=1.0
+recorded_io_replay_agreement=1.0
+unclassified_exceptions=0
+secret_hits=0
+eval_file_hash_changes=0
+unregistered_baseline_hash_changes=0

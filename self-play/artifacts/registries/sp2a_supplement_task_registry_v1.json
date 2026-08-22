@@ -1,0 +1,67 @@
+{
+  "protocol_version": "sp-protocol-v1",
+  "registry_version": "sp2a-supplement-tasks-v1",
+  "plan_version": "SP2A-SUPPLEMENT-PLAN 1.0",
+  "parent_plan_version": "SP2A-PLAN 1.0",
+  "parent_run_id": "sp2a-20260822T082704Z-28a5bc97",
+  "source": "independently_registered_from_live_head_edge",
+  "sampled_from_eval_sets": false,
+  "notes": [
+    "TAIL-positive uses the HEAD edge confirmed by the parent SP2-A run: m.02mjmr --people.person.place_of_birth--> m.02hrh0_.",
+    "Dynamic two-hop freezes only hop1. hop2.entity is forbidden in this registry and must be materialized from hop1 live canonical entities.",
+    "Action inputs do not include Oracle answers, witness paths, or frozen eval-set labels."
+  ],
+  "tasks": [
+    {
+      "task_id": "sp2a.supp.tail.honolulu_birthplace_positive",
+      "query_purpose": "TAIL_positive",
+      "usage_tags": ["TAIL_positive"],
+      "question": "SP2-A supplement TAIL-positive probe: reverse of a live-confirmed birthplace edge",
+      "entity": "m.02hrh0_",
+      "entity_public_name": "Honolulu (live object of Obama place_of_birth)",
+      "relation": "people.person.place_of_birth",
+      "direction": "tail",
+      "expected_response_class": "non-empty",
+      "sampled_from_eval_sets": false,
+      "source": "parent_sp2a_live_head_edge",
+      "known_edge": {
+        "subject": "m.02mjmr",
+        "relation": "people.person.place_of_birth",
+        "object": "m.02hrh0_",
+        "confirmed_by_run": "sp2a-20260822T082704Z-28a5bc97",
+        "confirmed_by_query": "HEAD m.02mjmr people.person.place_of_birth"
+      },
+      "expected_subjects": ["m.02mjmr"],
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02hrh0_", "relation": "people.person.place_of_birth", "direction": "tail"}
+      ]
+    },
+    {
+      "task_id": "sp2a.supp.twohop.obama_birthplace_then_name",
+      "query_purpose": "dynamic_twohop",
+      "usage_tags": ["dynamic_twohop"],
+      "question": "SP2-A supplement dynamic two-hop: hop2 entity must come from hop1 live return",
+      "entity_public_name": "Barack Obama",
+      "expected_response_class": "non-empty",
+      "sampled_from_eval_sets": false,
+      "source": "independently_registered_public_freebase_entities",
+      "hop1": {
+        "entity": "m.02mjmr",
+        "relation": "people.person.place_of_birth",
+        "direction": "head"
+      },
+      "hop2": {
+        "relation": "type.object.name",
+        "direction": "head"
+      },
+      "hop1_candidate_constraint": {
+        "term_type": "uri",
+        "must_start_with": ["m.", "g."],
+        "selection_rule": "sort_canonical_entity_id_first"
+      },
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02mjmr", "relation": "people.person.place_of_birth", "direction": "head"}
+      ]
+    }
+  ]
+}

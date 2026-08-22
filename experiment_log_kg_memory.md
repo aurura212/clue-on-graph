@@ -24,18 +24,18 @@
 | 字段 | 值 |
 |---|---|
 | 更新日期 | 2026-08-22 |
-| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0+SP1+SP2-A 已 PASS，**不是** V2-5 Self-Play |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0+SP1+SP2-A（含补充）已 PASS，**不是** V2-5 Self-Play |
 | 当前 Phase | `V2-3` |
-| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A 不改变本判定 |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A 含补充不改变本判定 |
 | 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
 | 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
 | **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
 | 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
-| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A PASS 不构成进入 V2-5 的许可 |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A（含补充）PASS 不构成进入 V2-5 的许可，也不得未在 `self-play/exp_plan/` 登记就启动 SP2-B |
 
 ### 下一步（唯一允许的动作）
 
-V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP2-A 已 PASS 并收口；若继续该实验空间，下一步须先按 `self-play/exp_plan/` 登记 SP2-B，不得当作本日志的 V2-5。
+V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP2-A 含补充已 PASS 并收口；若继续该实验空间，下一步须先按 `self-play/exp_plan/` 登记 SP2-B，不得当作本日志的 V2-5。
 
 ---
 
@@ -1654,6 +1654,22 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 报告：`self-play/reports/sp2a/SP2A_experiment_report.md`
 - 异常：登记 Honolulu MID `m.02hrh` 与 live 出生地不一致，TAIL/两跳第二跳为空，方向映射仍 100%
 - 结论：独立 SP2-A PASS 并收口。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 已开始，也不得未登记就启动 SP2-B
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-070 — 2026-08-22 — 独立 self-play/ SP2-A 补充实验 PASS（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.12（收口后 1.13）与 `03A_SP2A_supplement_tail_and_dynamic_multihop.md`。**不是** V2 §16.2 / V2-5 Self-Play，也不是 SP2-B
+- 代码：仅 `self-play/` 内补充检查、动态 hop-2、配置、测试与产物；未改 V2 R2，未改原 PoG 基线，未改原栈推理配置。Git `7da26850e4c5a519da6147e19398d86098359010` dirty
+- 配置：`self-play/configs/sp2a_supplement_v1.json` SHA-256 `288c5799a39438b4074ad27ce188f5b3bc48ccafb8a10d9d38f5f302c3fa9c02`；endpoint `http://localhost:8890/sparql`；无 LLM、无 memory
+- 产物：有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`；主 SP2-A run `sp2a-20260822T082704Z-28a5bc97` 未覆盖
+- 结果：S2A-S.1–S.4 与 replay PASS。真实 LLM=0，memory 读写=0，无评测集轨迹，无 EM/F1。TAIL(`m.02hrh0_`, `people.person.place_of_birth`) 非空且含 `m.02mjmr`；hop2 entity 100% 来自 hop1 live 返回
+- 报告：`self-play/reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
+- 异常：无。主实验 Honolulu `m.02hrh` 空 TAIL 记录保留，不重新解释
+- 结论：独立 SP2-A 补充 PASS 并收口。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 或 KGQA/memory 证据。不得未登记就启动 SP2-B
 - 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---

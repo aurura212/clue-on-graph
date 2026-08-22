@@ -3,9 +3,9 @@
 > 文档编号：SP2A-SUPPLEMENT-PLAN  
 > 版本：1.0  
 > 初始制定日期：2026-08-22  
-> 状态：已登记，待实施  
+> 状态：已完成 PASS（2026-08-22）  
 > 所属阶段：SP2-A 补充验证，不构成新的总体阶段  
-> 上位约束：`00_experiment_overall_requirements.md` v1.11  
+> 上位约束：`00_experiment_overall_requirements.md` v1.12（收口后 overall 升级为 1.13）  
 > 主计划：`03_SP2A_live_kg_environment_validation.md` SP2A-PLAN 1.0  
 > 前置报告：`reports/sp2a/SP2A_experiment_report.md`  
 > 前置结论：SP2-A 主实验已完成基础 PASS，但 TAIL 正向语义和真实返回驱动的动态两跳证据不足
@@ -294,7 +294,25 @@ self-play/
 
 ### 12.1 运行日志占位
 
-<!-- 补充实验运行后追加；当前计划生成不代表补充实验已启动或已通过。 -->
+### LOG-SP2A-S-001 — 2026-08-22 — 有效补充 run PASS
+
+- 日期：2026-08-22
+- 补充 Run ID：`sp2a-supp-20260822T111116Z-79aa8ea8`（有效，manifest status=SUCCESS）
+- 主计划版本：SP2A-PLAN 1.0；补充计划版本：SP2A-SUPPLEMENT-PLAN 1.0
+- 配置：`configs/sp2a_supplement_v1.json` SHA-256 `288c5799a39438b4074ad27ce188f5b3bc48ccafb8a10d9d38f5f302c3fa9c02`
+- Git：commit `7da26850e4c5a519da6147e19398d86098359010`，dirty
+- 补充 task registry：`artifacts/registries/sp2a_supplement_task_registry_v1.json` SHA-256 `ec6cdfb9c07a5e516f3e145ff0e2f8965deab7d077b4c1a03e784d102c26efca`
+- endpoint/snapshot：`http://localhost:8890/sparql`（只读 POST）
+- 输入：冻结 20/150/50 只校验哈希；exclusion 220；未生成评测轨迹
+- S2A-S.1–S.4 与 replay：全部 PASS。TAIL(`m.02hrh0_`, `people.person.place_of_birth`) 非空且包含 `m.02mjmr`；hop2 entity 100% 来自 hop1 live 返回
+- recorded I/O：`artifacts/recorded_io/sp2a/sp2a_supplement_recorded_io_v1.json` bundle_hash `db0ea71b8f329e0fa42c13651a4e2e6fb54bc915437ead3cde5074a08a244534`；replay 一致率 100%，replay 未用网络
+- LLM/memory/Oracle/test-label：0 / 0 / 0 / 0
+- 空 hop1 时 hop2 物理请求：0；预算边界正确率 100%
+- 失败分类：无未分类异常；无 INVALID run
+- 有效性：PASS。补充单元测试 9 通过
+- 主报告：`reports/sp2a/SP2A_experiment_report.md`（追加第 13 节，不覆盖主实验原始记录）
+- metrics：`reports/sp2a/metrics.json`；`report_sha256` `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
+- 结论：PASS。SP2-A TAIL 正向语义与动态两跳证据完整。不启动 SP2-B
 
 ### 12.2 计划变更记录
 

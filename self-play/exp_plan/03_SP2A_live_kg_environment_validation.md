@@ -281,6 +281,14 @@ self-play/reports/sp2a/SP2A_experiment_report.md
 - 有效性：PASS。单元测试 58 通过
 - 报告：`reports/sp2a/SP2A_experiment_report.md`
 
+### LOG-SP2A-002 — 2026-08-22 — 补充实验 PASS（不覆盖 LOG-SP2A-001）
+
+- 日期：2026-08-22
+- 补充 Run ID：`sp2a-supp-20260822T111116Z-79aa8ea8`
+- 对应补充计划：`03A_SP2A_supplement_tail_and_dynamic_multihop.md` LOG-SP2A-S-001
+- 结论：主实验原始 E2A.2 空 TAIL 与 E2A.3 预写第二跳实体的证据缺口已由补充实验补齐。主 run `sp2a-20260822T082704Z-28a5bc97` 保持不变。
+- 报告：更新 `reports/sp2a/SP2A_experiment_report.md` 第 13 节；SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
+
 ### 13.2 计划变更记录
 
 | 日期 | 版本 | 修改前 | 修改后 | 原因 | 对可比性的影响 |

@@ -1,7 +1,7 @@
 # PoG Self-Play 经验记忆实验总体要求
 
 > 文档编号：SP-GENERAL  
-> 版本：1.12  
+> 版本：1.13  
 > 制定日期：2026-08-21  
 > 实验根目录：clue_on_graph/self-play/  
 > 状态：生效，后续每一步实验均须遵守
@@ -75,16 +75,17 @@ self-play/
 
 ## 2.5 当前实验阶段与阶段更新规则
 
-当前总体阶段为：**SP2-A 补充实验：TAIL 正向语义与动态多跳验证（进行中）**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS 和阶段收口，但补充实验尚未完成。
+当前总体阶段为：**阶段间等待（SP2-A 含补充已收口，未启动 SP2-B）**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。
 
-- 对应计划文件：03A_SP2A_supplement_tail_and_dynamic_multihop.md（当前执行中）
-- 主实验状态：SP2-A 基础 live KG 环境验证 PASS；补充实验用于补齐真实非空 TAIL 正向语义和由第一跳真实返回驱动的动态两跳证据，并修复 SP2-A 报告哈希登记中的 `PENDING` 问题
-- 当前状态：SP2-A 补充实验进行中；SP2-B 被阻塞，直到补充实验通过、报告哈希补齐并完成 SP2-A 的重新收口
-- 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter + 已验证的 live KG Environment binding
-- 当前允许工作：只执行补充计划规定的真实 KG 环境验证、动态动作实例化、方向断言、状态转移、预算/计数和 replay 检查；不调用 LLM，不使用或生成 memory，不运行 WebQSP 20/150 或 CWQ 50 正式效果评测
+- 对应计划文件：03A_SP2A_supplement_tail_and_dynamic_multihop.md（已收口）
+- 主实验状态：SP2-A 基础 live KG 环境验证 PASS；补充实验已补齐真实非空 TAIL 正向语义和由第一跳真实返回驱动的动态两跳证据
+- 当前状态：SP2-A 含补充已 PASS 并收口；不自动进入 SP2-B，不调用 LLM，不注入 memory，不跑 20/150/50 效果评测
+- 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter + 已验证的 live KG Environment binding（含 TAIL-positive 与动态两跳）
+- 当前允许工作：保持 SP2-A 收口产物；若后续决定启动 SP2-B，须先登记计划后再做无 memory 的 LLM+KG rollout
 - 冻结评测集：`artifacts/datasets/webqsp_smoke_20.jsonl`（20，仅冒烟）、`webqsp_model_compare_150.jsonl`（150）、`cwq_model_compare_50.jsonl`（50）；后续只校验哈希，不得重抽
 - SP2-A 有效 run：`sp2a-20260822T082704Z-28a5bc97`
-- SP2-A 主实验报告：`reports/sp2a/SP2A_experiment_report.md`（SHA-256 见 `reports/sp2a/metrics.json`；当前登记仍需在补充实验中修复）
+- SP2-A 补充有效 run：`sp2a-supp-20260822T111116Z-79aa8ea8`
+- SP2-A 报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
 
 每个阶段的实验工作结束后，必须完成阶段收口。阶段收口的强制顺序为：
 
@@ -102,8 +103,8 @@ self-play/
 |---|---|---|---|---|
 | SP0 | 2026-08-21 | 01_SP0_protocol_workspace_and_data_contract.md | 已完成 PASS（2026-08-22） | E0.1-E0.7 全部通过；协议 `sp-protocol-v1` 与 WebQSP/CWQ 固定评测集已冻结。报告：`reports/sp0/SP0_experiment_report.md` |
 | SP1 | 2026-08-22 | 02_SP1_pog_adapter_and_environment_binding.md | 已完成 PASS（2026-08-22） | E1.1-E1.12 全部通过；有效 run `sp1-20260822T030044Z-8cb155e0`。报告：`reports/sp1/SP1_experiment_report.md` SHA-256 `5eebd53383e417a65a85dac8a42c1b2db494226bb7ab269bea7f878e51b9d333`。已完成阶段收口 |
-| SP2-A | 2026-08-22 | 03_SP2A_live_kg_environment_validation.md | 主实验已完成 PASS（2026-08-22） | E2A.1-E2A.7 全部通过；有效 run `sp2a-20260822T082704Z-28a5bc97`。报告：`reports/sp2a/SP2A_experiment_report.md`。基础实验已收口，但补充证据仍待完成 |
-| SP2-A-SUPPLEMENT | 2026-08-22 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 当前进行中 | 补充验证真实 TAIL 正向语义、真实返回驱动的动态两跳，并修复 SP2-A 报告哈希登记；完成前不得进入 SP2-B |
+| SP2-A | 2026-08-22 | 03_SP2A_live_kg_environment_validation.md | 主实验已完成 PASS（2026-08-22） | E2A.1-E2A.7 全部通过；有效 run `sp2a-20260822T082704Z-28a5bc97`。报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`。基础实验已收口；TAIL/动态两跳由补充实验补齐 |
+| SP2-A-SUPPLEMENT | 2026-08-22 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） | S2A-S.1–S.4 与 replay 通过；有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`。报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`（第 13 节）。已完成重新收口；不启动 SP2-B |
 
 ## 3. 实验核心思想
 
@@ -215,9 +216,9 @@ self-play/
 | SP0 | 实验空间、协议与数据契约冻结 | 01_SP0_protocol_workspace_and_data_contract.md | 已完成 PASS（2026-08-22） |
 | SP1 | 原 PoG 决策点适配与最小环境绑定 | 02_SP1_pog_adapter_and_environment_binding.md | 已完成 PASS（2026-08-22） |
 | SP2-A | 真实 KG 环境验证 | 03_SP2A_live_kg_environment_validation.md | 主实验已完成 PASS（2026-08-22） |
-| SP2-A-SUPPLEMENT | SP2-A 补充：TAIL 正向语义与动态多跳验证 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 当前进行中 |
+| SP2-A-SUPPLEMENT | SP2-A 补充：TAIL 正向语义与动态多跳验证 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） |
 
-后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP2-A 主实验虽已完成基础 PASS，但当前正在执行 SP2-A 补充实验；在补充实验通过、报告哈希补齐并完成 SP2-A 重新收口前，不得进入 SP2-B，不得调用 LLM 做关系或答案决策，不得注入 memory，也不得运行 20/150/50 效果评测。
+后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP2-A 主实验与补充实验均已 PASS 并收口；在登记并启动 SP2-B 之前，不得调用 LLM 做关系或答案决策，不得注入 memory，也不得运行 20/150/50 效果评测。
 
 ## 9. 预期实验顺序与 LLM/KG 使用边界
 
@@ -235,7 +236,7 @@ self-play/
 
 ### 9.1 首次 live KG 实验
 
-SP2-A 主实验已完成基础 live KG 验证，但其 TAIL 正向语义和真实返回驱动的动态两跳证据正在补充。补充实验完成前，不得将 SP2-A 视为已具备进入 SP2-B 的完整环境证据。SP2-A 及其补充实验只使用预制或计划内合法动作直接调用 Environment，不让 LLM 决定关系或答案；进入 LLM+KG 联合运行仍须在 SP2-A 补充实验重新收口后登记并启动 SP2-B。
+SP2-A 主实验已完成基础 live KG 验证，补充实验已补齐 TAIL 正向语义和真实返回驱动的动态两跳证据。SP2-A 现已具备进入 SP2-B 启动登记的环境前置条件，但仍须先生成并登记 SP2-B 计划后才能实现或运行。SP2-A 及其补充实验只使用预制或计划内合法动作直接调用 Environment，不让 LLM 决定关系或答案。
 
 SP1 中使用的人工 fixture 或已有 recorded I/O 只用于验证接口形状和确定性，不算作正式 live KG 实验，也不得作为后续 memory 的有效经验来源。
 
@@ -313,3 +314,4 @@ CONDITIONAL PASS 只能用于不影响核心有效性、隔离性和复现性的
 | 2026-08-22 | 1.10 | 登记 SP2-A 计划 `03_SP2A_live_kg_environment_validation.md`，将当前总体阶段切换为 SP2-A，并修正 SP1 报告实际 SHA-256 | SP1 已完成 fixture 级协议验证；下一步需要真实 KG 环境证据。SP2-A 仍不调用 LLM、不使用 memory、不进行正式 KGQA 效果评测 | SP2-A |
 | 2026-08-22 | 1.11 | SP2-A 验收 PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP2-B | E2A.1–E2A.7 通过；有效 run `sp2a-20260822T082704Z-28a5bc97`；报告 `reports/sp2a/SP2A_experiment_report.md` | SP2-A |
 | 2026-08-22 | 1.12 | 将当前阶段切换为 SP2-A 补充实验，登记 `03A_SP2A_supplement_tail_and_dynamic_multihop.md`，暂缓 SP2-B | 主 SP2-A 已验证基础 live KG 环境，但 TAIL 正向查询和真实返回驱动的动态两跳证据不足，且报告 SHA-256 仍为 `PENDING` | SP2-A-SUPPLEMENT |
+| 2026-08-22 | 1.13 | SP2-A 补充实验验收 PASS 并完成重新收口；当前阶段改为阶段间等待，不启动 SP2-B | S2A-S.1–S.4 与 replay 通过；有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`；报告 `reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc` | SP2-A-SUPPLEMENT |
