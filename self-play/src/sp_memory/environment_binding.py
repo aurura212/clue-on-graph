@@ -23,6 +23,7 @@ class EnvironmentStatus(str, Enum):
     DUPLICATE = "duplicate"
     MALFORMED = "malformed"
     TIMEOUT = "timeout"
+    ENDPOINT_FAILURE = "endpoint_failure"
     SYSTEM_ERROR = "system_error"
     SCHEMA_ERROR = "schema_error"
 

@@ -234,16 +234,29 @@ class PoGAdapter:
         allow_live_kg: bool = False,
         environment: Optional[EnvironmentBinding] = None,
         backtrack_state_policy: str = "unsupported",
+        stage: str = "sp1",
     ) -> None:
+        if stage not in {"sp1", "sp2a"}:
+            raise ProtocolError(ViolationCode.SCHEMA_ERROR, f"unsupported adapter stage {stage}")
         if allow_llm:
-            raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP1 adapter forbids allow_llm=true")
-        if allow_live_kg:
-            raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP1 adapter forbids allow_live_kg=true")
+            raise ProtocolError(ViolationCode.SCHEMA_ERROR, f"{stage.upper()} adapter forbids allow_llm=true")
+        env_is_live = bool(getattr(environment, "allow_live_kg", False)) if environment is not None else False
+        if stage == "sp1":
+            if allow_live_kg or env_is_live:
+                raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP1 adapter forbids allow_live_kg=true")
+            self.allow_live_kg = False
+            self.environment = environment or EnvironmentBinding(allow_live_kg=False)
+        else:
+            if not allow_live_kg:
+                raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP2-A adapter requires allow_live_kg=true")
+            if environment is None:
+                raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP2-A adapter requires an explicit live environment")
+            self.allow_live_kg = True
+            self.environment = environment
+        self.stage = stage
         self.adapter_enabled = adapter_enabled
         self.allow_llm = False
-        self.allow_live_kg = False
         self.backtrack_state_policy = backtrack_state_policy
-        self.environment = environment or EnvironmentBinding(allow_live_kg=False)
         self.llm_calls_observed = 0
 
     def project_visible_state(self, snapshot: PoGSnapshot | Mapping[str, Any]) -> VisibleState:

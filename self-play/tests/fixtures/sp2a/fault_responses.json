@@ -1,0 +1,26 @@
+{
+  "malformed_not_json": "this is not json",
+  "malformed_missing_bindings": {"head": {}, "results": {}},
+  "malformed_missing_tail_entity": {
+    "head": {"vars": ["tailEntity"]},
+    "results": {"bindings": [{"other": {"type": "uri", "value": "http://rdf.freebase.com/ns/m.x"}}]}
+  },
+  "duplicate_bindings": {
+    "head": {"vars": ["tailEntity"]},
+    "results": {
+      "bindings": [
+        {"tailEntity": {"type": "uri", "value": "http://rdf.freebase.com/ns/m.dup"}},
+        {"tailEntity": {"type": "uri", "value": "http://rdf.freebase.com/ns/m.dup"}},
+        {"tailEntity": {"type": "uri", "value": "http://rdf.freebase.com/ns/m.other"}}
+      ]
+    }
+  },
+  "success_bindings": {
+    "head": {"vars": ["tailEntity"]},
+    "results": {
+      "bindings": [
+        {"tailEntity": {"type": "uri", "value": "http://rdf.freebase.com/ns/m.ok"}}
+      ]
+    }
+  }
+}

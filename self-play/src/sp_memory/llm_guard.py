@@ -19,7 +19,7 @@ class LLMCallGuard:
         self.call_args.append({"args": args, "kwargs": {k: "<omitted>" for k in kwargs}})
         raise ProtocolError(
             ViolationCode.SCHEMA_ERROR,
-            "SP1 forbids real LLM calls; run_llm was invoked",
+            "Self-Play protocol forbids real LLM calls; run_llm was invoked",
             {"call_count": self.calls},
         )
 

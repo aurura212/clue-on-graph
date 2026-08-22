@@ -1,0 +1,27 @@
+SP2-A checks status=PASS
+run_id=sp2a-20260822T082704Z-28a5bc97
+protocol=sp-protocol-v1
+config_sha256=46cb85863055ba94698dcde966168ecd5e77f465e6a06bd07b2e78de80d60023
+endpoint=http://localhost:8890/sparql
+E2A.1: PASS
+E2A.2: PASS
+E2A.3: PASS
+E2A.4: PASS
+E2A.5: PASS
+E2A.6: PASS
+E2A.7: PASS
+real_llm_calls=0
+memory_reads=0
+memory_writes=0
+oracle_label_in_action=0
+eval_set_trajectory_uses=0
+head_tail_mapping_rate=1.0
+legal_transition_rate=1.0
+logical_physical_retry_correct_rate=1.0
+budget_boundary_correct_rate=1.0
+replay_agreement=1.0
+unclassified_exceptions=0
+e2a_statuses={'E2A.1': 'PASS', 'E2A.2': 'PASS', 'E2A.3': 'PASS', 'E2A.4': 'PASS', 'E2A.5': 'PASS', 'E2A.6': 'PASS', 'E2A.7': 'PASS'}
+secret_hits=0
+eval_file_hash_changes=0
+unregistered_baseline_hash_changes=0

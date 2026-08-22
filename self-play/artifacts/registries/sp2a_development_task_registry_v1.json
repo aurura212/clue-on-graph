@@ -1,0 +1,97 @@
+{
+  "protocol_version": "sp-protocol-v1",
+  "registry_version": "sp2a-dev-tasks-v1",
+  "plan_version": "SP2A-PLAN 1.0",
+  "source": "independently_registered_public_freebase_entities",
+  "sampled_from_eval_sets": false,
+  "notes": [
+    "Entities are public Freebase MIDs registered for environment validation only.",
+    "Action inputs do not include Oracle answers, witness paths, or frozen eval-set labels.",
+    "If a MID also appears in WebQSP/CWQ exclusion records, it is listed in overlap_topic_or_answer_mids for discovery exclusion."
+  ],
+  "tasks": [
+    {
+      "task_id": "sp2a.dev.connect.obama_name",
+      "usage_tags": ["E2A.1", "E2A.4", "E2A.6"],
+      "question": "SP2-A connectivity probe: type.object.name of a public entity",
+      "entity": "m.02mjmr",
+      "entity_public_name": "Barack Obama",
+      "relation": "type.object.name",
+      "direction": "head",
+      "expected_response_class": "literal",
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02mjmr", "relation": "type.object.name", "direction": "head"}
+      ]
+    },
+    {
+      "task_id": "sp2a.dev.head.obama_birthplace",
+      "usage_tags": ["E2A.1", "E2A.2", "E2A.3", "E2A.6", "E2A.7"],
+      "question": "SP2-A HEAD mapping probe for people.person.place_of_birth",
+      "entity": "m.02mjmr",
+      "entity_public_name": "Barack Obama",
+      "relation": "people.person.place_of_birth",
+      "direction": "head",
+      "expected_response_class": "non-empty",
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02mjmr", "relation": "people.person.place_of_birth", "direction": "head"}
+      ]
+    },
+    {
+      "task_id": "sp2a.dev.tail.honolulu_birthplace",
+      "usage_tags": ["E2A.2"],
+      "question": "SP2-A TAIL mapping probe for people.person.place_of_birth",
+      "entity": "m.02hrh",
+      "entity_public_name": "Honolulu",
+      "relation": "people.person.place_of_birth",
+      "direction": "tail",
+      "expected_response_class": "non-empty-or-empty",
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02hrh", "relation": "people.person.place_of_birth", "direction": "tail"}
+      ]
+    },
+    {
+      "task_id": "sp2a.dev.empty.obama_death",
+      "usage_tags": ["E2A.4", "E2A.6"],
+      "question": "SP2-A empty-result probe for people.person.date_of_death",
+      "entity": "m.02mjmr",
+      "entity_public_name": "Barack Obama",
+      "relation": "people.person.date_of_death",
+      "direction": "head",
+      "expected_response_class": "empty",
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02mjmr", "relation": "people.person.date_of_death", "direction": "head"}
+      ]
+    },
+    {
+      "task_id": "sp2a.dev.twohop.obama_honolulu_containedby",
+      "usage_tags": ["E2A.3"],
+      "question": "SP2-A consecutive two-hop legal EXPAND sequence",
+      "entity": "m.02mjmr",
+      "entity_public_name": "Barack Obama",
+      "relation": "people.person.place_of_birth",
+      "direction": "head",
+      "expected_response_class": "non-empty",
+      "source_entities": ["m.02mjmr", "m.02hrh"],
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02mjmr", "relation": "people.person.place_of_birth", "direction": "head"},
+        {"type": "EXPAND", "entity": "m.02hrh", "relation": "location.location.containedby", "direction": "head"}
+      ]
+    },
+    {
+      "task_id": "sp2a.dev.invalid.unenumerated_relation",
+      "usage_tags": ["E2A.5"],
+      "question": "SP2-A illegal EXPAND must be rejected before any KG request",
+      "entity": "m.02mjmr",
+      "entity_public_name": "Barack Obama",
+      "relation": "not.a.registered.relation",
+      "direction": "head",
+      "expected_response_class": "invalid_action",
+      "enumerated_relations": [
+        {"entity": "m.02mjmr", "relation": "people.person.place_of_birth", "direction": "head"}
+      ],
+      "steps": [
+        {"type": "EXPAND", "entity": "m.02mjmr", "relation": "not.a.registered.relation", "direction": "head"}
+      ]
+    }
+  ]
+}

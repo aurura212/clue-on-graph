@@ -3,9 +3,9 @@
 > 文档编号：SP2A-PLAN  
 > 版本：1.0  
 > 初始制定日期：2026-08-22  
-> 状态：已登记，待实施  
-> 当前阶段：SP2-A  
-> 上位约束：`00_experiment_overall_requirements.md` v1.10  
+> 状态：已完成 PASS（2026-08-22）  
+> 当前阶段：SP2-A（已收口）  
+> 上位约束：`00_experiment_overall_requirements.md` v1.10（运行时为 v1.10；收口后升级）  
 > 前置必读：`00_experiment_overall_requirements.md`、`01_SP0_protocol_workspace_and_data_contract.md`、`02_SP1_pog_adapter_and_environment_binding.md`、`reports/sp1/SP1_experiment_report.md`  
 > 前置结论：SP0 PASS；SP1 PASS；协议 `sp-protocol-v1`、固定评测集和 PoG adapter 已冻结
 
@@ -263,7 +263,23 @@ self-play/reports/sp2a/SP2A_experiment_report.md
 
 ### 13.1 运行日志占位
 
-<!-- 在 SP2-A 实验运行后追加。当前计划生成不代表实验已启动或已通过。 -->
+### LOG-SP2A-001 — 2026-08-22 — 有效 run PASS
+
+- 日期：2026-08-22
+- Run ID：`sp2a-20260822T082704Z-28a5bc97`（有效）
+- 计划版本：SP2A-PLAN 1.0
+- 配置：`configs/sp2a_live_kg_v1.json` SHA-256 `46cb85863055ba94698dcde966168ecd5e77f465e6a06bd07b2e78de80d60023`
+- Git：commit `09fd3a5657889e1f986b7e22021b92a429695cce`，dirty
+- 开发 task registry：`artifacts/registries/sp2a_development_task_registry_v1.json` SHA-256 `e85513a0c9ac1a1cbbb9586e033aaae1d121bcc21c85e2dd7e62a403b7906301`
+- endpoint/snapshot：`http://localhost:8890/sparql`（只读 POST）
+- 输入：冻结 20/150/50 只校验哈希，未生成评测轨迹；exclusion 220
+- E2A.1–E2A.7：全部 PASS。live Obama `place_of_birth` → `m.02hrh0_`；登记 Honolulu `m.02hrh` 的 TAIL/containedby 为空但方向映射正确
+- recorded I/O：`artifacts/recorded_io/sp2a/sp2a_recorded_io_v1.json` bundle_hash `5137e8d97d14d7a91742827a7d4a2ddaea80cc235c5c3fb67006f3d59d1498b5`，n=23；replay 一致率 100%，replay 未用网络
+- LLM/memory/Oracle/test-label：0 / 0 / 0 / 0
+- 计数：retry 用例 logical=1 physical=2 retry=1；timeout 耗尽 physical=3；非法动作 physical=0；超预算第二次物理请求=0
+- 失败分类：无未分类异常；无 INVALID run
+- 有效性：PASS。单元测试 58 通过
+- 报告：`reports/sp2a/SP2A_experiment_report.md`
 
 ### 13.2 计划变更记录
 
