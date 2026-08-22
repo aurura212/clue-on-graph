@@ -314,6 +314,14 @@ self-play/
 - metrics：`reports/sp2a/metrics.json`；`report_sha256` `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
 - 结论：PASS。SP2-A TAIL 正向语义与动态两跳证据完整。不启动 SP2-B
 
+### LOG-SP2A-S-002 — 2026-08-22 — 报告哈希核对（换行符，非内容漂移）
+
+- 登记值：`0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`
+- 仓库字节（LF，`sha256sum` / Python `hashlib` on raw file）：与登记值一致；HEAD blob 一致
+- 另一计算值 `beb43d7a9f8f4d2b20048bad8483486e11ec68b61daebeeab6797c241eec7ecd`：同一正文将 `\n` 换成 `\r\n` 后的 SHA-256，不是另一份报告
+- 处理：不改 `metrics.json`、不改报告正文、不把 CRLF 哈希登记为收口值
+- 结论：收口哈希有效。核对应对仓库内 LF 文件字节，不能对 CRLF 转写再哈希
+
 ### 12.2 计划变更记录
 
 | 日期 | 版本 | 修改前 | 修改后 | 原因 | 对可比性的影响 |

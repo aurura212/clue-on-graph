@@ -1673,3 +1673,18 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---
+
+### LOG-071 — 2026-08-22 — SP2-A 报告哈希核对（CRLF 假差异）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`incident`
+- 对应方案：独立 `self-play/` SP2-A 收口；**不是** V2-5
+- 代码：未改报告正文，未改 `metrics.json` 登记哈希
+- 配置：无
+- 产物：`self-play/reports/sp2a/SP2A_experiment_report.md`；核对记录见 `self-play/exp_plan/03A_SP2A_supplement_tail_and_dynamic_multihop.md` LOG-SP2A-S-002
+- 结果：登记 SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc` 与仓库 LF 文件一致。另一值 `beb43d7a…` 是同一文件 CRLF 转写的哈希
+- 异常：无内容漂移
+- 结论：收口哈希有效，不重登。V2 判定不变。不得未登记启动 SP2-B
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
