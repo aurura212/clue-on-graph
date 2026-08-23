@@ -3,8 +3,8 @@
 > 文档编号：SP4-PLAN  
 > 版本：2.1  
 > 制定日期：2026-08-23  
-> 状态：已登记，启动准备，尚未运行  
-> 当前阶段：SP4 前置能力补齐与候选经验受控晋升  
+> 状态：已运行，CONDITIONAL PASS 并收口  
+> 当前阶段：SP4 已完成收口；不得进入 SP5  
 > 实验根目录：`clue_on_graph/self-play/`  
 > 上位约束：`00_experiment_overall_requirements.md` v1.20  
 > 前置计划：`01_SP0_protocol_workspace_and_data_contract.md`、`02_SP1_pog_adapter_and_environment_binding.md`、`03_SP2A_live_kg_environment_validation.md`、`03A_SP2A_supplement_tail_and_dynamic_multihop.md`、`04_SP2B_llm_kg_baseline_rollout.md`、`05_SP3_candidate_experience_discovery.md`  
@@ -400,6 +400,40 @@ SP4 完成的是“经验是否具有进入 PoG 的资格”，不是“经验�
 - 当前允许：SP4.0 preflight、代码实现、数据冻结和审计准备
 - 当前禁止：候选直接注入、SP5、正式 WebQSP/CWQ 效果评测和 promotion 前生成正式 memory
 
+### LOG-SP4-002：代码实现与离线单测
+
+- 日期：2026-08-23
+- Run ID：无（仅代码与 `tests/test_sp4_offline.py`）
+- 计划版本：SP4-PLAN 2.1
+- overall 版本：SP-GENERAL 1.20
+- Git commit / dirty status：`492348b5aef5b04ca2d77cb41a1a9da8049e6b79` dirty
+- 配置、prompt、数据和 registry SHA-256：实现时配置尚未含 synthetic manifest hash
+- 模型、temperature、KG endpoint、seed、预算：无 LLM/KG
+- Oracle level、memory read、candidate injection：O0；memory_read=false
+- 输入规模与数据来源：fixture snapshot 生成器与 SP3 候选只读审计
+- 结果和指标：SP4 离线测试 14 通过；全库 103 通过 / 0 失败
+- 失败分类：无
+- 有效/无效 Run 判断：代码与测试有效，不是正式评测
+- 证据路径：`self-play/src/sp_memory/sp4_*.py`、`tests/test_sp4_offline.py`
+- 对下一步的判断：CONTINUE_PHASE，运行 preflight 并冻结 SP4-SYN/CF/V1/V2
+
+### LOG-SP4-003：SP4.0–SP4.7 无 LLM/KG 正式运行
+
+- 日期：2026-08-23
+- Run ID：`sp4-20260823T050956Z-69e15a34`
+- 计划版本：SP4-PLAN 2.1
+- overall 版本：SP-GENERAL 1.20
+- Git commit / dirty status：`492348b5aef5b04ca2d77cb41a1a9da8049e6b79` dirty
+- 配置、prompt、数据和 registry SHA-256：运行时配置 `58e9a544…`；冻结后配置（含 manifest hash）`2017dd81a4f6071a5b82cf5170a72072ab22ec6c48672de6fb1a8a06c7cfd977`；synthetic manifest `b22c08bd…`；snapshot file `09178a44…`
+- 模型、temperature、KG endpoint、seed、预算：未调用 LLM/KG；seed=20260823；snapshot 预算 depth 4 / steps 16
+- Oracle level、memory read、candidate injection：Actor/Critic O0；memory_read=false；injection=false
+- 输入规模与数据来源：fixture snapshot；discovery 12 / V1 8 / V2 8 / holdout 8；SP3 候选 119 条只审计
+- 结果和指标：split 污染 0；泄漏率 0。G0/G1/G2/G3 replay 100%，G1 system_failure 0。SP3 审计 113/119 通过。CF n=12，win=0，tie=0.583，invalid=0.417，harm=0。蒸馏 4 条，promoted 0，deferred 4
+- 失败分类：无未分类异常。降级：模板 verbalizer、启发式 Critic、fixture snapshot
+- 有效/无效 Run 判断：有效 CONDITIONAL PASS；不得进入 SP5
+- 证据路径：`runs/sp4-20260823T050956Z-69e15a34/`；`reports/sp4/SP4_experiment_report.md` SHA-256 `65a4d7da846ecb4c79207ecd48777f55be12e5d306c1ea8d704e342faed2de43`
+- 对下一步的判断：ACCEPT 本阶段 CONDITIONAL PASS 并收口。禁止 SP5、禁止把结果写成 EM/F1 或 V2-5
+
 ### 后续日志模板
 
 #### LOG-SP4-XXX：[步骤/运行名称]
@@ -426,6 +460,7 @@ SP4 完成的是“经验是否具有进入 PoG 的资格”，不是“经验�
 | 2026-08-23 | 1.0 | 登记候选反事实、validation、蒸馏和 promotion 计划 | SP3 生成 119 条候选但尚未验证 | 不改变 SP3 结果 |
 | 2026-08-23 | 2.0 | 将合成任务、严格 held-out split、多轨迹 Critic 补充、backtrack 门禁、candidate injection 审计纳入 SP4 前置；重新定义 SP4 验收门槛和后续边界 | 初始方案要求尚未全部落地，原 SP4 范围不足以支撑正式 Memory 评测 | 不重写 SP3；SP4 产物和 memory 版本升级为 v2；禁止使用 WebQSP/CWQ 固定 benchmark 集调参或 promotion |
 | 2026-08-23 | 2.1 | 新增独立的代码生成 Prompt，明确模块职责、数据契约、实验边界、测试要求和交付验收 | 让代码大模型能够按 SP4 计划生成可测试、可重放且默认安全失败的实现，也便于人工审阅预期代码范围 | 不改变实验数据和统计门槛；新增 prompt 文件需纳入 hash 和日志追踪 |
+| 2026-08-23 | 2.1 收口 | 状态改为 CONDITIONAL PASS 并收口；overall 收口后升级为 1.21 | 实验已完成：0 条 promotion；模板 verbalizer 与非 live LLM/KG 为登记降级 | 不改写运行产物；不启动 SP5 |
 
 
 

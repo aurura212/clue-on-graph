@@ -1,0 +1,80 @@
+{
+  "conclusion": "CONDITIONAL PASS",
+  "counterfactual": {
+    "harm_rate": 0.0,
+    "inapplicable_rate": 0.0,
+    "invalid_rate": 0.0,
+    "n": 120,
+    "n_applicable": 120,
+    "sham_better_ids": [],
+    "tie_rate": 1.0,
+    "win_rate": 0.0
+  },
+  "critic": {
+    "G0": {
+      "complete_rate": 1.0,
+      "critic_source": "explorer_only",
+      "mean_critic_rounds": 0.0,
+      "n": 40,
+      "recovery_rate": 0.0,
+      "replay_rate": 1.0,
+      "success_rate": 0.25
+    },
+    "G1": {
+      "complete_rate": 1.0,
+      "critic_source": "o0_critic",
+      "mean_critic_rounds": 1.675,
+      "n": 120,
+      "recovery_rate": 0.25,
+      "replay_rate": 1.0,
+      "success_rate": 0.4
+    },
+    "G2": {
+      "complete_rate": 1.0,
+      "critic_source": "oracle_guided_offline_teacher",
+      "mean_critic_rounds": 0.0,
+      "n": 40,
+      "recovery_rate": 0.0,
+      "replay_rate": 1.0,
+      "success_rate": 0.825
+    },
+    "G3": {
+      "complete_rate": 1.0,
+      "critic_source": "random_critic",
+      "mean_critic_rounds": 1.85,
+      "n": 40,
+      "recovery_rate": 0.15,
+      "replay_rate": 1.0,
+      "success_rate": 0.225
+    }
+  },
+  "n_promoted": 0,
+  "plan_version": "SP4-SUPPLEMENT 1.0",
+  "preflight_ok": true,
+  "promotion": {
+    "gates": {
+      "audit_pass_rate": 1.0,
+      "max_harm_rate": 0.1,
+      "min_cf_states": 5,
+      "min_cost_drop": 0.1,
+      "min_discovery_tasks": 3,
+      "min_margin": 0.2,
+      "min_v1_triggers": 5
+    },
+    "manifest_hash": "678c11ecce3555137e519d526e9633dc8108366ed6f9233f091456f029b1c75b",
+    "n_deferred": 6,
+    "n_promoted": 0,
+    "n_rejected_harmful": 0,
+    "n_rules": 6,
+    "n_validated_candidate": 0,
+    "protocol_version": "sp-protocol-v1",
+    "readonly": true,
+    "rule_ids_promoted": [],
+    "schema_version": "sp4-memory-manifest-v2"
+  },
+  "protocol_version": "sp-protocol-v1",
+  "report_path": "reports/sp4s/SP4S_experiment_report.md",
+  "report_sha256": "bd59b193edbdf82e04ee42fc53c774d2115712a97053a724a48b45ef6eb2295b",
+  "run_id": "sp4s-20260823T082040Z-7cecbcb0",
+  "sp5_allowed": false
+}

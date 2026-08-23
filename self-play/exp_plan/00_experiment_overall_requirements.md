@@ -1,7 +1,7 @@
 # PoG Self-Play 经验记忆实验总体要求
 
 > 文档编号：SP-GENERAL  
-> 版本：1.20
+> 版本：1.24
 > 制定日期：2026-08-21  
 > 实验根目录：clue_on_graph/self-play/  
 > 状态：生效，后续每一步实验均须遵守
@@ -75,15 +75,15 @@ self-play/
 
 ## 2.5 当前实验阶段与阶段更新规则
 
-当前总体阶段为：**SP4 已登记，处于启动准备阶段，尚未运行**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。SP2-B 已于 2026-08-22 验收 PASS 并完成收口。SP3 已于 2026-08-23 验收 PASS 并完成收口。
+当前总体阶段为：**SP4-SUPPLEMENT 已验收 CONDITIONAL PASS 并收口；不启动 SP5**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。SP2-B 已于 2026-08-22 验收 PASS 并完成收口。SP3 已于 2026-08-23 验收 PASS 并完成收口。SP4 已于 2026-08-23 验收 CONDITIONAL PASS 并完成收口。
 
-- 对应计划文件：06_SP4_precondition_counterfactual_distillation_promotion_v2.md（已登记，启动准备，尚未运行）
-- 前置阶段状态：SP2-B 无 Self-Play Experience Memory 的 LLM+live KG 端到端基线 PASS
-- 当前状态：SP3 候选经验发现已 PASS 并收口。SP4 v2 除对 119 条候选进行重新审计、同状态反事实验证、独立 validation、蒸馏和 promotion 外，还必须补齐合成 KGQA 任务与严格 held-out split、多轨迹 Critic 证据、backtrack 协议门禁和 candidate injection 审计。候选尚未注入，`promoted_memory` 尚未生成。不得进入 SP5，不得把 SP4 结果写成最终 EM/F1 提升
+- 对应计划文件：06A_SP4_supplement_same_state_nl_live_critic.md（补充实验已收口）；主计划 06_SP4_precondition_counterfactual_distillation_promotion_v2.md 仍为已收口的 CONDITIONAL PASS
+- 前置阶段状态：SP4 CONDITIONAL PASS；0 条 promoted_memory
+- 当前状态：SP4-SUPPLEMENT CONDITIONAL PASS。同状态 CF 可测；共享关系 split 污染 0；多模板问句泄漏 0；PROMOTION_GATES 未改；0 条 promoted。旧 `sp4_*` 只读。不得进入 SP5，不得把结果写成最终 EM/F1 提升
 - 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter + 已验证的 live KG Environment + 已冻结的无 memory LLM+KG 在线运行协议 + 已审计的 candidate store（未 promotion）
-- 当前数据边界：D0/D1/H 已冻结；SP4 必须另行冻结 `SP4-CF`、`SP4-V1` 和 `SP4-V2`，不得使用 `webqsp_smoke_20.jsonl`、`webqsp_model_compare_150.jsonl` 或 `cwq_model_compare_50.jsonl` 生成候选、蒸馏规则、调参或 promotion
-- 当前允许工作：SP4.0 preflight、合成任务与 split 实现、多轨迹 Critic 补充、backtrack 协议门禁、候选重新审计、反事实验证和 validation 的代码实现、数据冻结与审计准备
-- 当前禁止工作：运行 SP5、正式 WebQSP/CWQ 效果评测、在配置冻结前运行候选注入、在 promotion 前生成正式 memory
+- 当前数据边界：D0/D1/H 已冻结；SP4-SYN/CF/V1/V2 已冻结只读；SP4S 使用独立 `sp4s-*` 产物；不得使用 `webqsp_smoke_20.jsonl`、`webqsp_model_compare_150.jsonl` 或 `cwq_model_compare_50.jsonl` 生成候选、蒸馏规则、调参或 promotion
+- 当前允许工作：阶段间等待、只读复核；不得启动 SP5
+- 当前禁止工作：运行 SP5、正式 WebQSP/CWQ 效果评测、把空的 promoted_memory 注入 PoG、把 G1/G2/G3 snapshot 成功率写成 memory 增益、下调 PROMOTION_GATES
 - 冻结评测集：`artifacts/datasets/webqsp_smoke_20.jsonl`（20，仅冒烟）、`webqsp_model_compare_150.jsonl`（150）、`cwq_model_compare_50.jsonl`（50）；后续只校验哈希，不得重抽
 - SP2-A 有效 run：`sp2a-20260822T082704Z-28a5bc97`
 - SP2-A 补充有效 run：`sp2a-supp-20260822T111116Z-79aa8ea8`
@@ -94,6 +94,10 @@ self-play/
 - SP3 D1 有效 run：`sp3-20260822T160827Z-941c23fe`
 - SP3 holdout 有效 run：`sp3-20260822T164407Z-ce2cf6e6`
 - SP3 报告：`reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650`
+- SP4 有效 run：`sp4-20260823T050956Z-69e15a34`
+- SP4 报告：`reports/sp4/SP4_experiment_report.md` SHA-256 `65a4d7da846ecb4c79207ecd48777f55be12e5d306c1ea8d704e342faed2de43`
+- SP4-SUPPLEMENT 有效 run：`sp4s-20260823T082040Z-7cecbcb0`
+- SP4-SUPPLEMENT 报告：`reports/sp4s/SP4S_experiment_report.md` SHA-256 `bd59b193edbdf82e04ee42fc53c774d2115712a97053a724a48b45ef6eb2295b`
 
 每个阶段的实验工作结束后，必须完成阶段收口。阶段收口的强制顺序为：
 
@@ -115,7 +119,8 @@ self-play/
 | SP2-A-SUPPLEMENT | 2026-08-22 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） | S2A-S.1–S.4 与 replay 通过；有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`。报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`（第 13 节）。已完成重新收口；不启动 SP2-B |
 | SP2-B | 2026-08-22 | 04_SP2B_llm_kg_baseline_rollout.md | 已完成 PASS（2026-08-22） | B0/B1/B2 均可终止且 replay 100%；有效 run `sp2b-20260822T131350Z-b70a898b`。报告：`reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`。不生成 Self-Play 经验，不以 B2 准确率为门槛；不启动 SP3 |
 | SP3 | 2026-08-22 | 05_SP3_candidate_experience_discovery.md | 已完成 PASS（2026-08-23） | D0/D1 G0–G3/holdout 轨迹可 replay；候选 119 条只写不读。有效 run D0 `sp3-20260822T145537Z-0c4deb09`、D1 `sp3-20260822T160827Z-941c23fe`、H `sp3-20260822T164407Z-ce2cf6e6`。报告：`reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650`。不注入、不 promotion、不启动 SP4 |
-| SP4 | 2026-08-23 | 06_SP4_precondition_counterfactual_distillation_promotion_v2.md | 已登记，启动准备，尚未运行 | 在反事实、validation、蒸馏和 promotion 前补齐合成任务/严格 held-out、多轨迹 Critic、backtrack 门禁和 candidate injection 审计；G1/G2/G3 分层。尚未生成 promoted_memory；不得进入 SP5 |
+| SP4 | 2026-08-23 | 06_SP4_precondition_counterfactual_distillation_promotion_v2.md | 已完成 CONDITIONAL PASS（2026-08-23） | 合成 split 污染 0；G0–G3 replay 100%；SP3 候选 113/119 审计通过；CF win=0；promoted 0。有效 run `sp4-20260823T050956Z-69e15a34`。报告：`reports/sp4/SP4_experiment_report.md` SHA-256 `65a4d7da846ecb4c79207ecd48777f55be12e5d306c1ea8d704e342faed2de43`。不启动 SP5 |
+| SP4-SUPPLEMENT | 2026-08-23 | 06A_SP4_supplement_same_state_nl_live_critic.md | 已完成 CONDITIONAL PASS（2026-08-23） | 同状态 CF 可测（n=120，invalid=0，win=0，tie=1.0）；共享关系 split 污染 0；多模板问句泄漏 0；PROMOTION_GATES 未改；0 promoted。有效 run `sp4s-20260823T082040Z-7cecbcb0`。报告：`reports/sp4s/SP4S_experiment_report.md` SHA-256 `bd59b193edbdf82e04ee42fc53c774d2115712a97053a724a48b45ef6eb2295b`。不启动 SP5 |
 
 ## 3. 实验核心思想
 
@@ -230,9 +235,10 @@ self-play/
 | SP2-A-SUPPLEMENT | SP2-A 补充：TAIL 正向语义与动态多跳验证 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） |
 | SP2-B | 无 Self-Play Experience Memory 的 LLM+KG 端到端基线 Rollout | 04_SP2B_llm_kg_baseline_rollout.md | 已完成 PASS（2026-08-22） |
 | SP3 | Self-Play 候选经验发现与生成 | 05_SP3_candidate_experience_discovery.md | 已完成 PASS（2026-08-23） |
-| SP4 | 前置能力补齐、候选经验反事实验证、蒸馏与 promotion | 06_SP4_precondition_counterfactual_distillation_promotion_v2.md | 已登记，启动准备，尚未运行 |
+| SP4 | 前置能力补齐、候选经验反事实验证、蒸馏与 promotion | 06_SP4_precondition_counterfactual_distillation_promotion_v2.md | 已完成 CONDITIONAL PASS（2026-08-23） |
+| SP4-SUPPLEMENT | 同状态 CF、共享关系 split、NL 问句、snapshot LLM Critic | 06A_SP4_supplement_same_state_nl_live_critic.md | 已完成 CONDITIONAL PASS（2026-08-23） |
 
-后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP3 已 PASS 并收口；SP4 v2 已登记但尚未完成 SP4.0 冻结和审计，未通过 SP4.0 前不得运行候选反事实或 validation，不得进入 SP5，不得运行 WebQSP 150/CWQ 50 正式效果评测。
+后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP3 已 PASS 并收口；SP4 已 CONDITIONAL PASS 并收口。SP4-SUPPLEMENT 已 CONDITIONAL PASS 并收口。未 promotion 任何规则，不得进入 SP5，不得运行 WebQSP 150/CWQ 50 正式效果评测。
 
 ## 9. 预期实验顺序与 LLM/KG 使用边界
 
@@ -336,3 +342,7 @@ CONDITIONAL PASS 只能用于不影响核心有效性、隔离性和复现性的
 | 2026-08-23 | 1.18 | SP3 验收 PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP4 | D0/D1/G0–G3/holdout 可 replay；候选 119 条未注入。报告 `reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650` | SP3 |
 | 2026-08-23 | 1.19 | 登记 SP4 候选经验反事实验证、独立 validation、蒸馏与 promotion 计划；当前阶段切换为 SP4 启动准备，明确尚未运行且不得进入 SP5 | SP3 已生成 119 条候选但尚未注入；需要先验证候选的同状态收益、负迁移、跨任务复用和 Oracle 隔离，再冻结 `promoted_memory` | SP4 |
 | 2026-08-23 | 1.20 | 将 SP4 扩展为前置能力补齐、合成任务与严格 held-out、多轨迹 Critic、backtrack 门禁、candidate injection 审计、反事实验证、蒸馏和 promotion；主计划切换为 v2 | 对照初始方案发现原 SP4 计划遗漏了正式验证前必须补齐的任务生成、split、Critic 和动作协议证据 | 不改写 SP3 结果；SP4 使用独立 SP4-SYN/SP4-CF/SP4-V1/SP4-V2，正式 benchmark 仍延后 |
+| 2026-08-23 | 1.21 | SP4 验收 CONDITIONAL PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP5 | 合成任务与严格 split、压缩 Critic、backtrack 协议门禁、候选审计、反事实和 promotion 判定已完成；0 条规则 promotion；模板 verbalizer 与非 live LLM/KG 为登记降级。有效 run `sp4-20260823T050956Z-69e15a34`；报告 `reports/sp4/SP4_experiment_report.md` SHA-256 `65a4d7da846ecb4c79207ecd48777f55be12e5d306c1ea8d704e342faed2de43` | SP4 |
+| 2026-08-23 | 1.22 | 登记并启动 SP4-SUPPLEMENT；当前允许同状态 CF、共享关系 snapshot、NL 问句与 snapshot LLM Critic；仍禁止 SP5 | SP4 CONDITIONAL PASS 暴露了起点 CF、关系后缀拆分词表、模板问句和启发式 Critic 四类缺口；补充实验不改写 SP4 主结论，也不放宽 promotion 门槛 | SP4-SUPPLEMENT |
+| 2026-08-23 | 1.23 | SP4-SUPPLEMENT 验收 CONDITIONAL PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP5 | 同状态 CF 可测；split 污染 0；问句泄漏 0；门槛未改；0 promoted。有效 run `sp4s-20260823T082040Z-7cecbcb0`；报告 `reports/sp4s/SP4S_experiment_report.md` SHA-256 `bd59b193edbdf82e04ee42fc53c774d2115712a97053a724a48b45ef6eb2295b` | SP4-SUPPLEMENT |
+| 2026-08-23 | 1.24 | 将 SP4-SUPPLEMENT 报告改写为中文叙述并更新冻结 SHA-256；实验结论不变 | 仅文档语言与哈希；未重跑、未改 PROMOTION_GATES、未启动 SP5。报告 `reports/sp4s/SP4S_experiment_report.md` SHA-256 `bd59b193edbdf82e04ee42fc53c774d2115712a97053a724a48b45ef6eb2295b` | SP4-SUPPLEMENT |

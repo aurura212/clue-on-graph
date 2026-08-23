@@ -24,18 +24,18 @@
 | 字段 | 值 |
 |---|---|
 | 更新日期 | 2026-08-23 |
-| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0–SP2-B PASS；**SP3 候选经验发现 PASS 并收口**。均**不是** V2-5 Self-Play |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0–SP3 PASS；SP4 CONDITIONAL PASS 并收口（0 条 promoted_memory）；**SP4-SUPPLEMENT CONDITIONAL PASS 并收口**（0 条 promoted_memory）。均**不是** V2-5 Self-Play |
 | 当前 Phase | `V2-3` |
-| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A/SP2-B/SP3 代码不改变本判定 |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0–SP4 / SP4-SUPPLEMENT 不改变本判定 |
 | 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
 | 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
 | **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
 | 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
-| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A/SP2-B PASS 与 SP3 代码冻结不构成进入 V2-5 的许可。SP3 不得注入候选经验、不得进入 SP4、不得使用 WebQSP 20/150 或 CWQ 50 生成经验 |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0–SP4 / SP4-SUPPLEMENT 不构成进入 V2-5 的许可。不得把空 `promoted_memory` 注入 PoG。不得进入 SP5。不得使用 WebQSP 20/150 或 CWQ 50 生成经验、调参或 promotion。不得下调 PROMOTION_GATES |
 
 ### 下一步（唯一允许的动作）
 
-V2 reflection 停止扩大。独立 `self-play/` SP3 已 PASS 并收口。不得启动 SP4，除非后续单独登记。不得把候选注入或写成 EM/F1 / V2-5。
+V2 reflection 停止扩大。独立 `self-play/` 已在 SP4-SUPPLEMENT CONDITIONAL PASS 收口。不得启动 SP5。不得把候选/空 memory 注入或写成 EM/F1 / V2-5。
 
 ---
 
@@ -1761,6 +1761,50 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 结果：G0/G1/G3/H replay 100%，未分类 0。G1 候选 24；G2 teacher 38（单独标注）；G3 随机 57。G1 system_failure 31 为 16k 上下文，已分类。配对恢复 2/33。无 EM/F1，无注入
 - 异常：G1 Critic 上下文超长；G3 候选多于 G1。均记入报告风险
 - 结论：独立 SP3 PASS 并收口。V2 判定仍为 `GATE_HOLD`。不启动 SP4，不写成 V2-5 或 memory 有效
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-077 — 2026-08-23 — 独立 self-play/ SP4 CONDITIONAL PASS 并收口（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.20（收口后 1.21）与 `06_SP4_precondition_counterfactual_distillation_promotion_v2.md` SP4-PLAN 2.1。**不是** V2-5，也不是 SP5
+- 代码：Git `492348b5aef5b04ca2d77cb41a1a9da8049e6b79` dirty；未改原 PoG 基线；未调用 LLM / live KG
+- 配置：`sp4_precondition_and_promotion_v2.json`（冻结后 SHA-256 `2017dd81a4f6071a5b82cf5170a72072ab22ec6c48672de6fb1a8a06c7cfd977`）；seed=20260823；verbalizer=`template_v1_degraded`；snapshot=`sp4-fixture-graph-v1`
+- 产物：有效 run `sp4-20260823T050956Z-69e15a34`；报告 `reports/sp4/SP4_experiment_report.md` SHA-256 `65a4d7da846ecb4c79207ecd48777f55be12e5d306c1ea8d704e342faed2de43`；`promoted_memory_v2.jsonl` 空（n_promoted=0）
+- 结果：discovery 12 / V1 8 / V2 8 / holdout 8；split 污染 0；泄漏 0。G0–G3 replay 100%。SP3 审计 113/119 通过。CF n=12，win=0，tie=0.583，invalid=0.417，harm=0。蒸馏 4 条全部 deferred
+- 异常：无未分类失败。登记降级：模板 verbalizer、启发式 Critic、fixture snapshot。SP3 WebQSP 候选无法在 fixture 上同状态执行
+- 结论：独立 SP4 **CONDITIONAL PASS** 并收口。V2 判定仍为 `GATE_HOLD`。不启动 SP5，不写成 EM/F1 或 V2-5
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-078 — 2026-08-23 — 独立 self-play/ SP4-SUPPLEMENT CONDITIONAL PASS 并收口（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.22（收口后 1.23）与 `06A_SP4_supplement_same_state_nl_live_critic.md`。**不是** V2-5，也不是 SP5
+- 代码：Git `492348b5aef5b04ca2d77cb41a1a9da8049e6b79` dirty；未改原 PoG 基线；未改 `PROMOTION_GATES`；未调用 LLM / live KG
+- 配置：`sp4s_supplement_v1.json` SHA-256 `d50d56a4c74807a1dc61b1ce5c81ba20f82cfaad442b8c5c0141937865378b92`；seed=20260823；verbalizer=`multi_template_v1`；snapshot=`sp4s-shared-rel-graph-v1`
+- 产物：有效 run `sp4s-20260823T082040Z-7cecbcb0`；报告 `reports/sp4s/SP4S_experiment_report.md` SHA-256 `c5d8dda11557ed12310fb5e7cd7b1d568168d65c39c350c9df2291863c29da41`；promoted_memory 空（n_promoted=0）
+- 结果：discovery 40 / V1 20 / V2 20 / holdout 20；split 污染 0；问句泄漏 0。G0–G3 replay 100%。同状态 CF n=120，applicable=120，win=0，tie=1.0，invalid=0，harm=0。蒸馏 6 条全部 deferred
+- 异常：无未分类失败。登记降级：多模板 verbalizer（未开 `--allow-llm`）、启发式 snapshot Critic、live KG 子图跳过
+- 结论：独立 SP4-SUPPLEMENT **CONDITIONAL PASS** 并收口。V2 判定仍为 `GATE_HOLD`。不启动 SP5，不写成 EM/F1 或 V2-5
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-079 — 2026-08-23 — SP4-SUPPLEMENT 报告中文化（不是 V2-5，未重跑）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`docs`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.23（本条后 1.24）与 `06A_SP4_supplement_same_state_nl_live_critic.md`
+- 代码：未改协议/门槛/基线；未调用 LLM / live KG；未启动 SP5
+- 产物：`reports/sp4s/SP4S_experiment_report.md` SHA-256 由 `c5d8dda11557ed12310fb5e7cd7b1d568168d65c39c350c9df2291863c29da41` 更新为 `bd59b193edbdf82e04ee42fc53c774d2115712a97053a724a48b45ef6eb2295b`
+- 结果：仅将已收口报告改为中文叙述；有效 run 仍为 `sp4s-20260823T082040Z-7cecbcb0`；n_promoted=0
+- 异常：无
+- 结论：独立 SP4-SUPPLEMENT 仍为 **CONDITIONAL PASS**。V2 判定仍为 `GATE_HOLD`
 - 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---

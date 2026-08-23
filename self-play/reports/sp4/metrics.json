@@ -1,0 +1,63 @@
+{
+  "protocol_version": "sp-protocol-v1",
+  "plan_version": "SP4-PLAN 2.1",
+  "overall_version": "SP-GENERAL 1.20",
+  "run_id": "sp4-20260823T050956Z-69e15a34",
+  "conclusion": "CONDITIONAL PASS",
+  "n_promoted": 0,
+  "preflight_ok": true,
+  "llm_called": false,
+  "kg_called": false,
+  "git_commit": "492348b5aef5b04ca2d77cb41a1a9da8049e6b79",
+  "git_dirty": true,
+  "unit_tests": {"tests_run": 103, "failures": 0, "errors": 0, "skipped": 0, "was_successful": true},
+  "snapshot_id": "sp4-fixture-graph-v1",
+  "snapshot_hash": "545a7372f723864e53d31f1777488a42348581f7a29a80d94b8a994b21e40f8d",
+  "synthetic_manifest_hash": "b22c08bdbbf9dc355308611dfdebd8a645beda3cb23b89c57ad85d54ced8962f",
+  "verbalizer": "template_v1_degraded",
+  "split_counts": {"discovery": 12, "validation_v1": 8, "validation_v2": 8, "holdout": 8, "counterfactual_states": 12},
+  "split_contamination": 0,
+  "leakage_rate": 0.0,
+  "critic": {
+    "G0": {"n": 12, "complete_rate": 1.0, "replay_rate": 1.0, "success_rate": 0.3333, "recovery_rate": 0.0, "system_failure_rate": 0.0, "mean_steps": 11.333, "critic_source": "explorer_only"},
+    "G1": {"n": 36, "complete_rate": 1.0, "replay_rate": 1.0, "success_rate": 0.7778, "recovery_rate": 0.0556, "system_failure_rate": 0.0, "mean_steps": 7.806, "critic_source": "o0_critic"},
+    "G2": {"n": 12, "complete_rate": 1.0, "replay_rate": 1.0, "success_rate": 0.8333, "recovery_rate": 0.0, "system_failure_rate": 0.0, "mean_steps": 4.75, "critic_source": "oracle_guided_offline_teacher"},
+    "G3": {"n": 12, "complete_rate": 1.0, "replay_rate": 1.0, "success_rate": 0.8333, "recovery_rate": 0.0, "system_failure_rate": 0.0, "mean_steps": 6.25, "critic_source": "random_critic"}
+  },
+  "audit": {
+    "n": 119,
+    "passed": 113,
+    "rejected": 6,
+    "schema_pass_rate": 1.0,
+    "replay_pass_rate": 1.0,
+    "privacy_pass_rate": 0.9496,
+    "leakage_pass_rate": 0.9496,
+    "by_method": {"o0_critic": 24, "oracle_guided_offline_teacher": 38, "random_critic": 57}
+  },
+  "counterfactual": {
+    "n": 12,
+    "win_rate": 0.0,
+    "tie_rate": 0.5833,
+    "invalid_rate": 0.4167,
+    "harm_rate": 0.0,
+    "sham_better": 0
+  },
+  "promotion": {
+    "n_rules": 4,
+    "n_promoted": 0,
+    "n_validated_candidate": 0,
+    "n_rejected_harmful": 0,
+    "n_deferred": 4,
+    "manifest_hash": "0339550a3c8ec37f1e0d9bf0a00e219897badad0ab84c9e845ef5742a9e74b31"
+  },
+  "hashes": {
+    "sp3_candidates": "dcead529ff32f7a5aa4c3e653dc29cee90c4e3c85f7eeb09826645a50fe6a1dd",
+    "sp3_report": "c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650",
+    "explorer_prompt": "b331e54f489fac34ba7ba53b011f51e6ac0f10dfc7e48b8d207a7ef4b2449aed",
+    "critic_prompt": "d46dbe1797bd82c260c0924055c0b13188d7574b95c89c7a553a65d9ef00e956",
+    "distiller_prompt": "85a90ba8c663d530dcee30ff4327de0f9e84ddc69781d51834d3c3b91a86a896",
+    "code_generation_prompt": "bf1d48b8f9abaf1eeb9535d7a5ed090edd968d5dea89382315cb7213c693296b"
+  },
+  "report_path": "reports/sp4/SP4_experiment_report.md",
+  "report_sha256": "65a4d7da846ecb4c79207ecd48777f55be12e5d306c1ea8d704e342faed2de43"
+}

@@ -1,0 +1,15 @@
+Rewrite the question in fluent English. Keep the same meaning.
+
+Hard constraints:
+- Do not mention relation IDs, Freebase MIDs, SPARQL, or path notation.
+- Do not name the answer entity.
+- Do not mention gold paths or witness nodes.
+- You may use the person's public name only.
+
+Original question:
+{{QUESTION}}
+
+Name mentioned:
+{{NAME}}
+
+Return only the rewritten question on one line.

@@ -1,0 +1,73 @@
+{
+  "plan_version": "SP4-SUPPLEMENT 1.0",
+  "protocol_version": "sp-protocol-v1",
+  "overall_version": "SP-GENERAL 1.22",
+  "stage": "SP4-SUPPLEMENT",
+  "adapter_enabled_default": true,
+  "allow_llm": false,
+  "allow_live_kg": false,
+  "readonly_kg": true,
+  "allow_oracle_in_actor": false,
+  "allow_memory": false,
+  "allow_self_play_experience_memory_read": false,
+  "allow_self_play_experience_memory_write_candidates": true,
+  "allow_candidate_injection": false,
+  "backtrack_state_policy": "unsupported",
+  "snapshot_backtrack_policy": "visible_or_observed_state",
+  "synthetic_seed": 20260823,
+  "explorer_prompt": "prompts/sp4_explorer_v2.txt",
+  "critic_prompt": "prompts/sp4s_critic_o0_v1.txt",
+  "verbalizer_prompt": "prompts/sp4s_verbalizer_v1.txt",
+  "distiller_prompt": "prompts/sp4_distiller_v2.txt",
+  "endpoint": "http://localhost:8890/sparql",
+  "allowed_endpoints": ["http://localhost:8890/sparql"],
+  "llm": {
+    "provider": "openai_compatible",
+    "model": "gpt-3.5-turbo-0125",
+    "temperature_exploration": 0.3,
+    "temperature_reasoning": 0.3,
+    "max_tokens": 4096,
+    "timeout_sec": 60,
+    "max_retries": 2,
+    "retry_backoff_sec": [1.0, 2.0],
+    "api_base_env": "OPENAI_API_BASE",
+    "api_key_env": "OPENAI_API_KEY",
+    "default_api_base": "https://cn2us02.opapi.win/v1"
+  },
+  "budgets": {
+    "max_depth": 4,
+    "max_steps": 16,
+    "max_kg_calls": 24,
+    "max_llm_calls": 8,
+    "max_critic_rounds": 2,
+    "max_frontier_size": 80
+  },
+  "groups": {
+    "G0": {"critic_mode": "none", "note": "Explorer-only"},
+    "G1": {"critic_mode": "o0", "note": "O0 heuristic or optional LLM critic on frozen snapshot"},
+    "G2": {"critic_mode": "teacher", "note": "oracle_guided_offline_teacher, not merged into O0"},
+    "G3": {"critic_mode": "random", "note": "random legal suggestion control"}
+  },
+  "promotion_gates": {
+    "audit_pass_rate": 1.0,
+    "min_discovery_tasks": 3,
+    "min_cf_states": 5,
+    "min_margin": 0.2,
+    "max_harm_rate": 0.1,
+    "min_v1_triggers": 5,
+    "min_cost_drop": 0.1
+  },
+  "forbidden_benchmark_files": [
+    "artifacts/datasets/webqsp_smoke_20.jsonl",
+    "artifacts/datasets/webqsp_model_compare_150.jsonl",
+    "artifacts/datasets/cwq_model_compare_50.jsonl"
+  ],
+  "expected_eval_file_hashes": {
+    "webqsp_smoke_20": "e8e6c393fecffcca9063b036c4802f50f0a86b0e0d1c219f50ca061e67585393",
+    "webqsp_model_compare_150": "37276867bb297991e83c335a6d4bb4f5657642fae2c77fb16eeac56eb310628c",
+    "cwq_model_compare_50": "fa5f957de02ac804253d722fc1cc1a22652450a0480a1b5b4bd582ab4c5cb25b"
+  },
+  "expected_sp3_report": "reports/sp3/SP3_experiment_report.md",
+  "expected_sp3_report_sha256": "c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650",
+  "expected_sp3_candidates_sha256": "dcead529ff32f7a5aa4c3e653dc29cee90c4e3c85f7eeb09826645a50fe6a1dd"
+}
