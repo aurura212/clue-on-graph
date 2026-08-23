@@ -23,19 +23,19 @@
 
 | 字段 | 值 |
 |---|---|
-| 更新日期 | 2026-08-22 |
-| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0+SP1+SP2-A（含补充）+**SP2-B** 已 PASS，**不是** V2-5 Self-Play |
+| 更新日期 | 2026-08-23 |
+| 总体状态 | **原栈切片复跑已完成。V2 reflection 仍 `GATE_HOLD`。** random150 上原栈 EM 0.8933 > V2 R0 0.8533；hard150 原栈 EM 0.2200（压力切片，不是能力主结果）。另：独立 `self-play/` SP0–SP2-B PASS；**SP3 候选经验发现 PASS 并收口**。均**不是** V2-5 Self-Play |
 | 当前 Phase | `V2-3` |
-| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A/SP2-B 不改变本判定 |
+| 判定 | `GATE_HOLD`（V2 reflection 不变）+ 原栈评测完成。独立 SP0/SP1/SP2-A/SP2-B/SP3 代码不改变本判定 |
 | 已通过验收的 Phase | 同 LOG-063。V2-3 主评估未过；原栈切片评测 LOG-066 完成 |
 | 已冻结的 inference / memory 配置 | V2 R2 冻结不得再改去重跑。原栈：relation_memory=prompt top2 hybrid；constraint_pushdown=on；routing=auto；kg_memory=none |
 | **已冻结的校验切片** | hard150 = 压力；random150 = 能力主评估。两方法不得混报为同一结论 |
 | 阻塞 | V2 reflection 机制不成立，不得进 V2-4 / Self-Play |
-| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A/SP2-B PASS 不构成进入 V2-5 的许可，也不得未在 `self-play/exp_plan/` 登记就启动 SP3 |
+| 禁止事项 | 不得把原栈数字写成 V2-3 成功。不得把 hard150 当能力主结果。不得做 V2-5 Self-Play。不得改 R2 后重跑 random150。独立 SP0/SP1/SP2-A/SP2-B PASS 与 SP3 代码冻结不构成进入 V2-5 的许可。SP3 不得注入候选经验、不得进入 SP4、不得使用 WebQSP 20/150 或 CWQ 50 生成经验 |
 
 ### 下一步（唯一允许的动作）
 
-V2 reflection 停止扩大。原栈切片数字可作对照基线，不得替代 V2-3 负结果。允许整理负结果/诊断论文，或用户明确要求后的新 `PLAN_REVISION`。独立 `self-play/` SP2-B 已 PASS 并收口；若继续该实验空间，下一步须先按 `self-play/exp_plan/` 登记 SP3，不得当作本日志的 V2-5。
+V2 reflection 停止扩大。独立 `self-play/` SP3 已 PASS 并收口。不得启动 SP4，除非后续单独登记。不得把候选注入或写成 EM/F1 / V2-5。
 
 ---
 
@@ -1701,6 +1701,66 @@ hard150 路径–问句重叠同样 ≈0。首次 A 一致的 39 题上 R0 对 7
 - 报告：`self-play/reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`
 - 异常：多跳可能过早 STOP；空结果常落成 `answer_extraction_failure`；无信息关系可能耗尽 LLM 预算。均已分类，不掩盖
 - 结论：独立 SP2-B PASS 并收口。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5 或 memory 有效。不得未登记就启动 SP3
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-073 — 2026-08-22 — 独立 self-play/ SP3 代码与 discovery 冻结（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`code`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.17 与 `05_SP3_candidate_experience_discovery.md`。**不是** V2 §16.2 / V2-5 Self-Play，也不是 SP4 promotion
+- 代码：仅 `self-play/` 内 Critic、candidate store、去实体签名、SP3 sampling/rollout/checks、配置、prompt、冻结脚本与离线测试；未改 V2 R2，未改原 PoG 基线文件。Git `75d660f61701da82ff554254209745c8834f6c7f` dirty。离线单测 14/14，全套 89/89
+- 配置：`self-play/configs/sp3_candidate_discovery_v1.json` SHA-256 `20cc5dbe0a0cf00f5f388d7d856f5fe52e7add030eef93c17f9e60606e7ba720`；模型 `gpt-3.5-turbo-0125`；endpoint `http://localhost:8890/sparql`；candidate 只写不读；Actor/Critic O0；teacher 仅 O1-O3
+- 产物：D0/D1/H 已冻结。manifest hash `5ecd9719b781d3aa2bcae4eef9d6f7d5cb654ed88b9dc2a03576a48aa017381f`。未调用 LLM，未调用 live KG，无 candidate 写入，无 SP3 live Run ID
+- 结果：无 EM/F1。未从 WebQSP 20/150 或 CWQ 50 抽样。G3 实现为随机合法动作（无额外 Critic LLM），完整 Explorer rollout 仍可选 `--skip-g3`
+- 异常：无。JSONL 含 Oracle 后台字段；在线路径必须 `public_task_view`
+- 结论：独立 SP3 代码与数据冻结完成，live discovery 待用户启动。V2 判定仍为 `GATE_HOLD`。不得把本次写成 V2-5、memory 有效或 SP3 PASS
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变；独立 SP3 下一步是用户启动 preflight 与 discovery rollout
+
+---
+
+### LOG-074 — 2026-08-22 — 独立 self-play/ SP3 freeze 校验与 preflight PASS（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.17 与 `05_SP3_candidate_experience_discovery.md`。**不是** V2-5
+- 代码：Git `75d660f61701da82ff554254209745c8834f6c7f` dirty；未改原 PoG 基线
+- 配置：同 LOG-073；真实 LLM=0，live KG=0
+- 产物：freeze 校验 ok；preflight run `sp3-20260822T144305Z-bb131774`
+- 结果：单元测试 89/89；preflight PASS；无 EM/F1；无 candidate
+- 异常：无
+- 结论：允许启动 D0。V2 判定仍为 `GATE_HOLD`。不得把本次写成 SP3 PASS 或 V2-5
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-075 — 2026-08-22 — 独立 self-play/ SP3 D0 Explorer-only live PASS（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.17 与 `05_SP3_candidate_experience_discovery.md`。**不是** V2-5
+- 代码：Git `75d660f61701da82ff554254209745c8834f6c7f` dirty；未改原 PoG 基线
+- 配置：`sp3_candidate_discovery_v1.json` SHA-256 `20cc5dbe0a0cf00f5f388d7d856f5fe52e7add030eef93c17f9e60606e7ba720`；模型 `gpt-3.5-turbo-0125`；`--layer d0`；无 Critic；candidate 不注入
+- 产物：有效 run `sp3-20260822T145537Z-0c4deb09`；start 14:55:37Z end 14:57:25Z
+- 结果：n=12；轨迹完整率/replay/pipeline_ok 均为 1.0；未分类 0；mean LLM=5.0。失败：answer_extraction_failure 5、budget_insufficient 2、无失败 5。无 candidate。不以提交当 EM/F1
+- 异常：首次启动缺 API key 失败；本 run 为第二次启动。失败均已分类
+- 结论：D0 门控通过，可进 D1。V2 判定仍为 `GATE_HOLD`。不是 SP3 阶段 PASS，不是 V2-5
+- 判定后状态：`V2-3` / `GATE_HOLD` 不变
+
+---
+
+### LOG-076 — 2026-08-23 — 独立 self-play/ SP3 D1+holdout 完成并 PASS 收口（不是 V2-5）
+
+- 判定前状态：`V2-3` / `GATE_HOLD`
+- 类型：`run`
+- 对应方案：`self-play/exp_plan/00_experiment_overall_requirements.md` v1.17（收口后 1.18）与 `05_SP3_candidate_experience_discovery.md`。**不是** V2-5，也不是 SP4
+- 代码：Git `75d660f61701da82ff554254209745c8834f6c7f` dirty；未改原 PoG 基线
+- 配置：同 LOG-073/075；D1 `--layer d1`；holdout 独立 `--layer holdout` 以免覆盖 D1 结果 JSON
+- 产物：D1 `sp3-20260822T160827Z-941c23fe`；H `sp3-20260822T164407Z-ce2cf6e6`；候选 `dcead529…`（119 条）；报告 `reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650`
+- 结果：G0/G1/G3/H replay 100%，未分类 0。G1 候选 24；G2 teacher 38（单独标注）；G3 随机 57。G1 system_failure 31 为 16k 上下文，已分类。配对恢复 2/33。无 EM/F1，无注入
+- 异常：G1 Critic 上下文超长；G3 候选多于 G1。均记入报告风险
+- 结论：独立 SP3 PASS 并收口。V2 判定仍为 `GATE_HOLD`。不启动 SP4，不写成 V2-5 或 memory 有效
 - 判定后状态：`V2-3` / `GATE_HOLD` 不变
 
 ---

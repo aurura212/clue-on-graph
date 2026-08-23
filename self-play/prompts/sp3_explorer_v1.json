@@ -1,0 +1,7 @@
+{
+  "prompt_version": "sp3_explorer_v1",
+  "source": "prompt_list.py",
+  "note": "Explorer reuses the SP2-B O0 PoG actor templates. This file only freezes the explorer prompt identity for SP3.",
+  "inherits": "prompts/sp2b_actor_v1.json",
+  "self_play_memory_injected": false
+}

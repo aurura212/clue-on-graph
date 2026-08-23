@@ -85,6 +85,12 @@ class RunStatus(str, Enum):
     INVALID = "INVALID"
 
 
+class DiscoveryMethod(str, Enum):
+    O0_CRITIC = "o0_critic"
+    ORACLE_GUIDED_OFFLINE_TEACHER = "oracle_guided_offline_teacher"
+    RANDOM_CRITIC = "random_critic"
+
+
 TASK_PUBLIC_FIELDS = (
     "task_id",
     "question",
@@ -871,5 +877,143 @@ class OfflineFeedback(SchemaBase):
             level=level,  # type: ignore[arg-type]
             feedback_version=_expect_str("feedback_version", payload["feedback_version"]),
             payload=dict(body),
+            protocol_version=_expect_str("protocol_version", payload["protocol_version"]),
+        )
+
+
+CANDIDATE_EXPERIENCE_FIELDS = (
+    "experience_id",
+    "source_run_id",
+    "source_task_ids",
+    "discovery_method",
+    "trigger",
+    "recommendation",
+    "evidence",
+    "privacy",
+    "versions",
+    "status",
+    "canonical_hash",
+    "protocol_version",
+)
+CANDIDATE_TRIGGER_FIELDS = ("question_type", "decision_stage", "state_signature", "failure_class")
+CANDIDATE_RECOMMENDATION_FIELDS = (
+    "action_type",
+    "direction",
+    "relation_pattern",
+    "reason",
+    "negative_constraints",
+    "budget_condition",
+)
+CANDIDATE_EVIDENCE_FIELDS = (
+    "verified_replay",
+    "observed_outcome",
+    "support_count",
+    "counterfactual_status",
+)
+CANDIDATE_PRIVACY_FIELDS = (
+    "answer_removed",
+    "witness_removed",
+    "entity_ids_removed",
+    "gold_path_removed",
+    "oracle_level",
+)
+CANDIDATE_VERSION_FIELDS = ("protocol_version", "plan_version", "prompt_version", "config_hash")
+
+
+@dataclass
+class CandidateExperience(SchemaBase):
+    """Write-only SP3 candidate. Never injected into Explorer/Critic in this stage."""
+
+    experience_id: str
+    source_run_id: str
+    source_task_ids: List[str]
+    discovery_method: DiscoveryMethod
+    trigger: Dict[str, Any]
+    recommendation: Dict[str, Any]
+    evidence: Dict[str, Any]
+    privacy: Dict[str, Any]
+    versions: Dict[str, Any]
+    status: str = "candidate"
+    canonical_hash: str = ""
+    protocol_version: str = PROTOCOL_VERSION
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = {
+            "experience_id": self.experience_id,
+            "source_run_id": self.source_run_id,
+            "source_task_ids": list(self.source_task_ids),
+            "discovery_method": self.discovery_method.value,
+            "trigger": dict(self.trigger),
+            "recommendation": dict(self.recommendation),
+            "evidence": dict(self.evidence),
+            "privacy": dict(self.privacy),
+            "versions": dict(self.versions),
+            "status": self.status,
+            "canonical_hash": self.canonical_hash,
+            "protocol_version": self.protocol_version,
+        }
+        if not payload["canonical_hash"]:
+            payload["canonical_hash"] = canonical_hash(
+                {
+                    "trigger": payload["trigger"],
+                    "recommendation": payload["recommendation"],
+                    "discovery_method": payload["discovery_method"],
+                }
+            )
+        return payload
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "CandidateExperience":
+        _expect_type("CandidateExperience", payload, dict)
+        _check_protocol_version(payload)
+        _require_fields(payload, CANDIDATE_EXPERIENCE_FIELDS, "CandidateExperience")
+        _reject_unknown(payload, CANDIDATE_EXPERIENCE_FIELDS, "CandidateExperience")
+        if payload.get("status") != "candidate":
+            raise ProtocolError(ViolationCode.SCHEMA_ERROR, "SP3 experience status must be candidate")
+        trigger = payload["trigger"]
+        recommendation = payload["recommendation"]
+        evidence = payload["evidence"]
+        privacy = payload["privacy"]
+        versions = payload["versions"]
+        _expect_type("trigger", trigger, dict)
+        _expect_type("recommendation", recommendation, dict)
+        _expect_type("evidence", evidence, dict)
+        _expect_type("privacy", privacy, dict)
+        _expect_type("versions", versions, dict)
+        _require_fields(trigger, CANDIDATE_TRIGGER_FIELDS, "CandidateExperience.trigger")
+        _require_fields(recommendation, CANDIDATE_RECOMMENDATION_FIELDS, "CandidateExperience.recommendation")
+        _require_fields(evidence, CANDIDATE_EVIDENCE_FIELDS, "CandidateExperience.evidence")
+        _require_fields(privacy, CANDIDATE_PRIVACY_FIELDS, "CandidateExperience.privacy")
+        _require_fields(versions, CANDIDATE_VERSION_FIELDS, "CandidateExperience.versions")
+        leak = (set(trigger) | set(recommendation) | set(evidence) | set(privacy)) & FORBIDDEN_VISIBLE_FIELDS
+        if leak:
+            raise ProtocolError(
+                ViolationCode.ORACLE_LEAKAGE,
+                f"CandidateExperience contains Oracle fields {sorted(leak)}",
+            )
+        method = parse_enum(DiscoveryMethod, payload["discovery_method"], "discovery_method")
+        oracle_level = parse_enum(OracleLevel, privacy["oracle_level"], "privacy.oracle_level")
+        if oracle_level is OracleLevel.O4:
+            raise ProtocolError(ViolationCode.ORACLE_LEAKAGE, "candidate experience cannot be O4")
+        if evidence.get("counterfactual_status") != "deferred_to_sp4":
+            raise ProtocolError(
+                ViolationCode.SCHEMA_ERROR,
+                "SP3 candidates must set counterfactual_status=deferred_to_sp4",
+            )
+        for flag in ("answer_removed", "witness_removed", "entity_ids_removed", "gold_path_removed"):
+            if privacy.get(flag) is not True:
+                raise ProtocolError(ViolationCode.ORACLE_LEAKAGE, f"privacy.{flag} must be true")
+        return cls(
+            experience_id=_expect_str("experience_id", payload["experience_id"]),
+            source_run_id=_expect_str("source_run_id", payload["source_run_id"]),
+            source_task_ids=_expect_list_str("source_task_ids", payload["source_task_ids"]),
+            discovery_method=method,  # type: ignore[arg-type]
+            trigger=dict(trigger),
+            recommendation=dict(recommendation),
+            evidence=dict(evidence),
+            privacy=dict(privacy),
+            versions=dict(versions),
+            status=_expect_str("status", payload["status"]),
+            canonical_hash=_expect_str("canonical_hash", payload["canonical_hash"]),
             protocol_version=_expect_str("protocol_version", payload["protocol_version"]),
         )

@@ -91,6 +91,11 @@ class Sp2bRollout:
         self.trace: List[Dict[str, Any]] = []
         self.illegal_kg = 0
         self.token_totals = {"total": 0, "input": 0, "output": 0}
+        self.critic_mode = str(config.get("critic_mode") or "none")
+
+    def _maybe_intervene(self, event: str, snapshot, mapped=None):
+        """SP3 critic hook. Default keeps SP2-B Explorer-only behavior."""
+        return None
 
     def _o0_allowed(self, snapshot, *extra: str) -> List[str]:
         values = [snapshot.question, *extra]
@@ -344,9 +349,13 @@ class Sp2bRollout:
                 if flag_printed:
                     break
                 if not current_relations:
-                    snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
-                    flag_printed = True
-                    break
+                    intervention = self._maybe_intervene("empty_relations", snapshot)
+                    if intervention and intervention.get("action") is not None:
+                        current_relations = [intervention["action"]]
+                    else:
+                        snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
+                        flag_printed = True
+                        break
                 total_candidates = []
                 new_ent_rel: Dict[str, Any] = {}
                 for action in current_relations:
@@ -382,9 +391,29 @@ class Sp2bRollout:
                 snapshot.ent_rel_ent_dict = copy.deepcopy(new_ent_rel)
                 snapshot.depth_ent_rel_ent_dict = {str(k): v for k, v in depth_store.items()}
                 if not total_candidates:
-                    snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
-                    flag_printed = True
-                    break
+                    intervention = self._maybe_intervene("empty_candidates", snapshot)
+                    if not (intervention and intervention.get("action") is not None):
+                        snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
+                        flag_printed = True
+                        break
+                    snapshot, _outcome, _env, status = self._apply(snapshot, intervention["action"])
+                    itype = intervention["action"].action_type.value
+                    if itype == "ABSTAIN" and status == "applied":
+                        submitted = list(intervention["action"].params.get("answer_candidates") or [])
+                        failure_class = FailureClass.EXPLORER_FAILURE.value
+                        termination = TerminationReason.ABSTAINED.value
+                        flag_printed = True
+                        break
+                    if itype == "STOP" and status == "applied":
+                        submitted = list(intervention["action"].params.get("answer_candidates") or [])
+                        failure_class = None
+                        termination = TerminationReason.STOP_SUBMITTED.value
+                        flag_printed = True
+                        break
+                    if status != "applied":
+                        snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
+                        flag_printed = True
+                        break
                 snapshot, pruned, prune_fail = self._prune_entities(snapshot, new_ent_rel, entid_name, name_entid, sub_questions)
                 if prune_fail:
                     failure_class = prune_fail
@@ -430,19 +459,40 @@ class Sp2bRollout:
                     on_unresolvable=str(self.config.get("stop_on_unresolvable") or "failure"),
                 )
                 if mapped.status == "stop" and mapped.action is not None:
-                    snapshot, _outcome, _env, status = self._apply(snapshot, mapped.action)
-                    submitted = list(mapped.action.params.get("answer_candidates") or [])
-                    if status == "applied":
-                        termination = TerminationReason.STOP_SUBMITTED.value
-                        failure_class = None
+                    intervention = self._maybe_intervene("early_stop", snapshot, mapped)
+                    if intervention and intervention.get("status") == "continue" and intervention.get("action") is not None:
+                        snapshot, _outcome, _env, _status = self._apply(snapshot, intervention["action"])
+                        mapped.status = "continue"
+                        mapped.action = None
                     else:
-                        failure_class = FailureClass.ANSWER_EXTRACTION_FAILURE.value
-                        termination = TerminationReason.FAILURE.value
-                    flag_printed = True
-                    break
+                        snapshot, _outcome, _env, status = self._apply(snapshot, mapped.action)
+                        submitted = list(mapped.action.params.get("answer_candidates") or [])
+                        if status == "applied":
+                            termination = TerminationReason.STOP_SUBMITTED.value
+                            failure_class = None
+                        else:
+                            failure_class = FailureClass.ANSWER_EXTRACTION_FAILURE.value
+                            termination = TerminationReason.FAILURE.value
+                        flag_printed = True
+                        break
                 if mapped.status == "continue" and mapped.action is not None:
                     snapshot, _outcome, _env, _status = self._apply(snapshot, mapped.action)
                 if mapped.status == "failure":
+                    intervention = self._maybe_intervene("answer_failure", snapshot, mapped)
+                    if intervention and intervention.get("action") is not None:
+                        snapshot, _outcome, _env, status = self._apply(snapshot, intervention["action"])
+                        submitted = list(intervention["action"].params.get("answer_candidates") or [])
+                        if intervention["action"].action_type.value == "ABSTAIN" and status == "applied":
+                            failure_class = FailureClass.EXPLORER_FAILURE.value
+                            termination = TerminationReason.ABSTAINED.value
+                        elif intervention["action"].action_type.value == "STOP" and status == "applied":
+                            failure_class = None
+                            termination = TerminationReason.STOP_SUBMITTED.value
+                        else:
+                            failure_class = FailureClass.CRITIC_RECOVERY_FAILURE.value
+                            termination = TerminationReason.FAILURE.value
+                        flag_printed = True
+                        break
                     failure_class = (mapped.failure_class.value if mapped.failure_class else FailureClass.ANSWER_EXTRACTION_FAILURE.value)
                     termination = TerminationReason.FAILURE.value
                     flag_printed = True
@@ -475,11 +525,33 @@ class Sp2bRollout:
                 snapshot.frontier = sorted(set(snapshot.frontier) | set(topic_entity))
                 snapshot.budget.used_depth = depth
                 if not topic_entity:
-                    snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
-                    flag_printed = True
-                    break
+                    intervention = self._maybe_intervene("no_next_topic", snapshot)
+                    if intervention and intervention.get("action") is not None:
+                        snapshot, _outcome, _env, status = self._apply(snapshot, intervention["action"])
+                        entity = (intervention["action"].params or {}).get("entity")
+                        if entity:
+                            topic_entity = {entity: entid_name.get(entity, entity)}
+                            snapshot.topic_entity = dict(topic_entity)
+                            snapshot.frontier = sorted(set(snapshot.frontier) | set(topic_entity))
+                    if not topic_entity:
+                        snapshot, submitted, failure_class, termination = self._half_stop(snapshot, cluster_chain)
+                        flag_printed = True
+                        break
             if not flag_printed:
-                snapshot, submitted, failure_class, termination = self._no_path(snapshot, cluster_chain)
+                intervention = self._maybe_intervene("no_path", snapshot)
+                if intervention and intervention.get("action") is not None:
+                    snapshot, _outcome, _env, status = self._apply(snapshot, intervention["action"])
+                    submitted = list(intervention["action"].params.get("answer_candidates") or [])
+                    if intervention["action"].action_type.value == "ABSTAIN" and status == "applied":
+                        failure_class = FailureClass.EXPLORER_FAILURE.value
+                        termination = TerminationReason.ABSTAINED.value
+                        flag_printed = True
+                    elif intervention["action"].action_type.value == "STOP" and status == "applied":
+                        failure_class = None
+                        termination = TerminationReason.STOP_SUBMITTED.value
+                        flag_printed = True
+                if not flag_printed:
+                    snapshot, submitted, failure_class, termination = self._no_path(snapshot, cluster_chain)
         except ProtocolError as exc:
             if exc.code is ViolationCode.BUDGET_EXCEEDED:
                 failure_class = FailureClass.BUDGET_INSUFFICIENT.value

@@ -83,6 +83,11 @@ def public_task_view(task: Mapping[str, Any]) -> Dict[str, Any]:
         "usage_tags",
         "layer",
         "protocol_version",
+        "discovery_layer",
+        "question_type",
+        "dataset",
+        "usage",
+        "hop_count",
     }
     return {key: task[key] for key in allowed if key in task}
 

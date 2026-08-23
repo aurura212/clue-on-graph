@@ -3,7 +3,7 @@
 > 文档编号：SP3-PLAN  
 > 版本：1.0  
 > 制定日期：2026-08-22  
-> 状态：已登记，尚未运行  
+> 状态：已完成 PASS 并收口（2026-08-23）  
 > 当前阶段：SP3 候选经验发现阶段  
 > 实验根目录：`clue_on_graph/self-play/`  
 > 上位约束：`00_experiment_overall_requirements.md` v1.17  
@@ -380,29 +380,100 @@ SP3 PASS 需要同时满足：
 
 ### 12.1 运行日志占位
 
-#### LOG-SP3-001 — 待运行
+#### LOG-SP3-001 — 2026-08-22 — 代码与 discovery 冻结（无 LLM/KG）
 
-- 日期：
-- Run ID：
+- 日期：2026-08-22
+- Run ID：无 live run。冻结产物见 `artifacts/datasets/sp3_discovery_manifest_v1.json`
 - 计划版本：SP3-PLAN 1.0
 - overall 版本：SP-GENERAL 1.17
-- Git commit / dirty status：
+- Git commit / dirty status：`75d660f61701da82ff554254209745c8834f6c7f` dirty（SP3 代码与冻结产物尚未提交）
 - D0/D1/H registry 与 hash：
-- exclusion registry 与 hash：
-- 配置 / prompt / 模型：
-- Oracle level 与角色权限审计：
-- D0 结果：
-- D1 G0 结果：
-- D1 G1 O0 Critic 结果：
-- D1 G2 offline teacher 结果：
-- G3 结果（如执行）：
-- candidate 数量、支持任务数、失败类型覆盖：
-- replay / schema / leakage 结果：
-- `data/`、`cope_alias/` 和 baseline 写入审计：
-- 有效/无效 Run：
-- 阶段结论：
-- 证据路径：
-- 备注：
+  - D0 n=12 `artifacts/datasets/sp3_discovery_d0_12.jsonl` SHA-256 `c1b17f94bd4cda68c615b5888c759387952d12becd5e8cb1a676adfe3a95f1e8`（`empty_result|literal|one_hop|two_hop`）
+  - D1 n=60 `artifacts/datasets/sp3_discovery_d1_60.jsonl` SHA-256 `c77261ebd7c49028b11bf91ad39d5015cd96002a4d98103df958c4cd27c08dde`（`one_hop|two_hop`）
+  - H n=20 `artifacts/datasets/sp3_discovery_holdout_20.jsonl` SHA-256 `fb250702d3ad47429af80112793de4258c02ce5dd8b5f32de4fbf860c06a7d84`（`one_hop|two_hop`）
+  - registry `artifacts/registries/sp3_discovery_registry_v1.json` SHA-256 `ec395434a5c6d780fc500fbbbb41b6f317e31f3e7af870d284134636af330c80`
+  - manifest hash `5ecd9719b781d3aa2bcae4eef9d6f7d5cb654ed88b9dc2a03576a48aa017381f`
+- exclusion registry 与 hash：`artifacts/registries/sp3_exclusion_registry_v1.json` SHA-256 `dc7fe94274fc6f5f2fc98f7966bd17719841b83ad0d56a7da8167969edcb85db`；exposure `e89daa8134499ba17b97b4dd04db72c672e87380e7e9b2454108fff2f7503605`。未从冻结 WebQSP 20/150 或 CWQ 50 抽样；coverage_gaps 为空
+- 配置 / prompt / 模型：`configs/sp3_candidate_discovery_v1.json` SHA-256 `20cc5dbe0a0cf00f5f388d7d856f5fe52e7add030eef93c17f9e60606e7ba720`；模型 `gpt-3.5-turbo-0125`；seed `20260822`；预算 steps 28 / kg 88 / llm 44 / critic_rounds 2；prompt `sp3_explorer_v1` / `sp3_critic_o0_v1` / `sp3_critic_teacher_v1`
+- Oracle level 与角色权限审计：Actor/Critic 强制 O0；teacher 仅 O1-O3；`allow_candidate_injection=false`；`allow_self_play_experience_memory_read=false`；candidate store 只写不读。离线单测 14/14，全套 89/89
+- D0 结果：未跑 LLM/KG
+- D1 G0 结果：未跑
+- D1 G1 O0 Critic 结果：未跑
+- D1 G2 offline teacher 结果：未跑。G2 标注为 `oracle_guided_offline_teacher`，不得与 G1 合并
+- G3 结果（如执行）：代码已实现为随机合法动作、不额外调用 Critic LLM；仍需完整 Explorer rollout。预算不足时可用 `--skip-g3`，须在后续 live 日志说明
+- candidate 数量、支持任务数、失败类型覆盖：尚未生成
+- replay / schema / leakage 结果：离线 schema/O4/去实体/去重/read-guard 通过；live replay 待跑
+- `data/`、`cope_alias/` 和 baseline 写入审计：未改原 PoG 基线；新增仅在 `self-play/`
+- 有效/无效 Run：本条为 code + freeze，不是 live discovery 有效 Run
+- 阶段结论：尚未验收。允许用户启动 preflight 与 discovery；不得进入 SP4，不得注入候选经验，不得声称 EM/F1
+- 证据路径：`scripts/freeze_sp3_discovery.py`、`scripts/run_sp3_discovery.py`、`src/sp_memory/sp3_*.py`、`tests/test_sp3_offline.py`、上述冻结数据集与 registry
+- 备注：JSONL 仍含 Oracle 字段供 Verifier/teacher 后台使用；在线 Actor 必须走 `public_task_view`。adapter stage 仍为 `sp2b` 包装，不新增原 PoG 决策路径
+
+#### LOG-SP3-002 — 2026-08-22 — freeze 校验与 preflight PASS（无 LLM/KG）
+
+- 日期：2026-08-22
+- Run ID：`sp3-20260822T144305Z-bb131774`（preflight_only）
+- 计划版本：SP3-PLAN 1.0
+- overall 版本：SP-GENERAL 1.17
+- Git commit / dirty status：`75d660f61701da82ff554254209745c8834f6c7f` dirty
+- D0/D1/H registry 与 hash：与 LOG-SP3-001 相同，只校验不重抽；manifest `5ecd9719b781d3aa2bcae4eef9d6f7d5cb654ed88b9dc2a03576a48aa017381f`
+- exclusion registry 与 hash：同 LOG-SP3-001
+- 配置 / prompt / 模型：config SHA-256 `20cc5dbe0a0cf00f5f388d7d856f5fe52e7add030eef93c17f9e60606e7ba720`；未调用真实 LLM
+- Oracle level 与角色权限审计：candidate_injection=false；oracle_level_actor=O0
+- D0/D1/G2/G3/holdout：未跑 live
+- candidate 数量：0
+- replay / schema / leakage 结果：单元测试 89/89；preflight PASS
+- `data/`、`cope_alias/` 和 baseline 写入审计：无改动
+- 有效/无效 Run：有效 preflight run；不是 live discovery 有效 Run
+- 阶段结论：尚未验收。允许启动 D0；不得并行启动 D1/G1/G2/G3/holdout
+- 证据路径：`runs/sp3-20260822T144305Z-bb131774/`、`artifacts/protocol/sp3_check_result.json`
+- 备注：freeze 与 preflight 并行启动；二者均在 1s 内结束
+
+#### LOG-SP3-003 — 2026-08-22 — D0 Explorer-only live PASS
+
+- 日期：2026-08-22
+- Run ID：`sp3-20260822T145537Z-0c4deb09`
+- 计划版本：SP3-PLAN 1.0
+- overall 版本：SP-GENERAL 1.17
+- Git commit / dirty status：`75d660f61701da82ff554254209745c8834f6c7f` dirty
+- D0/D1/H registry 与 hash：沿用 LOG-SP3-001 冻结产物，只校验不重抽
+- exclusion registry 与 hash：同 LOG-SP3-001
+- 配置 / prompt / 模型：config SHA-256 `20cc5dbe0a0cf00f5f388d7d856f5fe52e7add030eef93c17f9e60606e7ba720`；`gpt-3.5-turbo-0125`；endpoint `http://localhost:8890/sparql`；`--layer d0 --skip-tests`
+- Oracle level 与角色权限审计：Explorer O0；无 Critic；candidate_injection=false；memory read=false
+- D0 结果：n=12；轨迹完整率 1.0；replay 1.0；未分类 0；pipeline_ok 1.0；mean LLM=5.0。失败分类：`answer_extraction_failure` 5、`budget_insufficient` 2、`none` 5（STOP_SUBMITTED）。不报 EM/F1
+- D1 G0/G1/G2/G3/holdout：未跑
+- candidate 数量、支持任务数、失败类型覆盖：D0 未提取候选（Explorer-only 协议检查）
+- replay / schema / leakage 结果：D0 replay 12/12；secret_hits=[]；baseline 未改
+- `data/`、`cope_alias/` 和 baseline 写入审计：无改动
+- 有效/无效 Run：有效 D0 run。首次启动因环境无 API key 失败（exit 2），本 run 为随后成功启动
+- 阶段结论：D0 门控通过，允许进入 D1。不是 SP3 阶段 PASS
+- 证据路径：`runs/sp3-20260822T145537Z-0c4deb09/`
+- 备注：start `2026-08-22T14:55:37Z`，end `2026-08-22T14:57:25Z`
+
+#### LOG-SP3-004 — 2026-08-22/23 — D1 G0–G3、holdout 与阶段 PASS
+
+- 日期：2026-08-22（D1/H 运行）至 2026-08-23（报告收口）
+- Run ID：D1 `sp3-20260822T160827Z-941c23fe`；holdout `sp3-20260822T164407Z-ce2cf6e6`。D0 仍为 LOG-SP3-003 的 `sp3-20260822T145537Z-0c4deb09`
+- 计划版本：SP3-PLAN 1.0
+- overall 版本：运行 SP-GENERAL 1.17；收口 1.18
+- Git commit / dirty status：`75d660f61701da82ff554254209745c8834f6c7f` dirty
+- D0/D1/H registry 与 hash：沿用 LOG-SP3-001，只校验不重抽
+- exclusion registry 与 hash：同 LOG-SP3-001
+- 配置 / prompt / 模型：config `20cc5dbe…`；`gpt-3.5-turbo-0125`
+- Oracle level 与角色权限审计：Explorer/Critic O0；G2 teacher O1–O3 标注 `oracle_guided_offline_teacher`；injection=false；memory read=false
+- D0 结果：见 LOG-SP3-003
+- D1 G0 结果：n=60；replay 1.0；未分类 0；LLM 336；失败 answer_extraction 32 / budget 1 / none 27
+- D1 G1 O0 Critic 结果：n=60；replay 1.0；未分类 0；LLM 410；候选 24/24 task；配对恢复 2/33。system_failure 31 为 Critic 16k 上下文 SCHEMA_ERROR，已分类可 replay
+- D1 G2 offline teacher 结果：LLM 60；接受 38 / 拒绝 22；不得与 G1 合并
+- G3 结果：n=60；replay 1.0；LLM 425；随机候选 57。已执行，未 skip
+- holdout：n=20；replay 1.0；LLM 108；promotion=false；trigger_rate 1.0 仅为题型观察
+- candidate 数量、支持任务数、失败类型覆盖：119 条；G1 24 / G2 38 / G3 57；阶段 relation_selection + continue_stop + answer_submission
+- replay / schema / leakage 结果：D1/H replay 100%；schema/leakage 1.0；secret 0
+- `data/`、`cope_alias/` 和 baseline 写入审计：无改动
+- 有效/无效 Run：上述三个 live run 有效。首次 D0 缺 key 失败不计入
+- 阶段结论：**PASS**。报告 `reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650`
+- 证据路径：对应 runs 与 candidate/feedback JSONL
+- 备注：不进入 SP4；不报 EM/F1；不是 V2-5
 
 ## 13. 计划变更记录
 
