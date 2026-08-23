@@ -1,7 +1,7 @@
 # PoG Self-Play 经验记忆实验总体要求
 
 > 文档编号：SP-GENERAL  
-> 版本：1.18
+> 版本：1.20
 > 制定日期：2026-08-21  
 > 实验根目录：clue_on_graph/self-play/  
 > 状态：生效，后续每一步实验均须遵守
@@ -75,14 +75,15 @@ self-play/
 
 ## 2.5 当前实验阶段与阶段更新规则
 
-当前总体阶段为：**SP3 已完成 PASS 并收口；当前为阶段间等待，不启动 SP4**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。SP2-B 已于 2026-08-22 验收 PASS 并完成收口。SP3 已于 2026-08-23 验收 PASS 并完成收口。
+当前总体阶段为：**SP4 已登记，处于启动准备阶段，尚未运行**。SP0 已于 2026-08-22 验收 PASS。SP1 已于 2026-08-22 验收 PASS。SP2-A 主实验已于 2026-08-22 完成基础 PASS。SP2-A 补充实验已于 2026-08-22 验收 PASS 并完成重新收口。SP2-B 已于 2026-08-22 验收 PASS 并完成收口。SP3 已于 2026-08-23 验收 PASS 并完成收口。
 
-- 对应计划文件：05_SP3_candidate_experience_discovery.md（已完成 PASS 并收口）
+- 对应计划文件：06_SP4_precondition_counterfactual_distillation_promotion_v2.md（已登记，启动准备，尚未运行）
 - 前置阶段状态：SP2-B 无 Self-Play Experience Memory 的 LLM+live KG 端到端基线 PASS
-- 当前状态：SP3 候选经验发现 PASS。D0/D1/G0–G3/holdout 均已运行；候选只写不读，未注入，未 promotion。不得进入 SP4，不得把本次写成 V2-5 Self-Play 或 EM/F1 提升
+- 当前状态：SP3 候选经验发现已 PASS 并收口。SP4 v2 除对 119 条候选进行重新审计、同状态反事实验证、独立 validation、蒸馏和 promotion 外，还必须补齐合成 KGQA 任务与严格 held-out split、多轨迹 Critic 证据、backtrack 协议门禁和 candidate injection 审计。候选尚未注入，`promoted_memory` 尚未生成。不得进入 SP5，不得把 SP4 结果写成最终 EM/F1 提升
 - 当前基线：self-play/ 下现有原 PoG 代码 + 冻结协议 `sp-protocol-v1` + 已验证的 PoG adapter + 已验证的 live KG Environment + 已冻结的无 memory LLM+KG 在线运行协议 + 已审计的 candidate store（未 promotion）
-- 当前数据边界：D0/D1/H 已冻结；不得使用 `webqsp_smoke_20.jsonl`、`webqsp_model_compare_150.jsonl` 或 `cwq_model_compare_50.jsonl` 生成候选经验
-- 当前允许工作：阶段间等待。不启动 SP4，除非后续单独登记计划
+- 当前数据边界：D0/D1/H 已冻结；SP4 必须另行冻结 `SP4-CF`、`SP4-V1` 和 `SP4-V2`，不得使用 `webqsp_smoke_20.jsonl`、`webqsp_model_compare_150.jsonl` 或 `cwq_model_compare_50.jsonl` 生成候选、蒸馏规则、调参或 promotion
+- 当前允许工作：SP4.0 preflight、合成任务与 split 实现、多轨迹 Critic 补充、backtrack 协议门禁、候选重新审计、反事实验证和 validation 的代码实现、数据冻结与审计准备
+- 当前禁止工作：运行 SP5、正式 WebQSP/CWQ 效果评测、在配置冻结前运行候选注入、在 promotion 前生成正式 memory
 - 冻结评测集：`artifacts/datasets/webqsp_smoke_20.jsonl`（20，仅冒烟）、`webqsp_model_compare_150.jsonl`（150）、`cwq_model_compare_50.jsonl`（50）；后续只校验哈希，不得重抽
 - SP2-A 有效 run：`sp2a-20260822T082704Z-28a5bc97`
 - SP2-A 补充有效 run：`sp2a-supp-20260822T111116Z-79aa8ea8`
@@ -114,6 +115,7 @@ self-play/
 | SP2-A-SUPPLEMENT | 2026-08-22 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） | S2A-S.1–S.4 与 replay 通过；有效 run `sp2a-supp-20260822T111116Z-79aa8ea8`。报告：`reports/sp2a/SP2A_experiment_report.md` SHA-256 `0d448a55c8c37dc77ab4d4da26f6d6e63092491136c7e95d25553237febf4bfc`（第 13 节）。已完成重新收口；不启动 SP2-B |
 | SP2-B | 2026-08-22 | 04_SP2B_llm_kg_baseline_rollout.md | 已完成 PASS（2026-08-22） | B0/B1/B2 均可终止且 replay 100%；有效 run `sp2b-20260822T131350Z-b70a898b`。报告：`reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c`。不生成 Self-Play 经验，不以 B2 准确率为门槛；不启动 SP3 |
 | SP3 | 2026-08-22 | 05_SP3_candidate_experience_discovery.md | 已完成 PASS（2026-08-23） | D0/D1 G0–G3/holdout 轨迹可 replay；候选 119 条只写不读。有效 run D0 `sp3-20260822T145537Z-0c4deb09`、D1 `sp3-20260822T160827Z-941c23fe`、H `sp3-20260822T164407Z-ce2cf6e6`。报告：`reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650`。不注入、不 promotion、不启动 SP4 |
+| SP4 | 2026-08-23 | 06_SP4_precondition_counterfactual_distillation_promotion_v2.md | 已登记，启动准备，尚未运行 | 在反事实、validation、蒸馏和 promotion 前补齐合成任务/严格 held-out、多轨迹 Critic、backtrack 门禁和 candidate injection 审计；G1/G2/G3 分层。尚未生成 promoted_memory；不得进入 SP5 |
 
 ## 3. 实验核心思想
 
@@ -228,8 +230,9 @@ self-play/
 | SP2-A-SUPPLEMENT | SP2-A 补充：TAIL 正向语义与动态多跳验证 | 03A_SP2A_supplement_tail_and_dynamic_multihop.md | 已完成 PASS（2026-08-22） |
 | SP2-B | 无 Self-Play Experience Memory 的 LLM+KG 端到端基线 Rollout | 04_SP2B_llm_kg_baseline_rollout.md | 已完成 PASS（2026-08-22） |
 | SP3 | Self-Play 候选经验发现与生成 | 05_SP3_candidate_experience_discovery.md | 已完成 PASS（2026-08-23） |
+| SP4 | 前置能力补齐、候选经验反事实验证、蒸馏与 promotion | 06_SP4_precondition_counterfactual_distillation_promotion_v2.md | 已登记，启动准备，尚未运行 |
 
-后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP3 已 PASS 并收口；当前为阶段间等待，不启动 SP4，不得把候选经验注入 Explorer，也不得运行 WebQSP 150/CWQ 50 正式效果评测。
+后续步骤不得只根据口头讨论直接实施。决定实际启动新阶段时，应先在本文件中明确阶段名称、状态、前置依赖和允许工作，并在该阶段的启动准备期间生成和登记对应计划文件。上一阶段的完成和报告生成不以该计划文件已经存在为条件。SP3 已 PASS 并收口；SP4 v2 已登记但尚未完成 SP4.0 冻结和审计，未通过 SP4.0 前不得运行候选反事实或 validation，不得进入 SP5，不得运行 WebQSP 150/CWQ 50 正式效果评测。
 
 ## 9. 预期实验顺序与 LLM/KG 使用边界
 
@@ -242,7 +245,7 @@ self-play/
 | SP2-A | 不调用 | 首次接入 live KG | 不生成、不使用 | 用预制合法动作验证真实 KG 查询、HEAD/TAIL 方向、异常分类、状态更新和计数 | 使用非评测 fixture 或预注册开发任务，不使用 20/150/50 生成轨迹 |
 | SP2-B | 首次正式调用 | 调用 live KG | 不生成、不读取 Self-Play Experience Memory；允许原 PoG 题内工作记忆 | 建立无 Self-Play Experience Memory 的 LLM+KG 端到端 Explorer/原 PoG 在线基线，验证动作合法性、终止、轨迹保存和重放 | 先使用独立开发任务；流程稳定后只允许用 WebQSP smoke 20 做冒烟检查 |
 | SP3 | 调用 | 调用 | 只生成候选经验，不得注入正式推理 | 在独立 discovery 任务上运行 Explorer、Critic、Oracle 和 Verifier，生成可审计、可重放的候选 Self-Play 经验 | 不得使用冻结的 WebQSP 20/150 或 CWQ 50；必须通过 exclusion registry 排除重叠 |
-| SP4 | 按预注册验证流程调用 | 按反事实和重放需要调用 | 候选经验经过反事实验证、蒸馏和 promotion，形成冻结 memory | 判断经验是否真实有效、可泛化、无 Oracle 依赖，并冻结 memory、检索配置和阈值 | 只使用独立 validation 数据，不得根据 20/150/50 结果修改 memory |
+| SP4 | 按预注册 discovery、Critic 和验证流程调用 | 按合成任务、反事实和重放需要调用 | 先补齐合成任务、严格 held-out、多轨迹 Critic 和注入审计，再进行反事实验证、蒸馏和 promotion | 判断经验是否真实有效、可泛化、无 Oracle 依赖，并冻结 memory、检索配置和阈值 | 只使用 SP4-SYN、SP4-CF、SP4-V1、SP4-V2，不得根据 20/150/50 结果修改 memory |
 | SP5 | 调用并冻结模型与 prompt 配置 | 调用并冻结搜索预算 | 只读冻结 memory | 比较原 PoG/无 memory 基线与 PoG+Self-Play memory，判断是否增强推理 | WebQSP model-compare 150 与 CWQ model-compare 50 分别正式评测；WebQSP smoke 20 仅作运行前冒烟检查 |
 
 ### 9.1 首次 live KG 实验
@@ -261,7 +264,7 @@ SP2-B 的主要结论是完整推理链能否合法运行、终止、保存和�
 
 候选经验只能在无 memory 的在线基线稳定后，于 SP3 的独立 discovery 数据上生成。SP3 计划文件为 `05_SP3_candidate_experience_discovery.md`，其启动顺序为：preflight 与数据冻结 -> Explorer-only -> O0 online Critic -> 可选 O1-O3 offline teacher -> 候选经验提取与审计。SP3 产物必须先作为 candidate experience 保存，不能在同一阶段直接作为正式 memory 注入 Explorer。Oracle 信息只能按照第 5 节权限用于任务构造、验证或离线监督，不得进入 Actor/Critic 的 O0 视图。
 
-SP4 必须先完成反事实比较、确定性重放、held-out validation、伤害率统计、蒸馏和 promotion，之后才能冻结 memory。未通过 promotion 的经验不得进入 SP5。SP5 测试期间 memory、prompt、模型、检索配置、阈值和预算均须只读冻结，不得根据 20/150/50 的结果回改。
+SP4 必须先完成合成任务与严格 split、Critic 补充、多轨迹证据、backtrack 协议门禁、candidate injection 审计、反事实比较、确定性重放、held-out validation、伤害率统计、蒸馏和 promotion，之后才能冻结 memory。未通过 promotion 的经验不得进入 SP5。SP5 测试期间 memory、prompt、模型、检索配置、阈值和预算均须只读冻结，不得根据 20/150/50 的结果回改。
 
 ### 9.4 阶段编号与启动登记规则
 
@@ -331,3 +334,5 @@ CONDITIONAL PASS 只能用于不影响核心有效性、隔离性和复现性的
 | 2026-08-22 | 1.16 | SP2-B 验收 PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP3 | B0/B1/B2 终止率与 replay 均为 100%；有效 run `sp2b-20260822T131350Z-b70a898b`；报告 `reports/sp2b/SP2B_experiment_report.md` SHA-256 `4ad722f64668af9b4de38ea474857fa8ebc1caf019aa3117e38fe8e5b2c4879c` | SP2-B |
 | 2026-08-22 | 1.17 | 登记 SP3 候选经验发现计划，并将当前阶段切换为 SP3 启动准备；明确独立 D0/D1/H discovery 数据、Explorer-only/O0 Critic/offline teacher 对照和 candidate-only 隔离 | SP2-B 已建立无 memory 的 LLM+KG 在线基线，下一步需要先生成和审计候选经验，再进入 SP4 的反事实验证、蒸馏与 promotion | SP3 |
 | 2026-08-23 | 1.18 | SP3 验收 PASS 并完成阶段收口；当前阶段改为阶段间等待，不启动 SP4 | D0/D1/G0–G3/holdout 可 replay；候选 119 条未注入。报告 `reports/sp3/SP3_experiment_report.md` SHA-256 `c30f54dad9d37f099c3faddac5377087400eb6287ee2c25831fec19d921bc650` | SP3 |
+| 2026-08-23 | 1.19 | 登记 SP4 候选经验反事实验证、独立 validation、蒸馏与 promotion 计划；当前阶段切换为 SP4 启动准备，明确尚未运行且不得进入 SP5 | SP3 已生成 119 条候选但尚未注入；需要先验证候选的同状态收益、负迁移、跨任务复用和 Oracle 隔离，再冻结 `promoted_memory` | SP4 |
+| 2026-08-23 | 1.20 | 将 SP4 扩展为前置能力补齐、合成任务与严格 held-out、多轨迹 Critic、backtrack 门禁、candidate injection 审计、反事实验证、蒸馏和 promotion；主计划切换为 v2 | 对照初始方案发现原 SP4 计划遗漏了正式验证前必须补齐的任务生成、split、Critic 和动作协议证据 | 不改写 SP3 结果；SP4 使用独立 SP4-SYN/SP4-CF/SP4-V1/SP4-V2，正式 benchmark 仍延后 |
