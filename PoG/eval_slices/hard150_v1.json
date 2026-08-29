@@ -1,0 +1,1234 @@
+{
+  "slice_id": "hard150_v1",
+  "n": 150,
+  "dataset": "webqsp",
+  "split": "test",
+  "created_at": "2026-08-19T12:23:58Z",
+  "selection": {
+    "rule": "both_systems_wrong_even_subsample",
+    "target_n": 150,
+    "description": "Questions that original PoG and the relation+decomposition memory run both got wrong (exact match), ordered by WebQSP test index, then evenly subsampled to 150. Not the first 150 test questions.",
+    "sources": {
+      "pog_orig": {
+        "path": "/data/zhujiajun/Freebase-setup/PoG-main/PoG/PoG_webqsp_gpt-3.5-turbo-0125.jsonl",
+        "total": 1639,
+        "exact_match": 0.8066,
+        "n_wrong": 317
+      },
+      "rel_decomp": {
+        "path": "/data/zhujiajun/Freebase-setup/clue-on-graph/PoG/result/webqsp_gpt-3.5-turbo-0125_mem-prompt_top2_hybrid_stages-relation_decompmem-prompt_top2_n1639_20260814_032036/results.jsonl",
+        "total": 1639,
+        "exact_match": 0.8414,
+        "n_wrong": 260
+      }
+    },
+    "n_pog_only": 140,
+    "n_mem_only": 83,
+    "n_both_wrong": 177,
+    "n_union_wrong": 400,
+    "n_overlap_prefix150": 13
+  },
+  "questions": [
+    {
+      "index": 6,
+      "RawQuestion": "what type of art does marc chagall do?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 21,
+      "RawQuestion": "what did hayes do?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 27,
+      "RawQuestion": "who plays blaine in batman?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 48,
+      "RawQuestion": "who does amy stiller play in dodgeball?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 52,
+      "RawQuestion": "where is the arizona cardinals stadium located?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 63,
+      "RawQuestion": "what does barbara bush do for work?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 71,
+      "RawQuestion": "what was franklin pierce famous for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 89,
+      "RawQuestion": "who are the senators of hawaii 2012?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 96,
+      "RawQuestion": "who was the soviet leader during world war ii?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 106,
+      "RawQuestion": "what is kentucky state slogan?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 115,
+      "RawQuestion": "what is monta ellis career high points?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 123,
+      "RawQuestion": "who is the head coach of inter milan?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 141,
+      "RawQuestion": "where did the latin language originate from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 206,
+      "RawQuestion": "when did liverpool fc last win the champions league?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 233,
+      "RawQuestion": "who are the coaches for the oakland raiders?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 236,
+      "RawQuestion": "what episode of how i met your mother is carrie underwood on?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 254,
+      "RawQuestion": "when was abe lincoln president?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 255,
+      "RawQuestion": "who is sir francis bacon?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 258,
+      "RawQuestion": "where did al qaeda attack?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 262,
+      "RawQuestion": "which country was justin bieber born in?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 273,
+      "RawQuestion": "what famous people are from barbados?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 280,
+      "RawQuestion": "what did romo do?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 284,
+      "RawQuestion": "where was the ottoman empire based?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 299,
+      "RawQuestion": "what type of books did agatha christie wrote?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 308,
+      "RawQuestion": "what was the last movie sean connery was in?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 324,
+      "RawQuestion": "where is kansas city?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 327,
+      "RawQuestion": "when does ziva start on ncis?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 334,
+      "RawQuestion": "who is the current leader of france 2010?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 339,
+      "RawQuestion": "when did arsenal won the league?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 341,
+      "RawQuestion": "what sports are popular in germany?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 344,
+      "RawQuestion": "how many kids were there in the kennedy family?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 355,
+      "RawQuestion": "what is john edwards indicted for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 357,
+      "RawQuestion": "what was francis bacon contributions?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 362,
+      "RawQuestion": "what university did obama graduated from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 380,
+      "RawQuestion": "who played bilbo in lord of the rings?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 392,
+      "RawQuestion": "what instruments does justin bieber use?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 405,
+      "RawQuestion": "what language is mainly spoken in egypt?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 413,
+      "RawQuestion": "what style of art did henri matisse do?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 424,
+      "RawQuestion": "who played carmen cortez in spy kids?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 438,
+      "RawQuestion": "where is shakira from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 441,
+      "RawQuestion": "who did jackie robinson first play for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 446,
+      "RawQuestion": "where does russia import from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 462,
+      "RawQuestion": "what was gregor mendel contribution?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 473,
+      "RawQuestion": "what does monsanto own?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 474,
+      "RawQuestion": "what country is nicki minaj from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 485,
+      "RawQuestion": "what does god shiva represent?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 487,
+      "RawQuestion": "who is the coach of the sf giants?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 502,
+      "RawQuestion": "where does houston dynamo play?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 530,
+      "RawQuestion": "what musical instruments does justin bieber play?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 548,
+      "RawQuestion": "what does david beckham play?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 549,
+      "RawQuestion": "what does wh smith stand for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 555,
+      "RawQuestion": "what was pink floyd's first album?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 564,
+      "RawQuestion": "what is the most populated state in united states?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 591,
+      "RawQuestion": "what war did the us lose the most soldiers?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 595,
+      "RawQuestion": "where did emperor hirohito live?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 597,
+      "RawQuestion": "what did alice paul accomplish?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 617,
+      "RawQuestion": "when did roth ira originate?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 621,
+      "RawQuestion": "who was the first dictator of the soviet union?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 624,
+      "RawQuestion": "who is number 22 on miami dolphins?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 626,
+      "RawQuestion": "what country sponsored ferdinand magellan?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 632,
+      "RawQuestion": "where is mt st helens located?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 637,
+      "RawQuestion": "when are the summer and winter olympics held?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 643,
+      "RawQuestion": "what is colorado technical university?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 658,
+      "RawQuestion": "when is the last time the ravens won a superbowl?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 661,
+      "RawQuestion": "where did cs lewis wrote?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 668,
+      "RawQuestion": "what region of the world is egypt associated with?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 671,
+      "RawQuestion": "what was kim richards in?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 684,
+      "RawQuestion": "who does ronaldinho play for now 2011?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 691,
+      "RawQuestion": "what does gm make?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 715,
+      "RawQuestion": "who did cam newton sign with?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 717,
+      "RawQuestion": "where did george w bush live as a child?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 733,
+      "RawQuestion": "where does marta play soccer?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 735,
+      "RawQuestion": "where was teddy roosevelt's house?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 740,
+      "RawQuestion": "who played cletus hogg?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 755,
+      "RawQuestion": "when did florida marlins join mlb?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 798,
+      "RawQuestion": "what state is barack obama from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 806,
+      "RawQuestion": "what type of religion did massachusetts have?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 815,
+      "RawQuestion": "where do most of the people live in russia?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 828,
+      "RawQuestion": "what does matt damon play in?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 853,
+      "RawQuestion": "what area of science did sir isaac newton study?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 857,
+      "RawQuestion": "where does greek language come from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 874,
+      "RawQuestion": "what year was first world series?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 895,
+      "RawQuestion": "who owns chrysler corporation 2011?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 898,
+      "RawQuestion": "what makes elvis presley famous?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 902,
+      "RawQuestion": "what team is kris humphries play for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 911,
+      "RawQuestion": "what were amelia earhart's achievements?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 962,
+      "RawQuestion": "where is denmark situated?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 974,
+      "RawQuestion": "what did james k polk do before he was president?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 980,
+      "RawQuestion": "where did andy murray started playing tennis?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 995,
+      "RawQuestion": "what other books did charles dickens write?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1008,
+      "RawQuestion": "what was the title of the book charles darwin wrote?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1015,
+      "RawQuestion": "who did the voice of darth vader in episode 3?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1026,
+      "RawQuestion": "where did rudolf virchow conduct his research?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1049,
+      "RawQuestion": "who did the chargers draft in 2011?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1059,
+      "RawQuestion": "where did mitt romney's parents come from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1060,
+      "RawQuestion": "when did michael jordan return to the nba?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1083,
+      "RawQuestion": "who does jordan palmer play for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1086,
+      "RawQuestion": "what was the first book charles dickens wrote?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1097,
+      "RawQuestion": "what country did magellan represent?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1110,
+      "RawQuestion": "who is princess leia in star wars?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1114,
+      "RawQuestion": "what team did ronaldo play for in 2003?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1116,
+      "RawQuestion": "when was president john adams elected?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1126,
+      "RawQuestion": "what was james garfield most known for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1139,
+      "RawQuestion": "who voiced darth vader?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1158,
+      "RawQuestion": "where did djokovic come from?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1177,
+      "RawQuestion": "what age did william penn get married?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1189,
+      "RawQuestion": "who is the prime minister of jamaica west indies?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1200,
+      "RawQuestion": "what is the name of the book hitler wrote in jail?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1226,
+      "RawQuestion": "what did thomas malthus do?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1236,
+      "RawQuestion": "where are the nordic countries?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1240,
+      "RawQuestion": "who plays marshall eriksen?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1254,
+      "RawQuestion": "who is number 22 for the dallas cowboys?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1258,
+      "RawQuestion": "what years did joe montana win super bowl?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1269,
+      "RawQuestion": "what jobs did john adams have before he was president?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1278,
+      "RawQuestion": "who is the miami dolphins quarterback?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1283,
+      "RawQuestion": "what two countries make up the dominican republic?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1291,
+      "RawQuestion": "what happened to dunkirk during ww2?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1300,
+      "RawQuestion": "what to do in hollywood ca this weekend?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1301,
+      "RawQuestion": "what town did justin bieber grew up in?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1359,
+      "RawQuestion": "who is ruling libya?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1371,
+      "RawQuestion": "what year did baltimore ravens win super bowl?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1372,
+      "RawQuestion": "what part of the country is ohio considered?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1374,
+      "RawQuestion": "what was john tyler?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1380,
+      "RawQuestion": "where is tennessee river?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1381,
+      "RawQuestion": "what guitar does corey taylor play?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1397,
+      "RawQuestion": "what the largest city in spain?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1400,
+      "RawQuestion": "who is my state senator arizona?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1417,
+      "RawQuestion": "what was nikola tesla known for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1420,
+      "RawQuestion": "who has coached the carolina panthers?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1423,
+      "RawQuestion": "who is the leader of libya 2011?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1438,
+      "RawQuestion": "who plays anakin skywalker in star wars 1?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1449,
+      "RawQuestion": "what prompted shakespeare to write poetry?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1461,
+      "RawQuestion": "what did niels bohr discover about the atomic structure?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1468,
+      "RawQuestion": "what is the parliament of nepal called?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1469,
+      "RawQuestion": "who is john cena married to?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1478,
+      "RawQuestion": "what new movies is robert pattinson in?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1485,
+      "RawQuestion": "when was president wilson in office?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1490,
+      "RawQuestion": "when did tony romo got drafted?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1497,
+      "RawQuestion": "what are bigos?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1508,
+      "RawQuestion": "who is the leader of north korea today?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1522,
+      "RawQuestion": "who does david beckham play for?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1530,
+      "RawQuestion": "who was married to jane wyman?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1536,
+      "RawQuestion": "where does the parana river flow?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1550,
+      "RawQuestion": "where was martin luther king jr buried?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1574,
+      "RawQuestion": "who does alyson stoner play in camp rock?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1583,
+      "RawQuestion": "what was franklin d roosevelt's job before president?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1593,
+      "RawQuestion": "who is rick scott?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1620,
+      "RawQuestion": "what materials did eduardo paolozzi use in his work?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1634,
+      "RawQuestion": "what are the mountains in northern italy called?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    },
+    {
+      "index": 1638,
+      "RawQuestion": "when was father chris riley born?",
+      "error_in": [
+        "pog_orig",
+        "rel_decomp"
+      ]
+    }
+  ],
+  "questions_sha256": "09ad7d10f566b791056d8d524acfb7cfec989715040d31f6d9728f91e31fec09"
+}

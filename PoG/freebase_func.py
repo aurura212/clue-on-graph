@@ -12,6 +12,10 @@ from sentence_transformers import util
 from sentence_transformers import SentenceTransformer
 from reference_utils import maybe_prepend_reference_context
 from relation_memory import relation_memory_context, should_use_relation_memory_at_stage
+from reflection_memory import (
+    ANSWER_DEPTH,
+    reflection_memory_context,
+)
 from constraint_compiler import (
     format_constraints_for_prompt,
     is_constraint_pushdown_enabled,
@@ -1059,7 +1063,7 @@ def build_bucket_next_nodes(
     return bucket_map
 
 
-def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args):
+def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, total_relations, args, reflection_context=""):
     prompt = extract_relation_prompt + question + '\nSubobjectives: ' + str(sub_questions) + '\nTopic Entity: ' + entity_name + '\nRelations: '+ '; '.join(total_relations)
     constraint_context = ""
     if should_inject_constraint_prompt(args, "relation"):
@@ -1086,69 +1090,85 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
             args,
             getattr(args, "sentence_model", None),
         )
-        if memory_context:
-            prompt = memory_context + "\n\n" + prompt
+    combined_context = "\n\n".join(part for part in [memory_context, str(reflection_context or "").strip()] if part)
+    if combined_context:
+        prompt = combined_context + "\n\n" + prompt
     setattr(args, "current_relation_memory_context", memory_context)
+    setattr(args, "current_relation_reflection_context", str(reflection_context or ""))
     setattr(args, "current_relation_constraint_context", constraint_context)
     return prompt
 
 
-def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, pre_head, question, args):
-    sparql_relations_extract_head = sparql_head_relations % (entity_id)
-    head_relations = execurte_sparql(sparql_relations_extract_head)
-    head_relations = replace_relation_prefix(head_relations)
 
-    sparql_relations_extract_tail= sparql_tail_relations % (entity_id)
-    tail_relations = execurte_sparql(sparql_relations_extract_tail)
-    tail_relations = replace_relation_prefix(tail_relations)
-
-    head_relations_raw = list(head_relations)
-    tail_relations_raw = list(tail_relations)
-
-    if args.remove_unnecessary_rel:
+def collect_candidate_relations_without_llm(entity_id, pre_relations=None, pre_head=-1, args=None):
+    """Collect and filter one-hop relation candidates without semantic ranking or an LLM call."""
+    pre_relations = list(pre_relations or [])
+    head_relations_raw = replace_relation_prefix(execurte_sparql(sparql_head_relations % entity_id))
+    tail_relations_raw = replace_relation_prefix(execurte_sparql(sparql_tail_relations % entity_id))
+    head_relations = list(head_relations_raw)
+    tail_relations = list(tail_relations_raw)
+    if args is None or getattr(args, "remove_unnecessary_rel", True):
         head_relations = [relation for relation in head_relations if not abandon_rels(relation)]
         tail_relations = [relation for relation in tail_relations if not abandon_rels(relation)]
-
     if pre_head:
         tail_relations = list(set(tail_relations) - set(pre_relations))
     else:
         head_relations = list(set(head_relations) - set(pre_relations))
+    head_relations = sorted(set(head_relations))
+    tail_relations = sorted(set(tail_relations))
+    return {
+        "head_relations_before_filter": sorted(head_relations_raw),
+        "tail_relations_before_filter": sorted(tail_relations_raw),
+        "head_relations": head_relations,
+        "tail_relations": tail_relations,
+        "candidate_relations": sorted(set(head_relations + tail_relations)),
+    }
 
-    head_relations = list(set(head_relations))
-    tail_relations = list(set(tail_relations))
-    total_relations = head_relations+tail_relations
-    total_relations.sort()  # make sure the order in prompt is always equal
 
+def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, pre_head, question, args, reflection_context=""):
+    candidates = collect_candidate_relations_without_llm(
+        entity_id, pre_relations, pre_head, args
+    )
+    head_relations = candidates["head_relations"]
+    tail_relations = candidates["tail_relations"]
+    total_relations = candidates["candidate_relations"]
     retrieved_relations = total_relations
     semantic_top_k = int(getattr(args, "relation_semantic_top_k", 20))
     if len(total_relations) > semantic_top_k:
         retrieved_relations = semantic_filter_relations(question, total_relations, args, top_k=semantic_top_k)
 
-    prompt = construct_relation_prune_prompt(question, sub_questions, entity_id, entity_name, retrieved_relations, args)
-    result, token_num = run_llm(prompt, args.temperature_exploration, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
-    flag, retrieve_relations = select_relations(result, entity_id, head_relations, tail_relations)
+    prompt = construct_relation_prune_prompt(
+        question, sub_questions, entity_id, entity_name, retrieved_relations, args,
+        reflection_context=reflection_context,
+    )
+    result, token_num = run_llm(
+        prompt, args.temperature_exploration, args.max_length,
+        args.opeani_api_keys, args.LLM_type, False, False
+    )
+    try:
+        flag, selected = select_relations(result, entity_id, head_relations, tail_relations)
+    except Exception:
+        flag, selected = False, []
 
     rel_trace = {
         "entity_id": entity_id,
         "entity_name": entity_name,
-        "head_relations_before_filter": sorted(head_relations_raw),
-        "tail_relations_before_filter": sorted(tail_relations_raw),
+        "head_relations_before_filter": candidates["head_relations_before_filter"],
+        "tail_relations_before_filter": candidates["tail_relations_before_filter"],
         "candidate_relations": total_relations,
         "retrieved_relations": retrieved_relations,
         "candidate_relations_sent_to_llm": retrieved_relations,
         "selected_relations": [
-            {"relation": r["relation"], "head": r["head"]} for r in (retrieve_relations if flag else [])
+            {"relation": item["relation"], "head": item["head"]} for item in (selected if flag else [])
         ],
         "llm_raw_output": result,
         "selection_success": bool(flag),
         "relation_memory_context": getattr(args, "current_relation_memory_context", ""),
+        "reflection_memory_context": getattr(args, "current_relation_reflection_context", ""),
         "constraint_context": getattr(args, "current_relation_constraint_context", ""),
     }
+    return (selected if flag else []), token_num, rel_trace
 
-    if flag:
-        return retrieve_relations, token_num, rel_trace
-    else:
-        return [], token_num, rel_trace
     
     
 def entity_search(entity, relation, head=True):
@@ -1250,9 +1270,10 @@ def is_all_digits(lst):
     return True
 
 
-def entity_condition_prune(question, total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, ent_rel_ent_dict, entid_name, name_entid, args, model):
+def entity_condition_prune(question, total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, ent_rel_ent_dict, entid_name, name_entid, args, model, reflection_context=""):
     cur_call_time = 0
     cur_token = {'total': 0, 'input': 0, 'output': 0}
+    setattr(args, "current_entity_reflection_context", str(reflection_context or ""))
 
     new_ent_rel_ent_dict = {}
     no_prune = ['time', 'number', 'date']
@@ -1316,6 +1337,8 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                             prune_method = "llm_after_embedding_top70"
 
                         prompt = prune_entity_prompt + question +'\nTriples: '
+                        if reflection_context:
+                            prompt = str(reflection_context).strip() + '\n\n' + prompt
                         sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
                         prompt += entid_name[topic_e] + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70)
 
@@ -1443,9 +1466,14 @@ def read_question_memory(q_mem_f_path):
     return ""
 
 
-def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args):
-    his_mem = read_question_memory(q_mem_f_path)
+def update_memory(
+    question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities,
+    q_mem_f_path, args, correction_context="", memory_override=None, persist_memory=True,
+):
+    his_mem = read_question_memory(q_mem_f_path) if memory_override is None else str(memory_override or "")
     prompt = update_mem_prompt + question + '\nSubobjectives: '+str(subquestions)+'\nMemory: ' + his_mem
+    if correction_context:
+        prompt = str(correction_context).strip() + "\n\n" + prompt
     prompt = append_constraint_prompt(prompt, args, "memory", covering_names=covering_answer_names(args, entid_name))
 
     use_dict = ent_rel_ent_dict
@@ -1457,8 +1485,8 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
     for topic_e, h_t_dict in sorted(use_dict.items()):
         for h_t, r_e_dict in sorted(h_t_dict.items()):
             for rela, e_list in sorted(r_e_dict.items()):
-                sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
-                chain_prompt += entid_name[topic_e] + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70) + '\n'
+                sorted_e_list = [entid_name.get(e_id, e_id) for e_id in sorted(e_list)]
+                chain_prompt += entid_name.get(topic_e, topic_e) + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70) + '\n'
 
     prefix = prompt + "\nKnowledge Triplets:\n"
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="memory")
@@ -1466,33 +1494,69 @@ def update_memory(question, subquestions, ent_rel_ent_dict, entid_name, cluster_
         budget_prefix, chain_prompt, args.LLM_type, args.max_length,
     )
     prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="memory")
-
-    response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
-    
+    response, token_num = run_llm(
+        prompt, args.temperature_reasoning, args.max_length,
+        args.opeani_api_keys, args.LLM_type, False, False
+    )
     mem = extract_memory(response)
     mem, conflicts = merge_memory_conflicts(his_mem, mem, args, entid_name)
     print(mem)
-    with open(q_mem_f_path+'/mem', 'w', encoding='utf-8') as f:
-        f.write(mem)
+    if persist_memory:
+        os.makedirs(q_mem_f_path, exist_ok=True)
+        with open(os.path.join(q_mem_f_path, 'mem'), 'w', encoding='utf-8') as f:
+            f.write(mem)
     mem_trace = {
         "memory_before": his_mem,
         "memory_after": mem,
         "llm_raw_output": response,
         "knowledge_triplets_prompt": chain_prompt.strip(),
+        "correction_context": str(correction_context or ""),
         "conflicts": conflicts,
     }
     return token_num, mem_trace
 
 
-def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args, restrict_to_covering: bool = False):
-    with open(q_mem_f_path+'/mem', 'r', encoding='utf-8') as f:
-        his_mem = f.read()
+
+def reasoning(
+    question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities,
+    q_mem_f_path, args, restrict_to_covering: bool = False, reflection_context="",
+    memory_override=None, return_trace=False,
+):
+    if memory_override is None:
+        his_mem = read_question_memory(q_mem_f_path)
+    else:
+        his_mem = str(memory_override or "")
+
+    use_dict = ent_rel_ent_dict
+    covering_ids = covering_entity_ids(args)
+    if restrict_to_covering and covering_ids:
+        use_dict = filter_ent_rel_ent_dict_to_covering(ent_rel_ent_dict, covering_ids)
+    chain_prompt = ''
+    for topic_e, h_t_dict in sorted(use_dict.items()):
+        for h_t, r_e_dict in sorted(h_t_dict.items()):
+            for rela, e_list in sorted(r_e_dict.items()):
+                sorted_e_list = [entid_name.get(e_id, e_id) for e_id in sorted(e_list)]
+                chain_prompt += entid_name.get(topic_e, topic_e) + ', ' + rela + ', ' + format_capped_list(sorted_e_list, 70) + '\n'
+
+    dynamic_context = str(reflection_context or "").strip()
+    selected_items = []
+    if not dynamic_context:
+        current_idx = int(getattr(args, "current_subobjective_idx", 0) or 0)
+        steps = parse_planning_steps(str(subquestions or ""))
+        current_subobjective = steps[current_idx] if steps and current_idx < len(steps) else ""
+        dynamic_context, selected_items = reflection_memory_context(
+            getattr(args, "reflection_memory_bank", []), ANSWER_DEPTH, question, his_mem,
+            chain_prompt, args, getattr(args, "sentence_model", None),
+            current_subobjective=current_subobjective,
+            entities=list(entid_name.values()), return_items=True,
+        )
+    setattr(args, "current_answer_depth_reflection_context", dynamic_context)
+    setattr(args, "current_answer_depth_reflection_items", selected_items)
 
     covering_names = covering_answer_names(args, entid_name)
-    prompt = answer_depth_prompt + question + '\nMemory: ' + his_mem
+    prompt = build_answer_depth_prompt(dynamic_context) + question + '\nMemory: ' + his_mem
     prompt = append_constraint_prompt(prompt, args, "reasoning", covering_names=covering_names)
     if constraint_routing_mode(args) != "off":
-        from decomposition_memory import parse_planning_steps
         steps = parse_planning_steps(str(subquestions or ""))
         n_steps = max(1, len(steps) or 1)
         current_idx = int(getattr(args, "current_subobjective_idx", 0) or 0)
@@ -1502,34 +1566,30 @@ def reasoning(question, subquestions, ent_rel_ent_dict, entid_name, cluster_chai
             + '\nAlso include "Subobjective_Progress" in the JSON: the number of subobjectives already completed '
             "(0 if none; after completing the first subobjective output 1)."
         )
-
-    use_dict = ent_rel_ent_dict
-    covering_ids = covering_entity_ids(args)
-    if restrict_to_covering and covering_ids:
-        use_dict = filter_ent_rel_ent_dict_to_covering(ent_rel_ent_dict, covering_ids)
-
-    chain_prompt = ''
-
-    for topic_e, h_t_dict in sorted(use_dict.items()):
-        for h_t, r_e_dict in sorted(h_t_dict.items()):
-            for rela, e_list in sorted(r_e_dict.items()):
-                sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
-                chain_prompt += entid_name[topic_e] + ', ' + rela + ', ' + format_capped_list(sorted_e_list, 70) + '\n'
-
     prefix = prompt + "\nKnowledge Triplets:\n"
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="reasoning")
     chain_prompt = truncate_knowledge_triplets_for_prompt(
         budget_prefix, chain_prompt, args.LLM_type, args.max_length,
     )
     prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="reasoning")
-
-    response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
+    response, token_num = run_llm(
+        prompt, args.temperature_reasoning, args.max_length,
+        args.opeani_api_keys, args.LLM_type, False
+    )
     print("Response from reasoning:", response)
     answer, reason, sufficient, progress = extract_reason_and_anwer(response)
     setattr(args, "last_subobjective_progress", progress)
+    trace = {
+        "llm_raw_output": response,
+        "answer": answer,
+        "reason": reason,
+        "sufficient": sufficient,
+        "subobjective_progress": progress,
+        "memory": his_mem,
+        "knowledge_triplets_prompt": chain_prompt.strip(),
+        "reflection_memory_context": dynamic_context,
+        "reflection_memory_items": selected_items,
+    }
+    if return_trace:
+        return response, answer, sufficient, token_num, trace
     return response, answer, sufficient, token_num
-
-    
-
-
-

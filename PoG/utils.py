@@ -23,6 +23,11 @@ get_chat_completion_extra_kwargs = _llm_api.get_chat_completion_extra_kwargs
 is_openai_compatible_engine = _llm_api.is_openai_compatible_engine
 from reference_utils import maybe_prepend_reference_context
 from decomposition_memory import decomposition_memory_context, parse_planning_steps
+from reflection_memory import (
+    ADD_ENTITY,
+    JUDGE_REVERSE,
+    reflection_memory_context,
+)
 from constraint_compiler import (
     format_constraints_for_prompt,
     is_constraint_pushdown_enabled,
@@ -619,78 +624,140 @@ def get_subquestions(q_mem_f_path, question, args):
 
     return sub_questions, token_num
 
-def if_finish_list(question, lst, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path, results, cluster_chain_of_entities, args, model):
+def if_finish_list(
+    question, lst, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path,
+    results, cluster_chain_of_entities, args, model, memory_override=None,
+    judge_reverse_context="", add_entity_context="", return_trace=False,
+):
     cur_call_time = 0
     cur_token = {'total': 0, 'input': 0, 'output': 0}
-
-    with open(q_mem_f_path+'/mem', 'r', encoding='utf-8') as f:
-        his_mem = f.read()
-
-    if all(elem == "[FINISH_ID]" for elem in lst):
-        new_lst = []
+    if memory_override is None:
+        mem_path = os.path.join(q_mem_f_path, 'mem')
+        his_mem = open(mem_path, 'r', encoding='utf-8').read() if os.path.exists(mem_path) else ""
     else:
-        new_lst = [elem for elem in lst if elem != "[FINISH_ID]"]
-    
+        his_mem = str(memory_override or "")
+
+    new_lst = [] if all(elem == "[FINISH_ID]" for elem in lst) else [elem for elem in lst if elem != "[FINISH_ID]"]
     all_ent_set = set()
-    for dep, ent_rel_ent_dict in depth_ent_rel_ent_dict.items():
+    for _dep, ent_rel_ent_dict in depth_ent_rel_ent_dict.items():
         for topic_e, h_t_dict in ent_rel_ent_dict.items():
             all_ent_set.add(topic_e)
-            for h_t, r_e_dict in h_t_dict.items():
-                for rela, e_list in r_e_dict.items():
-                    if all(entid_name[item].startswith('m.') for item in e_list) and len(e_list)>10:
-                        e_list = random.sample(e_list, 10)
-                        
-                    if len(e_list) > 70:
-                        print('··········exceed 70 entities··········')
-                        sorted_e_list = [entid_name[e_id] for e_id in e_list]
-                        topn_entities, topn_scores = retrieve_top_docs(question, sorted_e_list, model, 70)
-                        print('sentence:', topn_entities)
-                        e_list = [name_entid[e_n] for e_n in topn_entities]
-                        all_ent_set |= (set(e_list))
+            for _h_t, r_e_dict in h_t_dict.items():
+                for _rela, e_list in r_e_dict.items():
+                    all_ent_set.update(e_list)
 
-    chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
-    
+    chain_prompt = '\n'.join(
+        ', '.join(str(x) for x in chain)
+        for sublist in cluster_chain_of_entities for chain in sublist
+    )
+    entities_to_retrieve = sorted({entid_name.get(ent_i, ent_i) for ent_i in new_lst})
+    current_idx = int(getattr(args, "current_subobjective_idx", 0) or 0)
+    steps = parse_planning_steps(str(getattr(args, "current_subquestions", "") or ""))
+    current_subobjective = steps[current_idx] if steps and current_idx < len(steps) else ""
+
+    judge_context = str(judge_reverse_context or "").strip()
+    judge_items = []
+    if not judge_context:
+        judge_context, judge_items = reflection_memory_context(
+            getattr(args, "reflection_memory_bank", []), JUDGE_REVERSE, question,
+            his_mem, chain_prompt, args, getattr(args, "sentence_model", model),
+            current_subobjective=current_subobjective, entities=entities_to_retrieve,
+            return_items=True,
+        )
+    setattr(args, "current_judge_reverse_reflection_context", judge_context)
+    setattr(args, "current_judge_reverse_reflection_items", judge_items)
     prefix = (
-        judge_reverse + question
-        + '\nEntities set to be retrieved: ' + str(list(set(sorted([entid_name[ent_i] for ent_i in new_lst]))))
+        build_judge_reverse_prompt(judge_context) + question
+        + '\nEntities set to be retrieved: ' + str(entities_to_retrieve)
         + '\nMemory: ' + his_mem
         + '\nKnowledge Triplets:'
     )
     budget_prefix = maybe_prepend_reference_context(prefix, args, stage="reverse")
-    chain_prompt = truncate_knowledge_triplets_for_prompt(
+    shown_chain = truncate_knowledge_triplets_for_prompt(
         budget_prefix, chain_prompt, args.LLM_type, args.max_length,
     )
-    prompt = maybe_prepend_reference_context(prefix + chain_prompt, args, stage="reverse")
+    prompt = maybe_prepend_reference_context(prefix + shown_chain, args, stage="reverse")
 
     cur_call_time += 1
-    response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
-    for kk in token_num.keys():
-        cur_token[kk] += token_num[kk]
+    response, token_num = run_llm(
+        prompt, args.temperature_reasoning, args.max_length,
+        args.opeani_api_keys, args.LLM_type
+    )
+    for key in cur_token:
+        cur_token[key] += token_num.get(key, 0)
+    try:
+        flag, reason = extract_add_and_reason(response)
+    except Exception:
+        flag, reason = False, "The reverse-decision output could not be parsed."
 
-    flag, reason = extract_add_and_reason(response)
+    trace = {
+        "invoked": True,
+        "entities_to_retrieve": entities_to_retrieve,
+        "add": bool(flag),
+        "reason": reason,
+        "judge_raw_output": response,
+        "judge_reverse_context": judge_context,
+        "judge_reverse_items": judge_items,
+        "candidate_entities": [],
+        "add_prompt_invoked": False,
+        "add_raw_output": None,
+        "add_entity_context": "",
+        "add_entity_items": [],
+        "added_entity_ids": [],
+        "added_entity_names": [],
+    }
 
     if flag:
-        other_entities = sorted(list(all_ent_set - set(new_lst)))
-        other_entities_name = [entid_name[ent_i] for ent_i in other_entities]
-        
-        print('filter already', [entid_name[ent_i] for ent_i in new_lst], [entid_name[ent_i] for ent_i in all_ent_set], other_entities_name)
-
-        prompt = add_ent_prompt+question+'\nReason: '+reason+'\nCandidate Entities: ' + format_capped_list(sorted(other_entities_name), 70)+'\nMemory: '+his_mem
-        prompt = maybe_prepend_reference_context(prompt, args, stage="add_entity")
-
+        other_entities = sorted(all_ent_set - set(new_lst))
+        other_entities_name = [entid_name.get(ent_i, ent_i) for ent_i in other_entities]
+        trace["candidate_entities"] = list(other_entities_name)
+        add_context = str(add_entity_context or "").strip()
+        add_items = []
+        if not add_context:
+            add_context, add_items = reflection_memory_context(
+                getattr(args, "reflection_memory_bank", []), ADD_ENTITY, question,
+                his_mem, shown_chain, args, getattr(args, "sentence_model", model),
+                current_subobjective=current_subobjective, entities=other_entities_name,
+                return_items=True,
+            )
+        setattr(args, "current_add_entity_reflection_context", add_context)
+        setattr(args, "current_add_entity_reflection_items", add_items)
+        add_prompt = (
+            build_add_entity_prompt(add_context) + question + '\nReason: ' + reason
+            + '\nCandidate Entities: ' + format_capped_list(sorted(other_entities_name), 70)
+            + '\nMemory: ' + his_mem
+        )
+        add_prompt = maybe_prepend_reference_context(add_prompt, args, stage="add_entity")
         cur_call_time += 1
-        response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
-
-        for kk in token_num.keys():
-            cur_token[kk] += token_num[kk]
-
-        add_ent_list = extract_add_ent(response)
-        add_ent_list = [name_entid[ent_i] for ent_i in add_ent_list if ent_i in other_entities_name]
-        add_ent_list = sorted(add_ent_list)
+        add_response, token_num = run_llm(
+            add_prompt, args.temperature_reasoning, args.max_length,
+            args.opeani_api_keys, args.LLM_type
+        )
+        for key in cur_token:
+            cur_token[key] += token_num.get(key, 0)
+        try:
+            add_ent_names = extract_add_ent(add_response)
+        except Exception:
+            add_ent_names = []
+        add_ent_list = sorted(
+            name_entid[name] for name in add_ent_names
+            if name in other_entities_name and name in name_entid
+        )
+        trace.update({
+            "add_prompt_invoked": True,
+            "add_raw_output": add_response,
+            "add_entity_context": add_context,
+            "add_entity_items": add_items,
+            "added_entity_ids": list(add_ent_list),
+            "added_entity_names": [entid_name.get(entity_id, entity_id) for entity_id in add_ent_list],
+        })
         if add_ent_list:
-            print('add reverse ent:', len(add_ent_list), [entid_name[ent_i] for ent_i in add_ent_list])
-            return new_lst, add_ent_list, cur_call_time, cur_token
-    return new_lst, [], cur_call_time, cur_token
+            result = (new_lst, add_ent_list, cur_call_time, cur_token)
+            return result + (trace,) if return_trace else result
+
+    result = (new_lst, [], cur_call_time, cur_token)
+    return result + (trace,) if return_trace else result
+
 
     
 def prepare_dataset(dataset_name):

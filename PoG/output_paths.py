@@ -16,9 +16,14 @@ DECOMPOSITION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file_
 MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
 DECOMPOSITION_MEMORY_FILENAME = "decomposition_memory.jsonl"
 RELATION_MEMORY_FILENAME = "relation_memory.jsonl"
+REFLECTION_MEMORY_FILENAME = "reflection_memory.jsonl"
+FAILED_HOP_TRACES_FILENAME = "failed_hop_traces.jsonl"
 PROGRESS_FILENAME = "progress.jsonl"
 
-_META_PRESERVE_KEYS = ("evaluation", "relation_memory_label_counts", "decomposition_memory_count")
+_META_PRESERVE_KEYS = (
+    "evaluation", "relation_memory_label_counts", "decomposition_memory_count",
+    "reflection_memory_counts", "failed_reflection_hops",
+)
 
 
 def build_run_meta_from_args(
@@ -56,6 +61,13 @@ def build_run_meta_from_args(
         "relation_memory_path": getattr(args, "relation_memory_path", ""),
         "relation_memory_output_path": getattr(args, "relation_memory_output_path", ""),
         "relation_memory_top_k": getattr(args, "relation_memory_top_k", 4),
+        "reflection_memory_mode": getattr(args, "reflection_memory_mode", "none"),
+        "reflection_memory_path": getattr(args, "reflection_memory_path", ""),
+        "reflection_memory_output_path": getattr(args, "reflection_memory_output_path", ""),
+        "reflection_memory_top_k": getattr(args, "reflection_memory_top_k", 1),
+        "reflection_memory_prompt_token_budget": getattr(args, "reflection_memory_prompt_token_budget", 500),
+        "reflection_memory_stages": getattr(args, "reflection_memory_stages", "answer_depth,judge_reverse,add_entity"),
+        "max_reflection_rounds": getattr(args, "max_reflection_rounds", 3),
         "train_memory_family": getattr(args, "train_memory_family", "relation_choice"),
         "decomposition_memory_mode": getattr(args, "decomposition_memory_mode", "none"),
         "decomposition_memory_path": getattr(args, "decomposition_memory_path", ""),

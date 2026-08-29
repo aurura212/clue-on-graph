@@ -352,6 +352,49 @@ def make_memory_item(
     }
 
 
+
+def make_gold_relation_memory_item(
+    episode: dict[str, Any],
+    depth: int,
+    subobjectives: list[str],
+    current_subobjective: str,
+    entity_ids: list[str],
+    entity_names: dict[str, str],
+    incoming_relation: str,
+    previous_relations: list[str],
+    gold_relation: str,
+    candidate_relations: list[str],
+    entity_candidate_details: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Build a verified gold-hop relation example from KG candidates without an LLM call."""
+    candidates = list(dict.fromkeys(str(r).strip() for r in candidate_relations if str(r).strip()))
+    gold_in_candidates = bool(gold_relation) and gold_relation in candidates
+    labels = [entity_marker(entity_id, entity_names.get(entity_id)) for entity_id in entity_ids]
+    item = make_memory_item(
+        episode=episode,
+        depth=depth,
+        entity_labels=labels,
+        incoming_relation=incoming_relation,
+        previous_relations=previous_relations,
+        picked_relations=[gold_relation],
+        gold_relation=gold_relation,
+        label="positive",
+        selected_by_model=False,
+        gold_relation_in_candidates=gold_in_candidates,
+        gold_relation_in_retrieved=gold_in_candidates,
+        candidate_relations=candidates,
+        retrieved_relations=candidates,
+        llm_raw_output="",
+    )
+    item.update({
+        "subobjectives": list(subobjectives),
+        "current_subobjective": current_subobjective,
+        "relation_source": "gold_path_kg_candidates_without_llm",
+        "entity_candidate_details": list(entity_candidate_details or []),
+        "verified": gold_in_candidates,
+    })
+    return item
+
 def append_train_relation_memories(
     buffer: TrainRelationMemoryBuffer,
     episode: dict[str, Any],
@@ -501,11 +544,15 @@ def format_memory_example_for_prompt(item: dict[str, Any], relation_limit: int) 
 
     block = [
         f"Q: {item.get('question', '')}",
+    ]
+    if item.get("subobjectives"):
+        block.append(f"Subobjectives: {item.get('subobjectives')}")
+    block.extend([
         f"Topic Entity: {'; '.join(get_entity_labels(item)) or 'UNKNOWN'}",
         f"Relations: {'; '.join(shown_relations)}",
         "The output is:",
         format_relation_output_for_prompt([gold_relation]),
-    ]
+    ])
     return block
 
 

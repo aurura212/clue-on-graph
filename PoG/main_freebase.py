@@ -15,6 +15,13 @@ from output_paths import default_decomposition_memory_output_path, default_memor
 from output_paths import load_parse_ids_from_jsonl, filter_jsonl_by_parse_id, load_progress, append_progress
 from output_paths import DECOMPOSITION_MEMORY_FILENAME, RELATION_MEMORY_FILENAME
 from eval_run import run_post_test_evaluation
+from memory_train import (
+    run_combined_memory_train,
+    should_train_decomposition_memory,
+    should_train_reflection_memory,
+    should_train_relation_memory,
+)
+from reflection_memory import load_reflection_memory
 from relation_memory import (
     TrainRelationMemoryBuffer,
     append_train_relation_memories,
@@ -120,8 +127,23 @@ def add_relation_memory_args(parser):
                         default=1, help="Write missed_positive memory items when gold relation is in candidates but not selected.")
     parser.add_argument("--relation_semantic_top_k", type=int,
                         default=20, help="Keep top-k relations after semantic similarity ranking when candidate count exceeds this value.")
+    parser.add_argument("--reflection_memory_mode", type=str, choices=["none", "prompt"],
+                        default="none", help="Use verified reflection memories as dynamic prompt examples.")
+    parser.add_argument("--reflection_memory_path", type=str, default="",
+                        help="Path to reflection_memory.jsonl in test mode.")
+    parser.add_argument("--reflection_memory_output_path", type=str, default="",
+                        help="Path to write reflection_memory.jsonl in train mode.")
+    parser.add_argument("--reflection_memory_top_k", type=int, default=1,
+                        help="Maximum dynamic reflection examples per prompt stage.")
+    parser.add_argument("--reflection_memory_prompt_token_budget", type=int, default=500,
+                        help="Approximate token budget for dynamic reflection examples.")
+    parser.add_argument("--reflection_memory_stages", type=str,
+                        default="answer_depth,judge_reverse,add_entity",
+                        help="Reflection stages: answer_depth,judge_reverse,add_entity,all,none.")
+    parser.add_argument("--max_reflection_rounds", type=int, default=3,
+                        help="Maximum complete correction rounds per gold hop in train mode.")
     parser.add_argument("--train_memory_family", type=str,
-                        choices=["relation_choice", "decomposition", "all"],
+                        choices=["relation_choice", "decomposition", "reflection", "all"],
                         default="relation_choice", help="Which memory family to build in train mode.")
     parser.add_argument("--relation_memory_type", type=str,
                         default="relation_choice", help="Compatibility tag for train scripts.")
@@ -174,12 +196,8 @@ def add_relation_memory_args(parser):
                         default="off", help="Optionally re-plan once after repeated insufficient reasoning. Default off.")
 
 
-def should_train_relation_memory(args):
-    return getattr(args, "train_memory_family", "relation_choice") in {"relation_choice", "all"}
 
 
-def should_train_decomposition_memory(args):
-    return getattr(args, "train_memory_family", "relation_choice") in {"decomposition", "all"}
 
 
 def resolve_split(args):
@@ -211,234 +229,8 @@ def update_current_subobjective_idx(args, depth, sub_questions):
     return args.current_subobjective_idx
 
 
-def execute_gold_step(entity_ids, relation, frontier_limit, args=None, question=""):
-    next_entities = set()
-    for entity_id in sorted(entity_ids):
-        if not (str(entity_id).startswith("m.") or str(entity_id).startswith("g.")):
-            continue
-        if args is not None and getattr(args, "constraint_pushdown", "off") == "on":
-            entities = entity_search_with_constraints(entity_id, relation, True, question, args)
-        else:
-            entities = entity_search(entity_id, relation, True)
-        for entity in entities:
-            if str(entity).startswith("m.") or str(entity).startswith("g."):
-                next_entities.add(entity)
-    return sorted(next_entities)[:frontier_limit]
 
 
-def run_combined_memory_train(args, run_output, episodes, model):
-    if args.dataset.lower() != "webqsp":
-        raise ValueError("train mode currently supports only --dataset webqsp")
-
-    train_decomp = should_train_decomposition_memory(args)
-    train_relation = should_train_relation_memory(args)
-    if not (train_decomp or train_relation):
-        raise ValueError(f"Unsupported train_memory_family: {args.train_memory_family}")
-
-    memory_dir = args.memory_output_dir.strip() or default_memory_output_dir(args, len(episodes))
-    args.memory_output_dir = memory_dir
-    os.makedirs(memory_dir, exist_ok=True)
-
-    decomposition_memory_path = (
-        args.decomposition_memory_output_path.strip()
-        or os.path.join(memory_dir, DECOMPOSITION_MEMORY_FILENAME)
-    )
-    relation_memory_path = (
-        args.relation_memory_output_path.strip()
-        or os.path.join(memory_dir, RELATION_MEMORY_FILENAME)
-    )
-    os.makedirs(os.path.dirname(os.path.abspath(decomposition_memory_path)), exist_ok=True)
-    os.makedirs(os.path.dirname(os.path.abspath(relation_memory_path)), exist_ok=True)
-
-    print(f"Memory output dir: {memory_dir}")
-    if train_decomp:
-        print(f"Writing decomposition memory to: {decomposition_memory_path}")
-    if train_relation:
-        print(f"Writing relation memory to: {relation_memory_path}")
-    if getattr(args, "constraint_pushdown", "off") == "on":
-        print(f"Constraint pushdown enabled in train mode, as_of={args.constraint_asof_date}")
-
-    done = load_progress(memory_dir)
-    if done:
-        print(f"Resuming: {len(done)} episode(s) already completed according to progress.jsonl")
-    decomp_existing = load_parse_ids_from_jsonl(decomposition_memory_path) if train_decomp else set()
-    rel_existing = load_parse_ids_from_jsonl(relation_memory_path) if train_relation else set()
-
-    setattr(args, "relation_memory_bank", [])
-    setattr(args, "sentence_model", model)
-
-    decomp_written = 0
-    for episode in tqdm(episodes, desc="train memory"):
-        parse_id = str(episode.get("parse_id", ""))
-        if parse_id and parse_id in done:
-            continue
-
-        if parse_id:
-            if parse_id in decomp_existing:
-                filter_jsonl_by_parse_id(decomposition_memory_path, parse_id)
-                decomp_existing.discard(parse_id)
-            if parse_id in rel_existing:
-                filter_jsonl_by_parse_id(relation_memory_path, parse_id)
-                rel_existing.discard(parse_id)
-
-        question = episode["RawQuestion"]
-        topic_entity = dict(episode.get("topic_entity", {}))
-        setattr(args, "current_constraint_search_traces", {})
-        reset_coverage_map(args)
-        if args.constraint_pushdown == "on":
-            constraints = compile_question_constraints(
-                question,
-                topic_entity,
-                args,
-                model,
-                sparql_executor=execurte_sparql,
-            )
-            setattr(args, "current_constraints", constraints)
-            prompt_context = format_constraints_for_prompt(constraints)
-            if prompt_context:
-                print(f"compiled constraints [{parse_id}]: {prompt_context}")
-        else:
-            setattr(args, "current_constraints", {})
-
-        if train_decomp:
-            prompt = build_gold_planning_prompt(episode)
-            response, _token_num = run_llm(
-                prompt,
-                args.temperature_reasoning,
-                args.max_length,
-                args.opeani_api_keys,
-                args.LLM_type,
-                False,
-                False,
-            )
-            gold_subobjectives = parse_planning_steps(response)
-            if gold_subobjectives:
-                append_decomposition_memory(
-                    decomposition_memory_path,
-                    make_decomposition_memory_item(
-                        episode,
-                        gold_subobjectives=gold_subobjectives,
-                        llm_raw_output=response,
-                    ),
-                )
-                decomp_written += 1
-            else:
-                print(f"Skip decomposition memory with empty plan: {parse_id}")
-
-        if train_relation:
-            gold_path = list(episode.get("gold_relation_path") or [])
-            sub_questions = "[]"
-            current_frontier = sorted(topic_entity.keys())
-            entid_name = dict(topic_entity)
-            previous_relations = []
-            incoming_relation = ""
-
-            setattr(args, "current_topic_entity", topic_entity)
-
-            for hop_index, gold_relation in enumerate(gold_path):
-                depth = hop_index + 1
-                if not current_frontier:
-                    print(f"Stop train episode {parse_id}: empty gold frontier at depth {depth}")
-                    break
-
-                setattr(args, "current_constraint_search_traces", {})
-                next_frontier = execute_gold_step(
-                    current_frontier,
-                    gold_relation,
-                    args.gold_frontier_limit,
-                    args=args,
-                    question=question,
-                )
-                if args.constraint_pushdown == "on":
-                    traces = getattr(args, "current_constraint_search_traces", {}) or {}
-                    for (entity_id, relation, head), trace in traces.items():
-                        print(
-                            "constraint pushdown "
-                            f"parse={parse_id} entity={entity_id} relation={relation} head={head} "
-                            f"before={trace.get('before_count')} after={trace.get('after_count')} "
-                            f"applied={trace.get('pushdown_applied')} bind={trace.get('bind_relation')} "
-                            f"attempt={trace.get('attempt', '')} reason={trace.get('fallback_reason', '')}"
-                        )
-                hop_buffer = TrainRelationMemoryBuffer()
-                for entity_id in current_frontier:
-                    entity_name = entid_name.get(entity_id)
-                    if not entity_name:
-                        entity_name = id2entity_name_or_type(entity_id)
-                        entid_name[entity_id] = entity_name
-
-                    setattr(args, "current_relation_depth", depth)
-                    setattr(args, "current_incoming_relation", incoming_relation)
-                    setattr(args, "current_previous_relations", list(previous_relations))
-
-                    try:
-                        retrieve_relations, token_num, rel_trace = relation_search_prune(
-                            entity_id,
-                            sub_questions,
-                            entity_name,
-                            [],
-                            -1,
-                            question,
-                            args,
-                        )
-                    except Exception as exc:
-                        print(f"relation_search_prune failed in train mode: {exc}")
-                        continue
-
-                    candidate_relations = rel_trace.get("candidate_relations", [])
-                    retrieved_relations = rel_trace.get("retrieved_relations", [])
-                    selected_relations = rel_trace.get("selected_relations", [])
-                    append_train_relation_memories(
-                        hop_buffer,
-                        episode=episode,
-                        depth=depth,
-                        entity_id=entity_id,
-                        entity_name=entity_name,
-                        incoming_relation=incoming_relation,
-                        previous_relations=previous_relations,
-                        gold_relation=gold_relation,
-                        candidate_relations=candidate_relations,
-                        retrieved_relations=retrieved_relations,
-                        selected_relations=selected_relations,
-                        llm_raw_output=rel_trace.get("llm_raw_output", ""),
-                        write_missed_positive=bool(args.write_missed_positive),
-                    )
-
-                hop_buffer.flush(relation_memory_path)
-
-                for entity_id in next_frontier:
-                    if entity_id not in entid_name:
-                        entid_name[entity_id] = id2entity_name_or_type(entity_id)
-                current_frontier = next_frontier
-                previous_relations.append(gold_relation)
-                incoming_relation = gold_relation
-
-        if parse_id:
-            append_progress(memory_dir, parse_id)
-
-    meta_updates = {
-        "memory_output_dir": memory_dir,
-        "constraint_pushdown": getattr(args, "constraint_pushdown", "off"),
-        "constraint_asof_date": getattr(args, "constraint_asof_date", ""),
-        "constraint_hub_threshold": getattr(args, "constraint_hub_threshold", 50),
-    }
-    if train_decomp:
-        decomp_count = count_decomposition_memory(decomposition_memory_path)
-        meta_updates["decomposition_memory_output_path"] = decomposition_memory_path
-        meta_updates["decomposition_memory_count"] = decomp_count
-        print(f"Decomposition memory training finished. written={decomp_written}, total={decomp_count}")
-    if train_relation:
-        label_counts = count_relation_memory_labels(relation_memory_path)
-        meta_updates["relation_memory_output_path"] = relation_memory_path
-        meta_updates["relation_memory_label_counts"] = label_counts
-        print(
-            "Relation memory label counts: "
-            f"positive={label_counts['positive']}, "
-            f"missed_positive={label_counts['missed_positive']}, "
-            f"negative={label_counts['negative']}, "
-            f"total={label_counts['total']}"
-        )
-        print("Relation memory training finished.")
-    update_run_meta(meta_updates)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -510,8 +302,13 @@ if __name__ == '__main__':
                     planned_question_count=planned_question_count,
                     resume_dir=args.run_dir.strip() or None,
                 )
-                if should_train_decomposition_memory(args) or should_train_relation_memory(args):
-                    model = SentenceTransformer('../msmarco-distilbert-base-tas-b') if should_train_relation_memory(args) else None
+                if (
+                    should_train_decomposition_memory(args)
+                    or should_train_relation_memory(args)
+                    or should_train_reflection_memory(args)
+                ):
+                    needs_sentence_model = should_train_relation_memory(args) or should_train_reflection_memory(args)
+                    model = SentenceTransformer('../msmarco-distilbert-base-tas-b') if needs_sentence_model else None
                     run_combined_memory_train(args, run_output, selected_train_episodes, model)
                 else:
                     raise ValueError(f"Unsupported train_memory_family: {args.train_memory_family}")
@@ -559,6 +356,11 @@ if __name__ == '__main__':
                 relation_memory_bank = load_relation_memory(args.relation_memory_path.strip())
                 print(f"Loaded {len(relation_memory_bank)} relation memory items.")
             setattr(args, "relation_memory_bank", relation_memory_bank)
+            reflection_memory_bank = []
+            if args.reflection_memory_mode != "none" and args.reflection_memory_path.strip():
+                reflection_memory_bank = load_reflection_memory(args.reflection_memory_path.strip())
+                print(f"Loaded {len(reflection_memory_bank)} verified reflection memory items.")
+            setattr(args, "reflection_memory_bank", reflection_memory_bank)
             decomposition_memory_bank = []
             if args.decomposition_memory_mode != "none" and args.decomposition_memory_path.strip():
                 decomposition_memory_bank = load_decomposition_memory(args.decomposition_memory_path.strip())
@@ -639,6 +441,7 @@ if __name__ == '__main__':
 
                 call_num += 1
                 sub_questions, token_num = get_subquestions(q_mem_f_path, question, args)
+                setattr(args, "current_subquestions", sub_questions)
                 for kk in token_num.keys():
                     all_t[kk] += token_num[kk]
 
@@ -868,6 +671,8 @@ if __name__ == '__main__':
                             "answer_gate": gate_trace,
                             "subobjective_progress": getattr(args, "last_subobjective_progress", None),
                             "subobjective_idx": getattr(args, "current_subobjective_idx", 0),
+                            "reflection_memory_context": getattr(args, "current_answer_depth_reflection_context", ""),
+                            "reflection_memory_items": getattr(args, "current_answer_depth_reflection_items", []),
                         }
 
                         if stop:
@@ -886,7 +691,11 @@ if __name__ == '__main__':
                             add_ent_list = []
                             reverse_trace = {"triggered": False, "add_entities": [], "judge_response": None, "select_response": None}
                             if reverse_rec['time']<5:
-                                entities_id, add_ent_list, cur_call_time, cur_token = if_finish_list(question, entities_id, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path, results, cluster_chain_of_entities, args, model)
+                                entities_id, add_ent_list, cur_call_time, cur_token, reverse_trace = if_finish_list(
+                                    question, entities_id, depth_ent_rel_ent_dict, entid_name, name_entid,
+                                    q_mem_f_path, results, cluster_chain_of_entities, args, model,
+                                    return_trace=True,
+                                )
                                 call_num += cur_call_time
                                 for kk in cur_token.keys():
                                     all_t[kk] += cur_token[kk]

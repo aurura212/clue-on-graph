@@ -197,7 +197,7 @@ Now you need to directly output the results of the following question in JSON fo
 Q: """
 
 
-answer_depth_prompt = """Please answer the question based on the memory, related knowledge triplets and your knowledge.
+_ANSWER_DEPTH_FIXED_PROMPT = """Please answer the question based on the memory, related knowledge triplets and your knowledge.
 
 Here are five example:
 Q: Find the person who said \"Taste cannot be controlled by law\", what did this person die from?
@@ -289,7 +289,7 @@ Output:
 Now you need to directly output the results of the following question in JSON format (must include "A" and "R") without other information or notes. If the triplets explicitly contains the answer to the question, prioritize the fact of the triplet over memory.
 Q: """
 
-judge_reverse = """Based on the current set of entities to be retrieved and the known information including memory and triplets, is it necessary to add additional entities for answering question?
+_JUDGE_REVERSE_FIXED_PROMPT = """Based on the current set of entities to be retrieved and the known information including memory and triplets, is it necessary to add additional entities for answering question?
 Here are two examples:
 Q: Which of the countries in the Caribbean has the smallest country calling code?
 Entities set to be retrieved: ['Anguilla', 'Saint Lucia']
@@ -315,7 +315,7 @@ Now you need to directly output the results of the following question in the JSO
 Q: """
 
 
-add_ent_prompt = """Please select the fewest necessary entities to be retrieved for answering the Q from Candidate Entities, based on the current known information (Memory), the reason for additional retrieval, and your own knowledge.
+_ADD_ENTITY_FIXED_PROMPT = """Please select the fewest necessary entities to be retrieved for answering the Q from Candidate Entities, based on the current known information (Memory), the reason for additional retrieval, and your own knowledge.
 Here is an example:
 Q: Which of the countries in the Caribbean has the smallest country calling code?
 Reason: The entities set ignores other countries in the Caribbean.
@@ -329,6 +329,56 @@ Output: ['Barbados', 'Saint Lucia', 'Anguilla']
 
 Now you need to directly output the results for the following Q in the list format without other information or notes.
 Q: """
+
+
+def _build_prompt_with_dynamic_examples(fixed_prompt, examples_header, output_marker, dynamic_examples):
+    """Replace only the fixed examples; an empty context returns the byte-for-byte legacy prompt."""
+    dynamic_examples = str(dynamic_examples or "").strip()
+    if not dynamic_examples:
+        return fixed_prompt
+    prefix, remainder = fixed_prompt.split(examples_header, 1)
+    _fixed_examples, suffix = remainder.rsplit(output_marker, 1)
+    return (
+        prefix
+        + "Here are relevant examples:\n"
+        + dynamic_examples
+        + "\n\n"
+        + output_marker
+        + suffix
+    )
+
+
+def build_answer_depth_prompt(dynamic_examples=""):
+    return _build_prompt_with_dynamic_examples(
+        _ANSWER_DEPTH_FIXED_PROMPT,
+        "Here are five example:\n",
+        "Now you need to directly output the results of the following question",
+        dynamic_examples,
+    )
+
+
+def build_judge_reverse_prompt(dynamic_examples=""):
+    return _build_prompt_with_dynamic_examples(
+        _JUDGE_REVERSE_FIXED_PROMPT,
+        "Here are two examples:\n",
+        "Now you need to directly output the results of the following question",
+        dynamic_examples,
+    )
+
+
+def build_add_entity_prompt(dynamic_examples=""):
+    return _build_prompt_with_dynamic_examples(
+        _ADD_ENTITY_FIXED_PROMPT,
+        "Here is an example:\n",
+        "Now you need to directly output the results for the following Q",
+        dynamic_examples,
+    )
+
+
+# Backward-compatible constants preserve the original prompts when no dynamic memory is available.
+answer_depth_prompt = build_answer_depth_prompt()
+judge_reverse = build_judge_reverse_prompt()
+add_ent_prompt = build_add_entity_prompt()
 
 
 cot_prompt = """Please answer the question according to your knowledge step by step. Here is an example:
