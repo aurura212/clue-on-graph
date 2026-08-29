@@ -6,6 +6,9 @@ run_build_revolution_reference.sh
 run_*.sh
 eval.sh
 PoG*.jsonl
+/PoG/logs/
+/PoG/eval_slices/
+/PoG/kg_memory
 /msmarco-distilbert-base-tas-b
 /data/raw_train_set/
 /data/revolution_reference/
@@ -23,7 +26,11 @@ PoG*.jsonl
 /PoG/relation_memory/
 /PoG/decomposition_memory/
 /PoG/memory/
+/PoG/kg_memory/
 /mem_PoG
 /eval/__pycache__/
 /pog_diagnosis
 /PoG/gold_path_check*/
+/self-play/src/sp_memory/__pycache__/
+/self-play/tests/__pycache__/
+/self-play/runs/
