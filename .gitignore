@@ -9,6 +9,7 @@ PoG*.jsonl
 /PoG/logs/
 /PoG/eval_slices/
 /PoG/kg_memory
+/PoG/exp_memory
 /msmarco-distilbert-base-tas-b
 /data/raw_train_set/
 /data/revolution_reference/
@@ -27,6 +28,7 @@ PoG*.jsonl
 /PoG/decomposition_memory/
 /PoG/memory/
 /PoG/kg_memory/
+/PoG/exp_memory/
 /mem_PoG
 /eval/__pycache__/
 /pog_diagnosis

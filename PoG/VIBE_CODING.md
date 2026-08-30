@@ -67,7 +67,7 @@ PoG 推理时的顺序是：先做问题分解（decomposition / planning），�
 
 ## 6. JSONL 读写约定
 
-- 本项目用 **pretty-print 多行 JSONL**（`jsonl_io.py`，`indent=4`，一个对象跨多行）。
+- 本项目用 **pretty-print 多行 JSONL**（`jsonl_io.py`，`indent=2`，一个对象跨多行）。
 - 读取必须用 `iter_jsonl_records`（基于 `json.JSONDecoder.raw_decode`），**不能按行 `json.loads`**——按行读会把一个对象的第一行当独立 JSON 解析而报错。
 - 写入用 `append_jsonl_record` / `append_decomposition_memory` / `append_relation_memory`，不要自己拼 `json.dumps` + `write`。
 

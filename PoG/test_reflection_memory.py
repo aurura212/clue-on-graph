@@ -174,6 +174,19 @@ class PromptInjectionTest(unittest.TestCase):
         self.assertNotIn('smallest country calling code', reverse_prompt)
         self.assertNotIn('Saint Marie', add_prompt)
 
+    def test_correction_is_inserted_before_question_without_dropping_examples(self):
+        correction = (
+            "Training correction: output Sufficient=No and Answer=Null.\n"
+            '{\n    "A": {\n        "Sufficient": "No",\n        "Answer": "Null"\n    },\n    "R": "Not enough yet."\n}'
+        )
+        prompt = prompt_list.insert_instruction_before_question(
+            prompt_list.build_answer_depth_prompt(), correction
+        )
+        self.assertIn("Taste cannot be controlled by law", prompt)
+        self.assertIn('"Sufficient": "No"', prompt)
+        self.assertLess(prompt.find("Taste cannot be controlled by law"), prompt.find("Training correction"))
+        self.assertLess(prompt.find("Training correction"), prompt.rfind("Q:"))
+
     def test_prompt_formatter_never_leaks_training_metadata(self):
         item = {
             "memory_type": reflection_memory.ANSWER_DEPTH,
@@ -279,6 +292,56 @@ class ReflectionDiagnosisTest(unittest.TestCase):
         self.assertIn("relation", diagnosis["errors"])
         self.assertIn("entity", diagnosis["errors"])
 
+    def test_sufficient_correction_is_stage_local_and_shows_nested_json(self):
+        hop = make_hop(final=False)
+        trace = make_trace(final=False, correct=True)
+        trace["answer_depth"] = {"sufficient": "Yes", "answer": "m.next", "reason": "stopped too early"}
+        trace["reverse"] = {"invoked": False, "add": False}
+        diagnosis = reflection_memory.diagnose_gold_hop_round(trace, hop)
+        self.assertIn("sufficient", diagnosis["errors"])
+        nxt = reflection_memory.build_next_round_state({"memory": "{}"}, trace, diagnosis, hop)
+        memory = nxt["memory"]
+        self.assertIn(reflection_memory.MEMORY_SLOT_NOTE_SEP, memory)
+        self.assertIn("Sufficient=No", memory)
+        self.assertIn("Add=No", memory)
+        self.assertIn('"1"', memory)
+        self.assertNotIn("relation", nxt["stage_corrections"])
+        self.assertNotIn("memory", nxt["stage_corrections"])
+        answer = nxt["stage_corrections"]["answer"]
+        self.assertIn('"A":', answer)
+        self.assertIn('"Sufficient": "No"', answer)
+        self.assertNotIn('"Add"', answer)
+        reverse = nxt["stage_corrections"]["reverse"]
+        self.assertIn('"Add": "No"', reverse)
+        self.assertNotIn('"Sufficient"', reverse)
+        stripped = reflection_memory.strip_memory_slot_notes(memory)
+        self.assertNotIn(reflection_memory.MEMORY_SLOT_NOTE_SEP, stripped)
+        self.assertNotIn("Sufficient=No", stripped)
+        self.assertIn("The triplets provide the information that", stripped)
+        self.assertIn(reflection_memory.INCOMPLETE_MEMORY_SENTENCE, stripped)
+        self.assertNotIn("Observed facts:", memory)
+        self.assertNotIn("Not completed yet:", memory)
+
+    def test_memory_slot_error_goes_to_update_memory_prompt_not_old_memory(self):
+        hop = make_hop(final=True)
+        trace = make_trace(final=True, correct=True)
+        trace["memory_after"] = json.dumps({"1": "Answer is visible."})
+        diagnosis = reflection_memory.diagnose_gold_hop_round(trace, hop)
+        self.assertIn("memory", diagnosis["errors"])
+        self.assertIn("memory_missing_subobjective_slots", diagnosis["memory_problems"])
+        nxt = reflection_memory.build_next_round_state({"memory": "{}"}, trace, diagnosis, hop)
+        memory_prompt = nxt["stage_corrections"]["memory"]
+        self.assertIn("one short sentence per subobjective", memory_prompt)
+        self.assertIn(reflection_memory.INCOMPLETE_MEMORY_SENTENCE, memory_prompt)
+        self.assertIn("Find the next entity", memory_prompt)
+        self.assertIn("Answer the question", memory_prompt)
+        self.assertIn("omitted a subobjective", memory_prompt)
+        self.assertNotIn("Visible facts for", memory_prompt)
+        self.assertNotIn('"1":', memory_prompt)
+        self.assertNotIn("{", memory_prompt)
+        self.assertNotIn(reflection_memory.MEMORY_SLOT_NOTE_SEP, nxt["memory"])
+        self.assertNotIn("one short sentence per subobjective", nxt["memory"])
+
     def test_three_failed_rounds_do_not_create_memory(self):
         bad_trace = make_trace(final=False, correct=False)
         with mock.patch.object(reflection_memory, "run_gold_hop_round", return_value=bad_trace):
@@ -290,7 +353,7 @@ class ReflectionDiagnosisTest(unittest.TestCase):
         self.assertEqual(len(result["traces"]), 3)
         self.assertEqual(result["memory_bundle"], [])
 
-    def test_converged_hop_keeps_verified_add_yes_from_earlier_round(self):
+    def test_converged_hop_replaces_earlier_duplicate_stage_memory(self):
         wrong_trace = make_trace(final=False, correct=False)
         correct_trace = make_trace(final=False, correct=True)
         with mock.patch.object(
@@ -300,30 +363,36 @@ class ReflectionDiagnosisTest(unittest.TestCase):
                 make_hop(final=False), SimpleNamespace(max_reflection_rounds=3), None, max_rounds=3
             )
         self.assertTrue(result["success"])
+        answer_items = [
+            item for item in result["memory_bundle"]
+            if item["memory_type"] == reflection_memory.ANSWER_DEPTH
+        ]
+        self.assertEqual(len(answer_items), 1)
+        self.assertIn("Next", answer_items[0]["memory"])
+        judge_items = [
+            item for item in result["memory_bundle"]
+            if item["memory_type"] == reflection_memory.JUDGE_REVERSE
+        ]
+        self.assertEqual(len(judge_items), 1)
+        self.assertEqual(judge_items[0]["output"]["Add"], "No")
         add_items = [
             item for item in result["memory_bundle"]
             if item["memory_type"] == reflection_memory.ADD_ENTITY
         ]
         self.assertEqual(len(add_items), 1)
         self.assertEqual(add_items[0]["output"], ["Start"])
-        judge_yes = [
-            item for item in result["memory_bundle"]
-            if item["memory_type"] == reflection_memory.JUDGE_REVERSE
-            and item["output"]["Add"] == "Yes"
-        ]
-        self.assertEqual(len(judge_yes), 1)
 
-    def test_memory_with_hidden_gold_fact_is_rejected(self):
+    def test_memory_may_mention_gold_answer_from_parametric_knowledge(self):
         hop = make_hop(final=False)
-        trace = make_trace(final=False, correct=False)
+        trace = make_trace(final=False, correct=True)
         trace["memory_after"] = json.dumps({
-            "1": "The hidden correct entity is Next.",
-            "2": "Not completed yet.",
+            "1": "Start reaches Next through the visible relation.",
+            "2": "Parametric knowledge says the final answer is Answer.",
         })
         diagnosis = reflection_memory.diagnose_gold_hop_round(trace, hop)
-        self.assertFalse(diagnosis["memory_ok"])
-        self.assertIn("memory", diagnosis["errors"])
-        self.assertIn("memory_contains_hidden_gold_fact", diagnosis["memory_problems"])
+        self.assertTrue(diagnosis["memory_ok"])
+        self.assertNotIn("memory", diagnosis["errors"])
+        self.assertNotIn("memory_contains_hidden_gold_fact", diagnosis["memory_problems"])
 
 
 class RelationMemoryTest(unittest.TestCase):
@@ -522,6 +591,27 @@ class EpisodeCommitTest(unittest.TestCase):
         finally:
             import shutil
             shutil.rmtree(args.memory_output_dir, ignore_errors=True)
+
+    def test_count_reflection_memory_reads_pretty_printed_jsonl(self):
+        from jsonl_io import append_jsonl_record
+        from reflection_memory import count_reflection_memory
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "reflection_memory.jsonl")
+            append_jsonl_record(
+                path,
+                {
+                    "memory_type": "answer_depth",
+                    "verified": True,
+                    "parse_id": "p1",
+                },
+            )
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read()
+            self.assertIn('\n  "memory_type"', text)
+            counts = count_reflection_memory(path)
+            self.assertEqual(counts["answer_depth"], 1)
+            self.assertEqual(counts["total"], 1)
 
 
 if __name__ == "__main__":

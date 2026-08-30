@@ -216,7 +216,6 @@ def append_progress(memory_dir: str, parse_id: str) -> None:
     append_jsonl_record(
         os.path.join(memory_dir, PROGRESS_FILENAME),
         {"parse_id": str(parse_id)},
-        indent=0,
     )
 
 

@@ -1471,9 +1471,8 @@ def update_memory(
     q_mem_f_path, args, correction_context="", memory_override=None, persist_memory=True,
 ):
     his_mem = read_question_memory(q_mem_f_path) if memory_override is None else str(memory_override or "")
-    prompt = update_mem_prompt + question + '\nSubobjectives: '+str(subquestions)+'\nMemory: ' + his_mem
-    if correction_context:
-        prompt = str(correction_context).strip() + "\n\n" + prompt
+    prompt = insert_instruction_before_question(update_mem_prompt, correction_context)
+    prompt = prompt + question + '\nSubobjectives: '+str(subquestions)+'\nMemory: ' + his_mem
     prompt = append_constraint_prompt(prompt, args, "memory", covering_names=covering_answer_names(args, entid_name))
 
     use_dict = ent_rel_ent_dict
@@ -1520,7 +1519,7 @@ def update_memory(
 def reasoning(
     question, subquestions, ent_rel_ent_dict, entid_name, cluster_chain_of_entities,
     q_mem_f_path, args, restrict_to_covering: bool = False, reflection_context="",
-    memory_override=None, return_trace=False,
+    memory_override=None, return_trace=False, correction_context="",
 ):
     if memory_override is None:
         his_mem = read_question_memory(q_mem_f_path)
@@ -1554,7 +1553,9 @@ def reasoning(
     setattr(args, "current_answer_depth_reflection_items", selected_items)
 
     covering_names = covering_answer_names(args, entid_name)
-    prompt = build_answer_depth_prompt(dynamic_context) + question + '\nMemory: ' + his_mem
+    prompt = build_answer_depth_prompt(dynamic_context)
+    prompt = insert_instruction_before_question(prompt, correction_context)
+    prompt = prompt + question + '\nMemory: ' + his_mem
     prompt = append_constraint_prompt(prompt, args, "reasoning", covering_names=covering_names)
     if constraint_routing_mode(args) != "off":
         steps = parse_planning_steps(str(subquestions or ""))
@@ -1589,6 +1590,7 @@ def reasoning(
         "knowledge_triplets_prompt": chain_prompt.strip(),
         "reflection_memory_context": dynamic_context,
         "reflection_memory_items": selected_items,
+        "correction_context": str(correction_context or ""),
     }
     if return_trace:
         return response, answer, sufficient, token_num, trace

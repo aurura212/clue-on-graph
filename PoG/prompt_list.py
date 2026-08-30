@@ -331,6 +331,17 @@ Now you need to directly output the results for the following Q in the list form
 Q: """
 
 
+def insert_instruction_before_question(prompt: str, instruction: str) -> str:
+    """Keep few-shot examples intact; place extra instructions just before the live Q."""
+    instruction = str(instruction or "").strip()
+    if not instruction:
+        return prompt
+    idx = prompt.rfind("Q:")
+    if idx < 0:
+        return prompt.rstrip() + "\n\n" + instruction + "\n"
+    return prompt[:idx] + instruction + "\n\n" + prompt[idx:]
+
+
 def _build_prompt_with_dynamic_examples(fixed_prompt, examples_header, output_marker, dynamic_examples):
     """Replace only the fixed examples; an empty context returns the byte-for-byte legacy prompt."""
     dynamic_examples = str(dynamic_examples or "").strip()

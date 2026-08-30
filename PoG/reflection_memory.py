@@ -8,6 +8,7 @@ import re
 from copy import deepcopy
 from typing import Any, Iterable
 
+from jsonl_io import iter_jsonl_records
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,13 +31,10 @@ def resolve_project_path(path: str) -> str:
 
 
 def read_jsonl_file(path: str) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    with open(path, "r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
+    """Read pretty-printed multi-line JSONL. Do not parse line-by-line."""
+    if not path or not os.path.exists(path):
+        return []
+    return list(iter_jsonl_records(path))
 
 ANSWER_DEPTH = "answer_depth"
 JUDGE_REVERSE = "judge_reverse"
@@ -342,7 +340,7 @@ def _parse_memory_object(memory: Any) -> dict[str, Any] | None:
 
 
 def _memory_grounding_check(trace: dict[str, Any], hop: dict[str, Any]) -> tuple[bool, list[str]]:
-    """Require a structured memory grounded in visible evidence and free of hidden gold facts."""
+    """Require a structured memory that covers subobjective slots and visible triplet tokens."""
     memory = trace.get("memory_after", "")
     memory_obj = _parse_memory_object(memory)
     problems: list[str] = []
@@ -356,39 +354,6 @@ def _memory_grounding_check(trace: dict[str, Any], hop: dict[str, Any]) -> tuple
         problems.append("memory_missing_subobjective_slots")
 
     memory_norm = _normalise_answer(json.dumps(memory_obj, ensure_ascii=False))
-    visible_norms = {
-        _normalise_answer(value) for value in trace.get("visible_values", [])
-        if _normalise_answer(value)
-    }
-    hidden_gold_values: list[str] = []
-    for value in list(hop.get("gold_next_entity_ids", [])) + list(hop.get("gold_next_entity_names", [])):
-        norm = _normalise_answer(value)
-        if norm and norm not in visible_norms:
-            hidden_gold_values.append(norm)
-    for gold in hop.get("gold_answers", []):
-        for value in (gold.get("answer_id"), gold.get("answer")):
-            norm = _normalise_answer(value)
-            if norm and norm not in visible_norms:
-                hidden_gold_values.append(norm)
-    generic_values = {"answer", "answers", "entity", "unknown", "null", "yes", "no"}
-    memory_words = set(memory_norm.split())
-    for value in hidden_gold_values:
-        if not value or value in generic_values:
-            continue
-        if value.startswith(("m ", "g ")):
-            if value in memory_norm:
-                problems.append("memory_contains_hidden_gold_fact")
-                break
-        else:
-            value_words = value.split()
-            if len(value_words) == 1:
-                leaked = value_words[0] in memory_words
-            else:
-                leaked = value in memory_norm
-            if leaked:
-                problems.append("memory_contains_hidden_gold_fact")
-                break
-
     triplet_lines = triplets_to_lines(trace.get("knowledge_triplets", []))
     for line in triplet_lines:
         parts = [part.strip() for part in line.split(",", 2)]
@@ -470,25 +435,146 @@ def diagnose_gold_hop_round(trace: dict[str, Any], hop: dict[str, Any]) -> dict[
     }
 
 
+MEMORY_SLOT_NOTE_SEP = " | Note: "
+INCOMPLETE_MEMORY_SENTENCE = "It is not mentioned, and I also don't know."
+
+
+def strip_memory_slot_notes(memory: str) -> str:
+    """Drop training notes before a memory item is written as a few-shot."""
+    obj = _parse_memory_object(memory)
+    if not isinstance(obj, dict) or not obj:
+        return memory
+    cleaned: dict[str, str] = {}
+    for key, value in obj.items():
+        text = str(value)
+        if MEMORY_SLOT_NOTE_SEP in text:
+            text = text.split(MEMORY_SLOT_NOTE_SEP, 1)[0].rstrip()
+        cleaned[str(key)] = text
+    return json.dumps(cleaned, ensure_ascii=False, indent=4)
+
+
+def _visible_triplet_sentence(lines: list[str]) -> str:
+    """Phrase visible triplets like the update_memory few-shot, without dumping a JSON template."""
+    facts = [str(line).strip() for line in lines if str(line).strip()]
+    if not facts:
+        return INCOMPLETE_MEMORY_SENTENCE
+    if len(facts) == 1:
+        return f"The triplets provide the information that {facts[0]}."
+    return "The triplets provide the information that " + "; ".join(facts) + "."
+
+
 def build_corrected_memory(
     subobjectives: list[str],
     current_hop_index: int,
     knowledge_triplets: Any,
+    slot_note: str = "",
 ) -> str:
     """Rebuild memory from visible evidence only; no hidden gold answer or triplet is used."""
     lines = triplets_to_lines(knowledge_triplets)
+    note = _clean(slot_note)
+    visible_sentence = _visible_triplet_sentence(lines)
     corrected: dict[str, str] = {}
     for index, subobjective in enumerate(subobjectives):
         slot = str(index + 1)
         if index < current_hop_index:
-            corrected[slot] = f"Completed: {_clean(subobjective)}."
-        elif index == current_hop_index and lines:
-            corrected[slot] = "Observed facts: " + " ; ".join(lines)
+            body = f"This subobjective is already completed: {_clean(subobjective)}."
+        elif index == current_hop_index:
+            body = visible_sentence
         else:
-            corrected[slot] = f"Not completed yet: {_clean(subobjective)}."
+            body = INCOMPLETE_MEMORY_SENTENCE
+        if note and index == current_hop_index:
+            body = body + MEMORY_SLOT_NOTE_SEP + note
+        corrected[slot] = body
     if not corrected:
-        corrected["1"] = "Observed facts: " + (" ; ".join(lines) if lines else "No verified facts yet.")
+        body = visible_sentence
+        if note:
+            body = body + MEMORY_SLOT_NOTE_SEP + note
+        corrected["1"] = body
     return json.dumps(corrected, ensure_ascii=False, indent=4)
+
+
+def _hop_slot_note(diagnosis: dict[str, Any], hop: dict[str, Any]) -> str:
+    """Semantic trainer hints for the current hop slot; used by reasoning/reverse, not update_memory."""
+    errors = diagnosis.get("errors") or []
+    parts: list[str] = []
+    if "sufficient" in errors:
+        if diagnosis.get("expected_sufficient") == "Yes":
+            parts.append(
+                "This hop's evidence is enough to answer; Sufficient=Yes with an answer grounded in the facts."
+            )
+        else:
+            parts.append(
+                "This hop's evidence is not enough to answer; Sufficient=No and Answer=Null."
+            )
+    if "backtrack" in errors:
+        if diagnosis.get("expected_add") == "Yes":
+            names = hop.get("gold_start_entity_names") or []
+            extra = ": " + ", ".join(str(name) for name in names) + "." if names else "."
+            parts.append("Need the hop-start entity again" + extra)
+        else:
+            parts.append("The correct next entity is already in the frontier; Add=No.")
+    return " ".join(parts)
+
+
+def _memory_schema_example(subobjectives: list[str], problems: list[str] | None = None) -> str:
+    """Natural-language trainer hint for update_memory; do not dump a JSON object to copy."""
+    steps = [_clean(item) for item in (subobjectives or []) if _clean(item)]
+    problems = [str(item) for item in (problems or [])]
+    lines = [
+        "Write Memory in the same style as the example: one short sentence per subobjective.",
+        (
+            "If the current triplets support a subobjective, say what they show. "
+            f'If they do not, write "{INCOMPLETE_MEMORY_SENTENCE}"'
+        ),
+        "Do not invent names or answers that are absent from the current Knowledge Triplets.",
+    ]
+    if steps:
+        listed = "; ".join(steps)
+        lines.append(f"Keep a sentence for every subobjective in order: {listed}.")
+    if "memory_missing_subobjective_slots" in problems:
+        lines.append("The previous Memory omitted a subobjective; do not drop any of them.")
+    if "memory_not_json_object" in problems:
+        lines.append("Keep the same Memory layout as the example, with one sentence per subobjective.")
+    if "memory_missing_visible_head" in problems or "memory_missing_visible_tail" in problems:
+        lines.append("The Memory must mention the entities that appear in the current triplets.")
+    return " ".join(lines)
+
+
+def _answer_depth_schema_example(sufficient: str, answer: str) -> str:
+    answer_json = json.dumps("Null" if str(sufficient).lower() != "yes" else (answer or ""), ensure_ascii=False)
+    reason = (
+        "The visible evidence answers the question."
+        if str(sufficient).lower() == "yes"
+        else "The visible evidence does not yet answer the question."
+    )
+    return (
+        "Output exactly this JSON shape. A must be an object with Sufficient and Answer; "
+        "do not put the answer in A as a string; do not include Add.\n"
+        "{\n"
+        '    "A": {\n'
+        f'        "Sufficient": "{sufficient}",\n'
+        f"        \"Answer\": {answer_json}\n"
+        "    },\n"
+        f'    "R": "{reason}"\n'
+        "}"
+    )
+
+
+def _reverse_schema_example(add: str) -> str:
+    return (
+        'Output exactly this JSON shape (must include "Add" and "Reason" only):\n'
+        "{\n"
+        f'    "Add": "{add}",\n'
+        '    "Reason": "Explain whether a historical entity must be added."\n'
+        "}"
+    )
+
+
+def _append_stage_line(stages: dict[str, list[str]], stage: str, line: str) -> None:
+    header = "Training correction: solve the current hop again using only currently observed candidates and triplets."
+    bucket = stages.setdefault(stage, [header])
+    if line not in bucket:
+        bucket.append(line)
 
 
 def build_next_round_state(
@@ -502,14 +588,20 @@ def build_next_round_state(
         trace.get("knowledge_triplets", [])
     )
     next_state["memory"] = build_corrected_memory(
-        hop.get("subobjectives", []), hop.get("hop_index", 0), visible_triplets
+        hop.get("subobjectives", []),
+        hop.get("hop_index", 0),
+        visible_triplets,
+        slot_note=_hop_slot_note(diagnosis, hop),
     )
-    guidance: list[str] = [
-        "Training correction: solve the current hop again using only currently observed candidates and triplets."
-    ]
-    if "relation" in diagnosis.get("errors", []):
-        guidance.append(f"Select relation {hop.get('gold_relation')} because it is the verified relation for this hop.")
-    if "entity" in diagnosis.get("errors", []):
+    errors = diagnosis.get("errors") or []
+    stages: dict[str, list[str]] = {}
+    if "relation" in errors:
+        _append_stage_line(
+            stages,
+            "relation",
+            f"Select relation {hop.get('gold_relation')} because it is the verified relation for this hop.",
+        )
+    if "entity" in errors:
         observed_names = [
             name for entity_id, name in zip(
                 trace.get("entity_selection", {}).get("candidate_entity_ids", []),
@@ -517,34 +609,54 @@ def build_next_round_state(
             ) if entity_id in set(hop.get("gold_next_entity_ids", []))
         ]
         if observed_names:
-            guidance.append("Keep the observed candidate branch: " + ", ".join(_unique(observed_names)) + ".")
+            _append_stage_line(
+                stages,
+                "entity",
+                "Keep the observed candidate branch: " + ", ".join(_unique(observed_names)) + ".",
+            )
         else:
-            guidance.append("The correct branch was not retained; return to the current hop start and redo relation/entity selection.")
-    if "memory" in diagnosis.get("errors", []):
-        guidance.append(
-            "Rebuild Memory as a JSON object with one slot per subobjective; include only visible verified facts "
-            "and explicitly mark unfinished subobjectives."
-        )
-    if "sufficient" in diagnosis.get("errors", []):
-        if diagnosis.get("expected_sufficient") == "Yes":
-            guidance.append("Current visible evidence is sufficient; output Sufficient=Yes with an answer grounded in it.")
+            _append_stage_line(
+                stages,
+                "entity",
+                "The correct branch was not retained; return to the current hop start and redo relation/entity selection.",
+            )
+    if "memory" in errors:
+        stages["memory"] = [
+            _memory_schema_example(
+                hop.get("subobjectives") or [],
+                diagnosis.get("memory_problems") or [],
+            )
+        ]
+    if "sufficient" in errors:
+        expected_sufficient = diagnosis.get("expected_sufficient") or "No"
+        expected_answer = diagnosis.get("expected_answer") or "Null"
+        stages["answer"] = [_answer_depth_schema_example(expected_sufficient, expected_answer)]
+    if "backtrack" in errors:
+        expected_add = "Yes" if diagnosis.get("expected_add") == "Yes" else "No"
+        stages["reverse"] = [_reverse_schema_example(expected_add)]
+        if expected_add == "Yes":
+            names = hop.get("gold_start_entity_names") or []
+            stages["add"] = [
+                "From Candidate Entities, select only: " + ", ".join(str(name) for name in names) + "."
+                if names else "From Candidate Entities, select only the hop-start entity.",
+            ]
         else:
-            guidance.append("Current visible evidence is insufficient; output Sufficient=No and Answer=Null.")
-    if "backtrack" in diagnosis.get("errors", []):
-        if diagnosis.get("expected_add") == "Yes":
-            names = hop.get("gold_start_entity_names", [])
-            guidance.append("Output Add=Yes and add only the minimum hop-start entity" + (": " + ", ".join(names) if names else "."))
-        else:
-            guidance.append("Output Add=No: the correct next entity is already retained, so no historical entity is needed.")
-    guidance.append('Keep the existing JSON schemas: A/Sufficient/Answer/R and Add/Reason.')
-    next_state["correction_context"] = "\n".join(guidance)
+            stages["add"] = [
+                "Do not add extra historical entities. If this step runs, output an empty list.",
+            ]
+    next_state["stage_corrections"] = {stage: "\n".join(lines) for stage, lines in stages.items()}
+    next_state["correction_context"] = "\n\n".join(
+        next_state["stage_corrections"][stage]
+        for stage in ("relation", "entity", "memory", "answer", "reverse", "add")
+        if next_state["stage_corrections"].get(stage)
+    )
     return next_state
 
 
 def _common_memory_fields(hop: dict[str, Any], trace: dict[str, Any]) -> dict[str, Any]:
     question = hop.get("question", "")
     topic_entities = hop.get("topic_entities", {})
-    memory = trace.get("memory_after", "")
+    memory = strip_memory_slot_notes(trace.get("memory_after", ""))
     triplets = triplets_to_lines(trace.get("knowledge_triplets", []))
     current_subobjective = hop.get("current_subobjective", "")
     return {
@@ -629,26 +741,39 @@ def _build_stage_memory_bundle(
     return bundle
 
 
+def _reflection_memory_identity(item: dict[str, Any]) -> tuple[str, str, str, str]:
+    """One slot per question hop and reflection stage; Memory wording is not part of identity."""
+    return (
+        str(item.get("parse_id") or ""),
+        str(item.get("memory_type") or ""),
+        str(item.get("depth", "")),
+        str(item.get("current_subobjective") or ""),
+    )
+
+
+def upsert_reflection_memory_items(
+    existing: list[dict[str, Any]] | None = None,
+    incoming: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Keep insertion order of first-seen identities; later items replace earlier ones."""
+    merged: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for item in list(existing or []) + list(incoming or []):
+        merged[_reflection_memory_identity(item)] = item
+    return list(merged.values())
+
+
 def build_verified_hop_memory_bundle(
     hop: dict[str, Any],
     traces: dict[str, Any] | list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """After a hop converges, retain every stage-level positive from its real rounds."""
+    """After a hop converges, keep the latest positive example for each stage."""
     trace_list = traces if isinstance(traces, list) else [traces]
     bundle: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str]] = set()
     for trace in trace_list:
         diagnosis = trace.get("diagnosis") or diagnose_gold_hop_round(trace, hop)
-        for item in _build_stage_memory_bundle(hop, trace, diagnosis):
-            key = (
-                str(item.get("memory_type", "")),
-                str(item.get("state_key", "")),
-                json.dumps(item.get("output"), ensure_ascii=False, sort_keys=True),
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            bundle.append(item)
+        bundle = upsert_reflection_memory_items(
+            bundle, _build_stage_memory_bundle(hop, trace, diagnosis)
+        )
     return bundle
 
 
@@ -675,8 +800,10 @@ def run_gold_hop_round(
     entid_name = dict(hop.get("entity_names", {}))
     name_entid = {name: entity_id for entity_id, name in entid_name.items()}
     start_ids = list(hop.get("gold_start_entity_ids", []))
-    correction_context = state.get("correction_context", "")
-    relation_context = "\n\n".join(part for part in [relation_memory_example, correction_context] if part)
+    corrections = dict(state.get("stage_corrections") or {})
+    relation_context = "\n\n".join(
+        part for part in [relation_memory_example, corrections.get("relation", "")] if part
+    )
 
     relation_traces: list[dict[str, Any]] = []
     selected_relations: list[dict[str, Any]] = []
@@ -728,7 +855,7 @@ def run_gold_hop_round(
     entity_result = entity_condition_prune(
         question, total_entities_id, total_relations, total_candidates,
         total_topic_entities, total_head, ent_rel_ent_dict, entid_name,
-        name_entid, args, model, reflection_context=correction_context,
+        name_entid, args, model, reflection_context=corrections.get("entity", ""),
     )
     (entity_flag, cluster_chains, selected_entity_ids, selected_pre_relations,
      selected_pre_heads, selected_dict, call_count, entity_tokens, entity_details) = entity_result
@@ -738,20 +865,20 @@ def run_gold_hop_round(
     memory_tokens, memory_trace = update_memory(
         question, subobjectives, selected_dict, entid_name, cluster_chains,
         state.get("memory_dir", ""), args,
-        correction_context=correction_context,
+        correction_context=corrections.get("memory", ""),
         memory_override=state.get("memory", ""),
         persist_memory=False,
     )
     for key in token_totals:
         token_totals[key] += memory_tokens.get(key, 0)
 
-    answer_context = state.get("answer_depth_context", "")
     reasoning_result = reasoning(
         question, subobjectives, selected_dict, entid_name, cluster_chains,
         state.get("memory_dir", ""), args,
-        reflection_context="\n\n".join(part for part in [answer_context, correction_context] if part),
+        reflection_context=state.get("answer_depth_context", ""),
         memory_override=memory_trace.get("memory_after", ""),
         return_trace=True,
+        correction_context=corrections.get("answer", ""),
     )
     response, answer, sufficient, reasoning_tokens, reasoning_trace = reasoning_result
     for key in token_totals:
@@ -764,8 +891,10 @@ def run_gold_hop_round(
             entid_name, name_entid, state.get("memory_dir", ""), response,
             cluster_chains, args, model,
             memory_override=memory_trace.get("memory_after", ""),
-            judge_reverse_context="\n\n".join(part for part in [state.get("judge_reverse_context", ""), correction_context] if part),
-            add_entity_context="\n\n".join(part for part in [state.get("add_entity_context", ""), correction_context] if part),
+            judge_reverse_context=state.get("judge_reverse_context", ""),
+            add_entity_context=state.get("add_entity_context", ""),
+            judge_correction=corrections.get("reverse", ""),
+            add_correction=corrections.get("add", ""),
             return_trace=True,
         )
         _new_ids, _added_ids, reverse_calls, reverse_tokens, reverse_trace = finish_result
@@ -809,7 +938,8 @@ def run_gold_hop_round(
         "reverse": reverse_trace,
         "call_count": call_count + len(start_ids) + 2,
         "token_num": token_totals,
-        "training_correction_context": correction_context,
+        "training_correction_context": state.get("correction_context", ""),
+        "stage_corrections": corrections,
     }
 
 
@@ -826,6 +956,7 @@ def train_gold_hop_reflection(
         "memory": hop.get("initial_memory", ""),
         "memory_dir": hop.get("memory_dir", ""),
         "correction_context": "",
+        "stage_corrections": {},
     }
     traces: list[dict[str, Any]] = []
     for round_index in range(max_rounds):

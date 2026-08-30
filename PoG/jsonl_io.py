@@ -6,7 +6,7 @@ import json
 from typing import Any, Iterator
 
 
-DEFAULT_JSONL_INDENT = 4
+DEFAULT_JSONL_INDENT = 2
 
 
 def format_jsonl_record(obj: Any, indent: int = DEFAULT_JSONL_INDENT) -> str:

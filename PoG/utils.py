@@ -458,10 +458,45 @@ def extract_memory(string):
     string = string[first_brace_p:last_brace_p+1]
     return string
 
+def _scalar_text(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    text = str(value).strip()
+    return text if text else None
+
+
 def extract_reason_and_anwer(string):
     first_brace_p = string.find('{')
     last_brace_p = string.rfind('}')
     string = string[first_brace_p:last_brace_p+1]
+    try:
+        parsed = json.loads(string)
+    except Exception:
+        parsed = None
+    if isinstance(parsed, dict):
+        payload = parsed.get("A") if isinstance(parsed.get("A"), dict) else parsed
+        answer = _scalar_text(payload.get("Answer")) if isinstance(payload, dict) else None
+        sufficient = _scalar_text(payload.get("Sufficient")) if isinstance(payload, dict) else None
+        reason = _scalar_text(parsed.get("R"))
+        if (
+            answer is None
+            and "Answer" not in (payload or {})
+            and "Answer" not in parsed
+            and isinstance(parsed.get("A"), str)
+        ):
+            answer = parsed.get("A")
+        if answer is not None or sufficient is not None:
+            progress = extract_subobjective_progress(string)
+            print("Answer:", answer)
+            print("Reason:", reason)
+            print("Sufficient:", sufficient)
+            if progress is not None:
+                print("Subobjective_Progress:", progress)
+            return answer, reason, sufficient, progress
     answer = re.search(r'"Answer":\s*"(.*?)"', string)
     try:
         if answer:
@@ -628,6 +663,7 @@ def if_finish_list(
     question, lst, depth_ent_rel_ent_dict, entid_name, name_entid, q_mem_f_path,
     results, cluster_chain_of_entities, args, model, memory_override=None,
     judge_reverse_context="", add_entity_context="", return_trace=False,
+    judge_correction="", add_correction="",
 ):
     cur_call_time = 0
     cur_token = {'total': 0, 'input': 0, 'output': 0}
@@ -666,8 +702,11 @@ def if_finish_list(
         )
     setattr(args, "current_judge_reverse_reflection_context", judge_context)
     setattr(args, "current_judge_reverse_reflection_items", judge_items)
+    prefix = insert_instruction_before_question(
+        build_judge_reverse_prompt(judge_context), judge_correction
+    )
     prefix = (
-        build_judge_reverse_prompt(judge_context) + question
+        prefix + question
         + '\nEntities set to be retrieved: ' + str(entities_to_retrieve)
         + '\nMemory: ' + his_mem
         + '\nKnowledge Triplets:'
@@ -722,8 +761,11 @@ def if_finish_list(
             )
         setattr(args, "current_add_entity_reflection_context", add_context)
         setattr(args, "current_add_entity_reflection_items", add_items)
+        add_prompt = insert_instruction_before_question(
+            build_add_entity_prompt(add_context), add_correction
+        )
         add_prompt = (
-            build_add_entity_prompt(add_context) + question + '\nReason: ' + reason
+            add_prompt + question + '\nReason: ' + reason
             + '\nCandidate Entities: ' + format_capped_list(sorted(other_entities_name), 70)
             + '\nMemory: ' + his_mem
         )

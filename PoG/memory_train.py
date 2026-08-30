@@ -35,6 +35,7 @@ from reflection_memory import (
     build_corrected_memory,
     count_reflection_memory,
     train_gold_hop_reflection,
+    upsert_reflection_memory_items,
 )
 
 
@@ -304,7 +305,7 @@ def prepare_gold_hops_and_relation_memories(
 def _append_records(path: str, records: list[dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     for record in records:
-        append_jsonl_record(path, record, indent=0)
+        append_jsonl_record(path, record)
 
 
 def commit_episode_memory_bundle(
@@ -420,7 +421,9 @@ def run_combined_memory_train(args: Any, run_output: dict[str, Any], episodes: l
                     max_rounds=getattr(args, "max_reflection_rounds", 3),
                 )
                 if result["success"]:
-                    reflection_items.extend(result["memory_bundle"])
+                    reflection_items = upsert_reflection_memory_items(
+                        reflection_items, result["memory_bundle"]
+                    )
                 else:
                     failed_items.append({
                         "dataset": episode.get("dataset", "webqsp"),
