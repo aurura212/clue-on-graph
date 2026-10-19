@@ -87,7 +87,9 @@ BIND_RELATION_HINTS = (
 #     return any(s.endswith(word) for word in words)
 
 def abandon_rels(relation):
-    if relation.startswith("http://") or relation == "type.object.type" or relation == "type.object.name" or relation.startswith("common.") or relation.startswith("freebase.") or "sameAs" in relation:
+    # Keep common.* and type.object.name: they appear in WebQSP InferentialChain
+    # (e.g. common.topic.notable_types, type.object.name).
+    if relation.startswith("http://") or relation == "type.object.type" or relation.startswith("freebase.") or "sameAs" in relation:
         return True
 
 
@@ -373,8 +375,6 @@ def build_constraint_query(
             )
             where_lines.append(
                 "FILTER("
-                f'!STRSTARTS(STR({var}), "http://rdf.freebase.com/ns/type.object.name") && '
-                f'!STRSTARTS(STR({var}), "http://rdf.freebase.com/ns/common.") && '
                 f'!STRSTARTS(STR({var}), "http://rdf.freebase.com/ns/freebase.")'
                 ")"
             )
