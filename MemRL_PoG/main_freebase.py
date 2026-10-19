@@ -15,6 +15,8 @@ from constraint_runtime import (
     covering_answer_names,
     reset_coverage_map,
 )
+from eval_run import run_post_test_evaluation
+from trace_utils import flatten_chain_triples, new_depth_record, new_run_trace, serialize_name_dict
 import os
 import pprint
 import traceback
@@ -145,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument("--question", type=str, default="",
                         help="Run a single question by exact RawQuestion/question text. Overrides --start/--limit.")
     parser.add_argument("--result_root", type=str, default="",
-                        help="Directory for timestamped run folders (results.jsonl, run_meta.json). Empty uses PoG/result. Relative paths are resolved from PoG/.")
+                        help="Directory for timestamped run folders (results.jsonl, pog_trace.jsonl, run_meta.json). Empty uses MemRL_PoG/result.")
     parser.add_argument("--working_memory_root", type=str, default="",
                         help="Directory for per-question working memory (mem, subq). Empty uses ../exp_mem_PoG, sibling of mem_PoG. Relative paths are resolved from PoG/.")
     parser.add_argument("--run_dir", type=str, default="",
@@ -189,8 +191,14 @@ if __name__ == '__main__':
                 print(f"Remaining after skipping processed: {len(datas)}")
                 if len(datas) == 0:
                     print("All questions have been processed.")
+                    run_post_test_evaluation(args, run_output)
                     break
-            model = SentenceTransformer('../msmarco-distilbert-base-tas-b')
+            model_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..",
+                "msmarco-distilbert-base-tas-b",
+            )
+            model = SentenceTransformer(model_dir)
             setattr(args, "sentence_model", model)
 
             print("Start Running PoG on %s dataset." % args.dataset)
@@ -244,6 +252,17 @@ if __name__ == '__main__':
                 cluster_chain_of_entities = []
                 depth_ent_rel_ent_dict = {}
                 reverse_rec = {'time': 0, 'ent': []}
+                pog_trace = new_run_trace(sub_questions, topic_entity)
+                pog_trace["constraints"] = getattr(args, "current_constraints", {}) or {}
+                pog_trace["decomposition"] = {
+                    "subquestions": sub_questions,
+                    "llm_prompt": getattr(args, "current_decomposition_prompt", ""),
+                    "llm_raw_output": getattr(args, "current_decomposition_raw_output", ""),
+                    "grounding": getattr(args, "current_decomposition_grounding", {}),
+                    "constraint_routing": getattr(args, "sub_constraint_routing", None),
+                    "resolved_constraint_routing": getattr(args, "resolved_constraint_routing", None),
+                    "constraint_routing_status": getattr(args, "constraint_routing_status", "off"),
+                }
 
                 entid_name = {}
                 name_entid = {}
@@ -253,13 +272,19 @@ if __name__ == '__main__':
 
                 if len(topic_entity) == 0:
                     call_num += 1
-                    results, token_num = generate_without_explored_paths(question, sub_questions, args)
+                    results, token_num, cot_prompt_text = generate_without_explored_paths(question, sub_questions, args)
                     for kk in token_num.keys():
                         all_t[kk] += token_num[kk]
                     
                     new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                     reverse_rec['ent'] = new_e_rev_list
-                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time)
+                    pog_trace["final_stop_reason"] = "no_topic_entity_cot"
+                    pog_trace["final_answer_generation"] = {
+                        "method": "generate_without_explored_paths",
+                        "llm_prompt": cot_prompt_text,
+                        "llm_response": results,
+                    }
+                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                     continue
 
                 pre_relations = []
@@ -267,6 +292,8 @@ if __name__ == '__main__':
                 flag_printed = False
                 for depth in range(1, args.depth+1):
                     update_current_subobjective_idx(args, depth, sub_questions)
+                    depth_record = new_depth_record(depth, topic_entity)
+                    depth_record["subobjective_idx"] = getattr(args, "current_subobjective_idx", 0)
                     current_entity_relations_list = []
                     i=0
                     for entity in topic_entity:
@@ -276,7 +303,8 @@ if __name__ == '__main__':
                             setattr(args, "current_relation_depth", depth)
                             setattr(args, "current_incoming_relation", "" if depth == 1 else (pre_relations[i] if i < len(pre_relations) else ""))
                             setattr(args, "current_previous_relations", list(pre_relations))
-                            retrieve_relations, token_num = relation_search_prune(entity, sub_questions, topic_entity[entity], pre_relations, pre_heads[i], question, args)
+                            retrieve_relations, token_num, rel_trace = relation_search_prune(entity, sub_questions, topic_entity[entity], pre_relations, pre_heads[i], question, args)
+                            depth_record["relation_prune"].append(rel_trace)
                             for kk in token_num.keys():
                                 all_t[kk] += token_num[kk]
                             if entity.startswith("m.") == False and entity.startswith("g.") == False:
@@ -337,17 +365,24 @@ if __name__ == '__main__':
                         total_candidates, total_relations, total_entities_id, total_topic_entities, total_head = update_history(entity_candidates, ent_rel, entity_candidates_id, total_candidates, total_relations, total_entities_id, total_topic_entities, total_head)
                     
                     depth_ent_rel_ent_dict[depth] = ent_rel_ent_dict
+                    depth_record["before_entity_prune"] = serialize_name_dict(convert_dict_name(ent_rel_ent_dict, entid_name))
                     
                     pprint.pprint(summarize_name_dict(convert_dict_name(ent_rel_ent_dict, entid_name)))
 
                     if len(total_candidates) == 0:
+                        depth_record["stop_reason"] = "no_candidates_after_relation_entity_search"
+                        pog_trace["depths"].append(depth_record)
                         new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                         reverse_rec['ent'] = new_e_rev_list
-                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args)
+                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                         flag_printed = True
                         break
                     
-                    flag, chain_of_entities, entities_id, pre_relations, pre_heads, new_ent_rel_ent_dict, cur_call_time, cur_token = entity_condition_prune(question, total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, ent_rel_ent_dict, entid_name, name_entid, args, model)
+                    flag, chain_of_entities, entities_id, pre_relations, pre_heads, new_ent_rel_ent_dict, cur_call_time, cur_token, entity_prune_details = entity_condition_prune(question, total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, ent_rel_ent_dict, entid_name, name_entid, args, model)
+                    depth_record["after_entity_prune"] = serialize_name_dict(convert_dict_name(new_ent_rel_ent_dict, entid_name))
+                    depth_record["entity_prune_details"] = entity_prune_details
+                    depth_record["pruned_triples"] = flatten_chain_triples(chain_of_entities)
+                    depth_record["entity_prune_success"] = flag
                     cluster_chain_of_entities.append(chain_of_entities)
 
                     call_num += cur_call_time
@@ -358,16 +393,24 @@ if __name__ == '__main__':
                     setattr(args, "current_entid_name", entid_name)
                     if flag:
                         call_num += 1
-                        token_num = update_memory(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
+                        token_num, mem_trace = update_memory(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
+                        depth_record["memory_update"] = mem_trace
                         for kk in token_num.keys():
                             all_t[kk] += token_num[kk]
 
                         call_num += 1
-                        results, answer, sufficient, token_num = reasoning(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
+                        results, answer, sufficient, token_num, reason_io = reasoning(question, sub_questions, new_ent_rel_ent_dict, entid_name, cluster_chain_of_entities, q_mem_f_path, args)
                         for kk in token_num.keys():
                             all_t[kk] += token_num[kk]
 
                         covering_names = covering_answer_names(args, entid_name)
+                        gate_trace = {
+                            "mode": answer_gate_mode(args),
+                            "triggered": False,
+                            "reasked": False,
+                            "covering_names": sorted(name for name in covering_names if not str(name).startswith(("m.", "g."))),
+                            "reask_io": None,
+                        }
 
                         if str(answer).lower() == 'null' or str(answer).lower() == 'none'  or str(answer).startswith('m.') or str(answer).startswith('[\"m.') or str(answer).startswith("['m.") or 'yes' not in str(sufficient).lower():
                             stop = False
@@ -380,14 +423,18 @@ if __name__ == '__main__':
                             and covering_names
                             and not answer_in_covering_set(answer, covering_names)
                         ):
+                            gate_trace["triggered"] = True
+                            gate_trace["rejected_answer"] = answer
                             call_num += 1
-                            results2, answer2, sufficient2, token_num2 = reasoning(
+                            results2, answer2, sufficient2, token_num2, reason_io2 = reasoning(
                                 question, sub_questions, new_ent_rel_ent_dict, entid_name,
                                 cluster_chain_of_entities, q_mem_f_path, args,
                                 restrict_to_covering=True,
                             )
                             for kk in token_num2.keys():
                                 all_t[kk] += token_num2[kk]
+                            gate_trace["reasked"] = True
+                            gate_trace["reask_io"] = reason_io2
                             uncovered = (
                                 str(answer2).lower() in {"null", "none"}
                                 or str(answer2).startswith("m.")
@@ -398,21 +445,37 @@ if __name__ == '__main__':
                                 stop = False
                             else:
                                 results, answer, sufficient = results2, answer2, sufficient2
+                                reason_io = reason_io2
                                 stop = True
 
+                        depth_record["evaluation"] = {
+                            "llm_prompt": reason_io.get("llm_prompt"),
+                            "llm_response": results,
+                            "answer": answer,
+                            "sufficient": sufficient,
+                            "stop": stop,
+                            "answer_gate": gate_trace,
+                            "subobjective_progress": getattr(args, "last_subobjective_progress", None),
+                            "subobjective_idx": getattr(args, "current_subobjective_idx", 0),
+                        }
 
                         if stop:
                             print("PoG stoped at depth %d." % depth)
+                            depth_record["stop_reason"] = "reasoning_sufficient"
+                            pog_trace["depths"].append(depth_record)
+                            pog_trace["final_stop_reason"] = "reasoning_sufficient"
+                            pog_trace["final_stop_depth"] = depth
                             new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                             reverse_rec['ent'] = new_e_rev_list
-                            save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time)
+                            save_2_jsonl(question, question_string, results, cluster_chain_of_entities, call_num, all_t, start_time, pog_trace=pog_trace)
                             flag_printed = True
                             break
                         else:
                             print("depth %d still not find the answer." % depth)
                             add_ent_list = []
+                            reverse_trace = {"invoked": False, "add": False}
                             if reverse_rec['time']<5:
-                                entities_id, add_ent_list, cur_call_time, cur_token = if_finish_list(
+                                entities_id, add_ent_list, cur_call_time, cur_token, reverse_trace = if_finish_list(
                                     question, entities_id, depth_ent_rel_ent_dict, entid_name, name_entid,
                                     q_mem_f_path, results, cluster_chain_of_entities, args, model,
                                 )
@@ -420,7 +483,12 @@ if __name__ == '__main__':
                                 for kk in cur_token.keys():
                                     all_t[kk] += cur_token[kk]
                                 add_ent_list = [ent for ent in add_ent_list if ent not in reverse_rec['ent']]
+                                if add_ent_list:
+                                    reverse_trace["add"] = True
+                                    reverse_trace["add_entities"] = [entid_name.get(e, e) for e in add_ent_list]
 
+                            depth_record["reverse_retrieval"] = reverse_trace
+                            pog_trace["depths"].append(depth_record)
 
                             if add_ent_list:
                                 reverse_rec['time'] += 1
@@ -435,7 +503,7 @@ if __name__ == '__main__':
                             if not entities_id or depth>5:
                                 new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                                 reverse_rec['ent'] = new_e_rev_list
-                                half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args)
+                                half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                                 flag_printed = True
                                 break
                             else:
@@ -448,23 +516,32 @@ if __name__ == '__main__':
                                         topic_entity[entity] = entid_name[entity]
 
                     else:
+                        depth_record["stop_reason"] = "entity_prune_failed"
+                        pog_trace["depths"].append(depth_record)
                         new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                         reverse_rec['ent'] = new_e_rev_list
-                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args)
+                        half_stop(question, question_string, sub_questions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=pog_trace)
                         flag_printed = True
                         break
                 
                 if not flag_printed:
                     call_num += 1
-                    results, token_num = generate_without_explored_paths(question, sub_questions, args)
+                    results, token_num, cot_prompt_text = generate_without_explored_paths(question, sub_questions, args)
                     for kk in token_num.keys():
                         all_t[kk] += token_num[kk]
                     
                     new_e_rev_list = [entid_name[x] for x in reverse_rec['ent']]
                     reverse_rec['ent'] = new_e_rev_list
-                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time)
+                    pog_trace["final_stop_reason"] = "max_depth_cot_fallback"
+                    pog_trace["final_answer_generation"] = {
+                        "method": "generate_without_explored_paths",
+                        "llm_prompt": cot_prompt_text,
+                        "llm_response": results,
+                    }
+                    save_2_jsonl(question, question_string, results, [], call_num, all_t, start_time, pog_trace=pog_trace)
                 '''except:
                     continue'''
+            run_post_test_evaluation(args, run_output)
             break
         except Exception:
             print("Error occurred, retrying...")

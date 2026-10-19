@@ -39,3 +39,5 @@ PoG*.jsonl
 /self-play/tests/__pycache__/
 /self-play/runs/
 /MemRL_PoG/__pycache__/
+/MemRL_PoG/result/
+/MemRL_PoG/eval_slices/

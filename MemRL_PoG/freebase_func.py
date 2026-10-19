@@ -2,7 +2,6 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from utils import *
 import os
 import random
-from freebase_func import *
 from prompt_list import *
 import json
 import time
@@ -1102,7 +1101,22 @@ def relation_search_prune(entity_id, sub_questions, entity_name, pre_relations, 
     except Exception:
         flag, selected = False, []
 
-    return (selected if flag else []), token_num
+    rel_trace = {
+        "entity_id": entity_id,
+        "entity_name": entity_name,
+        "head_relations_before_filter": candidates["head_relations_before_filter"],
+        "tail_relations_before_filter": candidates["tail_relations_before_filter"],
+        "candidate_relations": total_relations,
+        "candidate_relations_sent_to_llm": retrieved_relations,
+        "selected_relations": [
+            {"relation": item["relation"], "head": item["head"]} for item in (selected if flag else [])
+        ],
+        "llm_prompt": prompt,
+        "llm_raw_output": result,
+        "selection_success": bool(flag),
+        "constraint_context": getattr(args, "current_relation_constraint_context", ""),
+    }
+    return (selected if flag else []), token_num, rel_trace
 
     
     
@@ -1152,16 +1166,26 @@ def update_history(entity_candidates, ent_rel, entity_candidates_id, total_candi
     return total_candidates, total_relations, total_entities_id, total_topic_entities, total_head
 
 
-def half_stop(question, question_string, subquestions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args):
+def half_stop(question, question_string, subquestions, cluster_chain_of_entities, depth, call_num, all_t, start_time, args, pog_trace=None):
     print("No new knowledge added during search depth %d, stop searching." % depth)
     call_num += 1
-    answer, token_num = generate_answer(question, subquestions, cluster_chain_of_entities, args)
+    answer, token_num, prompt = generate_answer(question, subquestions, cluster_chain_of_entities, args)
 
     for kk in token_num.keys():
         all_t[kk] += token_num[kk]
 
+    if pog_trace is not None:
+        pog_trace["final_stop_reason"] = "half_stop"
+        pog_trace["final_stop_depth"] = depth
+        if pog_trace.get("depths"):
+            pog_trace["depths"][-1]["stop_reason"] = pog_trace["depths"][-1].get("stop_reason") or "half_stop"
+        pog_trace["final_answer_generation"] = {
+            "method": "generate_answer",
+            "llm_prompt": prompt,
+            "llm_response": answer,
+        }
 
-    save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time)
+    save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, pog_trace=pog_trace)
 
 
 def generate_answer(question, subquestions, cluster_chain_of_entities, args): 
@@ -1179,7 +1203,7 @@ def generate_answer(question, subquestions, cluster_chain_of_entities, args):
     )
     prompt = prefix + chain_prompt
     result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
-    return result, token_num
+    return result, token_num, prompt
 
 
 def if_topic_non_retrieve(string):
@@ -1203,6 +1227,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
     new_ent_rel_ent_dict = {}
     no_prune = ['time', 'number', 'date']
     filter_entities_id, filter_tops, filter_relations, filter_candidates, filter_head = [], [], [], [], []
+    entity_prune_details = []
     constraint_trace_cache = getattr(args, "current_constraint_search_traces", {}) or {}
     bucket_next_nodes = build_bucket_next_nodes(ent_rel_ent_dict, entid_name, constraint_trace_cache)
     for topic_e, h_t_dict in sorted(ent_rel_ent_dict.items()):
@@ -1211,6 +1236,8 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                 constraint_trace = lookup_constraint_trace(constraint_trace_cache, topic_e, rela, h_t == "head")
                 prune_method = "llm"
                 llm_raw = None
+                llm_prompt = None
+                candidates_before = [entid_name[e_id] for e_id in sorted(e_list)]
 
                 if constraint_trace.get("pushdown_applied") and len(e_list) <= int(getattr(args, "constraint_auto_keep_top_k", 50)):
                     sorted_e_list = candidates_before
@@ -1252,6 +1279,7 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                         prompt = prune_entity_prompt + question +'\nTriples: '
                         sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
                         prompt += entid_name[topic_e] + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70)
+                        llm_prompt = prompt
 
                         cur_call_time += 1
                         result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)
@@ -1269,6 +1297,21 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                 if constraint_trace.get("pushdown_applied"):
                     bucket_keys = keys_from_applied_constraints(constraint_trace.get("applied_constraints"))
                 child_keys = parent_keys | bucket_keys
+                dropped = sorted(set(candidates_before) - set(select_ent))
+                entity_prune_details.append({
+                    "topic_entity": entid_name[topic_e],
+                    "topic_entity_id": topic_e,
+                    "head_or_tail": h_t,
+                    "relation": rela,
+                    "candidates_before_prune": candidates_before[:50] + (
+                        [f"... +{len(candidates_before) - 50} more"] if len(candidates_before) > 50 else []
+                    ),
+                    "candidates_after_prune": list(select_ent),
+                    "dropped_candidates": dropped,
+                    "prune_method": prune_method,
+                    "llm_prompt": llm_prompt,
+                    "llm_raw_output": llm_raw,
+                })
 
                 if len(select_ent) == 0 or all(x == '' for x in select_ent):
                     continue
@@ -1296,11 +1339,11 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
 
 
     if len(filter_entities_id) == 0:
-        return False, [], [], [], [], new_ent_rel_ent_dict, cur_call_time, cur_token
+        return False, [], [], [], [], new_ent_rel_ent_dict, cur_call_time, cur_token, entity_prune_details
 
 
     cluster_chain_of_entities = [[(filter_tops[i], filter_relations[i], filter_candidates[i]) for i in range(len(filter_candidates))]]
-    return True, cluster_chain_of_entities, filter_entities_id, filter_relations, filter_head, new_ent_rel_ent_dict, cur_call_time, cur_token
+    return True, cluster_chain_of_entities, filter_entities_id, filter_relations, filter_head, new_ent_rel_ent_dict, cur_call_time, cur_token, entity_prune_details
 
 def add_pre_info(add_ent_list, depth_ent_rel_ent_dict, new_ent_rel_ent_dict, entid_name, name_entid, args):
     add_entities_id = sorted(add_ent_list)
@@ -1387,7 +1430,13 @@ def update_memory(
     os.makedirs(q_mem_f_path, exist_ok=True)
     with open(os.path.join(q_mem_f_path, 'mem'), 'w', encoding='utf-8') as f:
         f.write(mem)
-    return token_num
+    mem_trace = {
+        "memory_before": his_mem,
+        "memory_after": mem,
+        "llm_prompt": prompt,
+        "llm_raw_output": response,
+    }
+    return token_num, mem_trace
 
 
 def reasoning(
@@ -1433,4 +1482,13 @@ def reasoning(
     print("Response from reasoning:", response)
     answer, reason, sufficient, progress = extract_reason_and_anwer(response)
     setattr(args, "last_subobjective_progress", progress)
-    return response, answer, sufficient, token_num
+    io_trace = {
+        "llm_prompt": prompt,
+        "llm_response": response,
+        "answer": answer,
+        "reason": reason,
+        "sufficient": sufficient,
+        "restrict_to_covering": bool(restrict_to_covering),
+        "subobjective_progress": progress,
+    }
+    return response, answer, sufficient, token_num, io_trace

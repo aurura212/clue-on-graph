@@ -122,6 +122,7 @@ def build_run_meta_from_args(
         "working_memory_root": getattr(args, "working_memory_root", ""),
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "results_file": "results.jsonl",
+        "trace_file": "pog_trace.jsonl",
     }
 
 
@@ -242,6 +243,7 @@ def init_run_output(
         "config_tag": config_tag,
         "planned_question_count": planned_question_count,
         "results_path": os.path.join(run_dir, "results.jsonl"),
+        "trace_path": os.path.join(run_dir, "pog_trace.jsonl"),
         "meta_path": os.path.join(run_dir, "run_meta.json"),
     }
 
@@ -614,9 +616,16 @@ def run_llm(prompt, temperature, max_tokens, openai_api_keys, engine="gpt-3.5-tu
         if completion is None:
             raise last_error
 
-        result = completion.choices[0].message.content
-
-        token_num = {"total": completion.usage.total_tokens, "input": completion.usage.prompt_tokens, "output": completion.usage.completion_tokens}
+        result = completion.choices[0].message.content or ""
+        usage = completion.usage
+        if usage is None:
+            token_num = {"total": 0, "input": 0, "output": 0}
+        else:
+            token_num = {
+                "total": usage.total_tokens or 0,
+                "input": usage.prompt_tokens or 0,
+                "output": usage.completion_tokens or 0,
+            }
 
         if print_out:
             print(color_yellow + result + color_end)
@@ -668,7 +677,7 @@ def summarize_name_dict(name_dict, max_per_rel=20):
 
     
 
-def save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=None):
+def save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, call_num, all_t, start_time, file_name=None, pog_trace=None):
     tt = time.time()-start_time
     result_dict = {
         question_string: question,
@@ -684,11 +693,16 @@ def save_2_jsonl(question, question_string, answer, cluster_chain_of_entities, c
     run = get_current_run()
     if run:
         results_path = run["results_path"]
+        trace_path = run.get("trace_path") or f"PoG_{(file_name or 'default')}_trace.jsonl"
     else:
         tag = file_name or "default"
         results_path = f"PoG_{tag}.jsonl"
+        trace_path = f"PoG_{tag}_trace.jsonl"
 
     append_jsonl_record(results_path, result_dict)
+
+    if pog_trace is not None:
+        append_jsonl_record(trace_path, {question_string: question, "pog_trace": pog_trace})
 
 
 def extract_add_ent(string):
@@ -800,7 +814,7 @@ def generate_without_explored_paths(question, subquestions, args):
     prompt = cot_prompt + question 
 
     response, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False)
-    return response, token_num
+    return response, token_num, prompt
 
 
 def extract_list_output(text):
@@ -948,6 +962,18 @@ def if_finish_list(
     except Exception:
         flag, reason = False, "The reverse-decision output could not be parsed."
 
+    reverse_trace = {
+        "invoked": True,
+        "add": bool(flag),
+        "reason": reason,
+        "judge_prompt": prompt,
+        "judge_raw_output": response,
+        "entities_to_retrieve": entities_to_retrieve,
+        "add_prompt": None,
+        "add_raw_output": None,
+        "add_entities": [],
+        "add_entity_ids": [],
+    }
 
     if flag:
         other_entities = sorted(all_ent_set - set(new_lst))
@@ -957,11 +983,13 @@ def if_finish_list(
             + '\nCandidate Entities: ' + format_capped_list(sorted(other_entities_name), 70)
             + '\nMemory: ' + his_mem
         )
+        reverse_trace["add_prompt"] = add_prompt
         cur_call_time += 1
         add_response, token_num = run_llm(
             add_prompt, args.temperature_reasoning, args.max_length,
             args.opeani_api_keys, args.LLM_type
         )
+        reverse_trace["add_raw_output"] = add_response
         for key in cur_token:
             cur_token[key] += token_num.get(key, 0)
         try:
@@ -972,51 +1000,48 @@ def if_finish_list(
             name_entid[name] for name in add_ent_names
             if name in other_entities_name and name in name_entid
         )
-        if add_ent_list:
-            result = (new_lst, add_ent_list, cur_call_time, cur_token)
-            return result
+        reverse_trace["add_entities"] = [entid_name.get(eid, eid) for eid in add_ent_list]
+        reverse_trace["add_entity_ids"] = list(add_ent_list)
+        return new_lst, add_ent_list, cur_call_time, cur_token, reverse_trace
 
-    result = (new_lst, [], cur_call_time, cur_token)
-    return result
+    return new_lst, [], cur_call_time, cur_token, reverse_trace
 
 
     
 def prepare_dataset(dataset_name):
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+
+    def _load_dataset(filename):
+        path = os.path.join(data_dir, filename)
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
     if dataset_name == 'cwq':
-        with open('../data/cwq.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('cwq.json')
         question_string = 'question'
     elif dataset_name == 'cwq0':
-        with open('../data/cwq0.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('cwq0.json')
         question_string = 'question'
     elif dataset_name == 'cwq1':
-        with open('../data/cwq1.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('cwq1.json')
         question_string = 'question'
     elif dataset_name == 'cwq2':
-        with open('../data/cwq2.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('cwq2.json')
         question_string = 'question'
     elif dataset_name == 'cwq_split':
-        with open('../data/cwq_split.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('cwq_split.json')
         question_string = 'question'
     elif dataset_name == 'webqsp':
-        with open('../data/WebQSP.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('WebQSP.json')
         question_string = 'RawQuestion'
     elif dataset_name == 'webqsp_split':
-        with open('../data/WebQSP_split.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('WebQSP_split.json')
         question_string = 'RawQuestion'
     elif dataset_name == 'grailqa':
-        with open('../data/grailqa.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('grailqa.json')
         question_string = 'question'
     elif dataset_name == 'grailqa_split':
-        with open('../data/grailqa_split.json',encoding='utf-8') as f:
-            datas = json.load(f)
+        datas = _load_dataset('grailqa_split.json')
         question_string = 'question'
     else:
         print("dataset not found, you should pick from {cwq, webqsp, grailqa}.")
