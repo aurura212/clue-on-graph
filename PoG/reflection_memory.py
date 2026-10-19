@@ -467,11 +467,9 @@ def build_corrected_memory(
     subobjectives: list[str],
     current_hop_index: int,
     knowledge_triplets: Any,
-    slot_note: str = "",
 ) -> str:
-    """Rebuild memory from visible evidence only; no hidden gold answer or triplet is used."""
+    """Rebuild memory from visible evidence only; training corrections are prompt-only."""
     lines = triplets_to_lines(knowledge_triplets)
-    note = _clean(slot_note)
     visible_sentence = _visible_triplet_sentence(lines)
     corrected: dict[str, str] = {}
     for index, subobjective in enumerate(subobjectives):
@@ -482,38 +480,10 @@ def build_corrected_memory(
             body = visible_sentence
         else:
             body = INCOMPLETE_MEMORY_SENTENCE
-        if note and index == current_hop_index:
-            body = body + MEMORY_SLOT_NOTE_SEP + note
         corrected[slot] = body
     if not corrected:
-        body = visible_sentence
-        if note:
-            body = body + MEMORY_SLOT_NOTE_SEP + note
-        corrected["1"] = body
+        corrected["1"] = visible_sentence
     return json.dumps(corrected, ensure_ascii=False, indent=4)
-
-
-def _hop_slot_note(diagnosis: dict[str, Any], hop: dict[str, Any]) -> str:
-    """Semantic trainer hints for the current hop slot; used by reasoning/reverse, not update_memory."""
-    errors = diagnosis.get("errors") or []
-    parts: list[str] = []
-    if "sufficient" in errors:
-        if diagnosis.get("expected_sufficient") == "Yes":
-            parts.append(
-                "This hop's evidence is enough to answer; Sufficient=Yes with an answer grounded in the facts."
-            )
-        else:
-            parts.append(
-                "This hop's evidence is not enough to answer; Sufficient=No and Answer=Null."
-            )
-    if "backtrack" in errors:
-        if diagnosis.get("expected_add") == "Yes":
-            names = hop.get("gold_start_entity_names") or []
-            extra = ": " + ", ".join(str(name) for name in names) + "." if names else "."
-            parts.append("Need the hop-start entity again" + extra)
-        else:
-            parts.append("The correct next entity is already in the frontier; Add=No.")
-    return " ".join(parts)
 
 
 def _memory_schema_example(subobjectives: list[str], problems: list[str] | None = None) -> str:
@@ -591,7 +561,6 @@ def build_next_round_state(
         hop.get("subobjectives", []),
         hop.get("hop_index", 0),
         visible_triplets,
-        slot_note=_hop_slot_note(diagnosis, hop),
     )
     errors = diagnosis.get("errors") or []
     stages: dict[str, list[str]] = {}
@@ -621,29 +590,58 @@ def build_next_round_state(
                 "The correct branch was not retained; return to the current hop start and redo relation/entity selection.",
             )
     if "memory" in errors:
-        stages["memory"] = [
+        _append_stage_line(
+            stages,
+            "memory",
             _memory_schema_example(
                 hop.get("subobjectives") or [],
                 diagnosis.get("memory_problems") or [],
-            )
-        ]
+            ),
+        )
     if "sufficient" in errors:
+        if diagnosis.get("expected_sufficient") == "Yes":
+            _append_stage_line(
+                stages,
+                "answer",
+                "This hop's evidence is enough to answer; Sufficient=Yes with an answer grounded in the facts.",
+            )
+        else:
+            _append_stage_line(
+                stages,
+                "answer",
+                "This hop's evidence is not enough to answer; Sufficient=No and Answer=Null.",
+            )
         expected_sufficient = diagnosis.get("expected_sufficient") or "No"
         expected_answer = diagnosis.get("expected_answer") or "Null"
-        stages["answer"] = [_answer_depth_schema_example(expected_sufficient, expected_answer)]
+        _append_stage_line(
+            stages,
+            "answer",
+            _answer_depth_schema_example(expected_sufficient, expected_answer),
+        )
     if "backtrack" in errors:
-        expected_add = "Yes" if diagnosis.get("expected_add") == "Yes" else "No"
-        stages["reverse"] = [_reverse_schema_example(expected_add)]
-        if expected_add == "Yes":
+        if diagnosis.get("expected_add") == "Yes":
             names = hop.get("gold_start_entity_names") or []
-            stages["add"] = [
+            extra = ": " + ", ".join(str(name) for name in names) + "." if names else "."
+            _append_stage_line(stages, "reverse", "Need the hop-start entity again" + extra)
+            _append_stage_line(
+                stages,
+                "add",
                 "From Candidate Entities, select only: " + ", ".join(str(name) for name in names) + "."
                 if names else "From Candidate Entities, select only the hop-start entity.",
-            ]
+            )
         else:
-            stages["add"] = [
+            _append_stage_line(
+                stages,
+                "reverse",
+                "The correct next entity is already in the frontier; Add=No.",
+            )
+            _append_stage_line(
+                stages,
+                "add",
                 "Do not add extra historical entities. If this step runs, output an empty list.",
-            ]
+            )
+        expected_add = "Yes" if diagnosis.get("expected_add") == "Yes" else "No"
+        _append_stage_line(stages, "reverse", _reverse_schema_example(expected_add))
     next_state["stage_corrections"] = {stage: "\n".join(lines) for stage, lines in stages.items()}
     next_state["correction_context"] = "\n\n".join(
         next_state["stage_corrections"][stage]

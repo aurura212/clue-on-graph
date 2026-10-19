@@ -14,6 +14,7 @@ from output_paths import init_run_output, load_processed_questions, get_current_
 from output_paths import default_decomposition_memory_output_path, default_memory_output_dir
 from output_paths import load_parse_ids_from_jsonl, filter_jsonl_by_parse_id, load_progress, append_progress
 from output_paths import DECOMPOSITION_MEMORY_FILENAME, RELATION_MEMORY_FILENAME
+from output_paths import question_working_memory_dir
 from eval_run import run_post_test_evaluation
 from memory_train import (
     run_combined_memory_train,
@@ -78,6 +79,48 @@ def get_one_data(datas, question_string, question):
         if data[question_string] == question:
             return [data]
     return []
+
+
+def load_questions_file_texts(path: str) -> list[str]:
+    """Read question texts from an eval slice JSON (hard150_v1.json or a list)."""
+    with open(path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    if isinstance(payload, dict):
+        items = payload.get("questions", [])
+    elif isinstance(payload, list):
+        items = payload
+    else:
+        raise ValueError(f"Unsupported questions file format: {path}")
+    texts = []
+    for item in items:
+        if isinstance(item, str):
+            text = item.strip()
+        elif isinstance(item, dict):
+            text = str(item.get("RawQuestion") or item.get("question") or "").strip()
+        else:
+            text = ""
+        if text:
+            texts.append(text)
+    if not texts:
+        raise ValueError(f"No questions found in {path}")
+    return texts
+
+
+def filter_dataset_by_questions_file(datas, question_string, questions_file):
+    """Keep dataset rows that appear in the slice, in slice order."""
+    wanted = load_questions_file_texts(questions_file)
+    by_question = {}
+    for row in datas:
+        key = str(row.get(question_string, "")).strip()
+        if key and key not in by_question:
+            by_question[key] = row
+    missing = [q for q in wanted if q not in by_question]
+    if missing:
+        raise ValueError(
+            f"{len(missing)} questions from {questions_file} were not found in the dataset, "
+            f"e.g. {missing[0]!r}"
+        )
+    return [by_question[q] for q in wanted]
 
 
 def select_questions(datas, question_string, start, limit, question):
@@ -181,7 +224,10 @@ def add_relation_memory_args(parser):
                         default=50, help="Skip time-only pushdown when unconstrained neighbor count is below this threshold.")
     parser.add_argument("--constraint_prompt_stages", type=str,
                         default="relation,memory,reasoning,answer",
-                        help="Stages that receive compiled question constraints in prompts.")
+                        help="LLM prompt stages that receive compiled question constraints. "
+                             "Comma list of relation,memory,reasoning,answer; all=all four; "
+                             "none/off/empty=no prompt injection. SPARQL pushdown, routing, "
+                             "answer gate, and frontier bias are unchanged.")
     parser.add_argument("--constraint_answer_gate", type=str, choices=["off", "soft", "hard"],
                         default="hard", help="Stop-search gate using constraint-covering provenance. off=disabled, soft=prompt only, hard=reject uncovered answers.")
     parser.add_argument("--decomposition_grounding_check", type=int,
@@ -270,6 +316,12 @@ if __name__ == '__main__':
                         help="Max number of questions to run. -1 means no limit.")
     parser.add_argument("--question", type=str, default="",
                         help="Run a single question by exact RawQuestion/question text. Overrides --start/--limit.")
+    parser.add_argument("--questions_file", type=str, default="",
+                        help="JSON slice file (e.g. eval_slices/hard150_v1.json). Applied before --start/--limit.")
+    parser.add_argument("--result_root", type=str, default="",
+                        help="Directory for timestamped run folders (results.jsonl, pog_trace.jsonl, run_meta.json). Empty uses PoG/result. Relative paths are resolved from PoG/.")
+    parser.add_argument("--working_memory_root", type=str, default="",
+                        help="Directory for per-question working memory (mem, subq). Empty uses ../exp_mem_PoG, sibling of mem_PoG. Relative paths are resolved from PoG/.")
     parser.add_argument("--run_dir", type=str, default="",
                         help="Resume an existing run under result/. Pass folder name (e.g. webqsp_..._n10_20250617_120000) or full path.")
     add_relation_memory_args(parser)
@@ -316,6 +368,14 @@ if __name__ == '__main__':
 
             datas, question_string = prepare_dataset(args.dataset)
             total_in_dataset = len(datas)
+            questions_file = args.questions_file.strip()
+            if questions_file:
+                datas = filter_dataset_by_questions_file(datas, question_string, questions_file)
+                print(
+                    f"Loaded {len(datas)} questions from {questions_file} "
+                    f"(dataset size={total_in_dataset})."
+                )
+            pool_size = len(datas)
             datas = select_questions(
                 datas, question_string, args.start, args.limit, args.question.strip()
             )
@@ -323,9 +383,9 @@ if __name__ == '__main__':
             if args.question.strip():
                 print(f"Selected 1 question by --question (dataset size={total_in_dataset}).")
             elif args.start > 0 or args.limit >= 0:
-                end = args.start + args.limit if args.limit >= 0 else total_in_dataset
+                end = args.start + args.limit if args.limit >= 0 else pool_size
                 print(
-                    f"Selected questions [{args.start}:{end}) -> {planned_question_count} / {total_in_dataset} "
+                    f"Selected questions [{args.start}:{end}) -> {planned_question_count} / {pool_size} "
                     f"(start={args.start}, limit={args.limit})."
                 )
 
@@ -409,7 +469,9 @@ if __name__ == '__main__':
                 set_current_decomposition_reference_context(args, decomposition_reference_context)
                 if decomposition_reference_context:
                     print("PoG decomposition reference context:\n", decomposition_reference_context)
-                q_mem_f_path = '../mem_PoG/'+run_output["run_folder_name"]+'/'+question[:255]
+                q_mem_f_path = question_working_memory_dir(
+                    args, run_output["run_folder_name"], question
+                )
                 if not os.path.exists(q_mem_f_path):
                     os.makedirs(q_mem_f_path)
 

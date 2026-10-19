@@ -187,6 +187,21 @@ class PromptInjectionTest(unittest.TestCase):
         self.assertLess(prompt.find("Taste cannot be controlled by law"), prompt.find("Training correction"))
         self.assertLess(prompt.find("Training correction"), prompt.rfind("Q:"))
 
+    def test_relation_and_entity_corrections_keep_fixed_examples(self):
+        correction = "Training correction: select people.person.sibling_s."
+        relation_prompt = prompt_list.extract_relation_prompt + "who is justin bieber's brother?"
+        relation_prompt += "\nSubobjectives: ['find siblings']\nTopic Entity: Justin Bieber\nRelations: a; b"
+        relation_prompt = prompt_list.insert_instruction_before_question(relation_prompt, correction)
+        self.assertIn("Brahui", relation_prompt)
+        self.assertLess(relation_prompt.find("Brahui"), relation_prompt.find("Training correction"))
+        self.assertLess(relation_prompt.find("Training correction"), relation_prompt.rfind("Q:"))
+
+        entity_prompt = prompt_list.prune_entity_prompt + "who is justin bieber's brother?\nTriples: Justin Bieber people.person.sibling_s ['x']"
+        entity_prompt = prompt_list.insert_instruction_before_question(entity_prompt, correction)
+        self.assertIn("Miley Cyrus", entity_prompt)
+        self.assertLess(entity_prompt.find("Miley Cyrus"), entity_prompt.find("Training correction"))
+        self.assertLess(entity_prompt.find("Training correction"), entity_prompt.rfind("Q:"))
+
     def test_prompt_formatter_never_leaks_training_metadata(self):
         item = {
             "memory_type": reflection_memory.ANSWER_DEPTH,
@@ -301,26 +316,29 @@ class ReflectionDiagnosisTest(unittest.TestCase):
         self.assertIn("sufficient", diagnosis["errors"])
         nxt = reflection_memory.build_next_round_state({"memory": "{}"}, trace, diagnosis, hop)
         memory = nxt["memory"]
-        self.assertIn(reflection_memory.MEMORY_SLOT_NOTE_SEP, memory)
-        self.assertIn("Sufficient=No", memory)
-        self.assertIn("Add=No", memory)
+        self.assertNotIn(reflection_memory.MEMORY_SLOT_NOTE_SEP, memory)
+        self.assertNotIn("Sufficient=No", memory)
+        self.assertNotIn("Add=No", memory)
         self.assertIn('"1"', memory)
         self.assertNotIn("relation", nxt["stage_corrections"])
         self.assertNotIn("memory", nxt["stage_corrections"])
         answer = nxt["stage_corrections"]["answer"]
+        self.assertIn("Sufficient=No and Answer=Null", answer)
         self.assertIn('"A":', answer)
         self.assertIn('"Sufficient": "No"', answer)
         self.assertNotIn('"Add"', answer)
         reverse = nxt["stage_corrections"]["reverse"]
+        self.assertIn("already in the frontier", reverse)
         self.assertIn('"Add": "No"', reverse)
         self.assertNotIn('"Sufficient"', reverse)
-        stripped = reflection_memory.strip_memory_slot_notes(memory)
-        self.assertNotIn(reflection_memory.MEMORY_SLOT_NOTE_SEP, stripped)
-        self.assertNotIn("Sufficient=No", stripped)
-        self.assertIn("The triplets provide the information that", stripped)
-        self.assertIn(reflection_memory.INCOMPLETE_MEMORY_SENTENCE, stripped)
-        self.assertNotIn("Observed facts:", memory)
-        self.assertNotIn("Not completed yet:", memory)
+        self.assertIn("The triplets provide the information that", memory)
+        self.assertIn(reflection_memory.INCOMPLETE_MEMORY_SENTENCE, memory)
+        inserted = prompt_list.insert_instruction_before_question(
+            prompt_list.build_answer_depth_prompt(), answer
+        )
+        self.assertIn("Taste cannot be controlled by law", inserted)
+        self.assertLess(inserted.find("Taste cannot be controlled by law"), inserted.find("Training correction"))
+        self.assertLess(inserted.find("Training correction"), inserted.rfind("Q:"))
 
     def test_memory_slot_error_goes_to_update_memory_prompt_not_old_memory(self):
         hop = make_hop(final=True)

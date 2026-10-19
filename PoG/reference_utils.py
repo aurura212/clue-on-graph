@@ -371,11 +371,21 @@ def format_decomposition_memory_tag(args) -> str:
     )
 
 
+def format_questions_file_tag(args) -> str:
+    path = str(getattr(args, "questions_file", "") or "").strip()
+    if not path:
+        return ""
+    return os.path.splitext(os.path.basename(path))[0]
+
+
 def get_output_file_tag(args):
     tag = f"{args.dataset}_{args.LLM_type}"
     run_mode = getattr(args, "run_mode", "test")
     if run_mode != "test":
         tag += f"_{run_mode}"
+    slice_tag = format_questions_file_tag(args)
+    if slice_tag:
+        tag += f"_{slice_tag}"
     reference_tag = format_reference_tag(args)
     if reference_tag:
         tag += f"_{reference_tag}"

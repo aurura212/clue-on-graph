@@ -19,16 +19,39 @@ from constraint_compiler import (
 )
 
 
+_CONSTRAINT_PROMPT_STAGE_DEFAULT = "relation,memory,reasoning,answer"
+_CONSTRAINT_PROMPT_STAGE_NONE = frozenset({"none", "off", "false", "0"})
+
+
 def parse_stage_set(raw: Any, default: str) -> set[str]:
-    text = str(raw if raw not in (None, "") else default)
+    """Parse a comma/space stage list. None uses default; '' is an empty set."""
+    if raw is None:
+        text = default
+    else:
+        text = str(raw).strip()
+        if not text:
+            return set()
     return {part.strip().lower() for part in re.split(r"[,;\s]+", text) if part.strip()}
 
 
 def should_inject_constraint_prompt(args: Any, stage: str) -> bool:
+    """Whether compiled constraints are appended to this LLM prompt stage.
+
+    Does not affect SPARQL pushdown, hop routing, answer gate, or frontier bias.
+    `none` / `off` / empty string disables all prompt-stage injection.
+    """
     if not is_constraint_pushdown_enabled(args):
         return False
-    stages = parse_stage_set(getattr(args, "constraint_prompt_stages", ""), "relation,memory,reasoning,answer")
-    return stage.lower() in stages or "all" in stages
+    raw = getattr(args, "constraint_prompt_stages", None)
+    stages = parse_stage_set(
+        _CONSTRAINT_PROMPT_STAGE_DEFAULT if raw is None else raw,
+        _CONSTRAINT_PROMPT_STAGE_DEFAULT,
+    )
+    if not stages or stages & _CONSTRAINT_PROMPT_STAGE_NONE:
+        return False
+    if "all" in stages:
+        return True
+    return stage.lower() in stages
 
 
 def answer_gate_mode(args: Any) -> str:

@@ -24,12 +24,14 @@ PoG*.jsonl
 /src/process_analysis
 /PoG/__pycache__/
 /PoG/result/
+/PoG/exp_result/
 /PoG/relation_memory/
 /PoG/decomposition_memory/
 /PoG/memory/
 /PoG/kg_memory/
 /PoG/exp_memory/
 /mem_PoG
+/exp_mem_PoG
 /eval/__pycache__/
 /pog_diagnosis
 /PoG/gold_path_check*/

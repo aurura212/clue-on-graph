@@ -1092,7 +1092,7 @@ def construct_relation_prune_prompt(question, sub_questions, entity_id, entity_n
         )
     combined_context = "\n\n".join(part for part in [memory_context, str(reflection_context or "").strip()] if part)
     if combined_context:
-        prompt = combined_context + "\n\n" + prompt
+        prompt = insert_instruction_before_question(prompt, combined_context)
     setattr(args, "current_relation_memory_context", memory_context)
     setattr(args, "current_relation_reflection_context", str(reflection_context or ""))
     setattr(args, "current_relation_constraint_context", constraint_context)
@@ -1337,10 +1337,10 @@ def entity_condition_prune(question, total_entities_id, total_relations, total_c
                             prune_method = "llm_after_embedding_top70"
 
                         prompt = prune_entity_prompt + question +'\nTriples: '
-                        if reflection_context:
-                            prompt = str(reflection_context).strip() + '\n\n' + prompt
                         sorted_e_list = [entid_name[e_id] for e_id in sorted(e_list)]
                         prompt += entid_name[topic_e] + ' ' + rela + ' ' + format_capped_list(sorted_e_list, 70)
+                        if reflection_context:
+                            prompt = insert_instruction_before_question(prompt, reflection_context)
 
                         cur_call_time += 1
                         result, token_num = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type, False, False)

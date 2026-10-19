@@ -10,7 +10,11 @@ from typing import Any
 from reference_utils import get_output_file_tag
 from jsonl_io import iter_jsonl_records, append_jsonl_record, format_jsonl_record
 
-RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
+DEFAULT_RESULT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "result")
+RESULT_ROOT = DEFAULT_RESULT_ROOT
+DEFAULT_WORKING_MEMORY_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "exp_mem_PoG")
+)
 RELATION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "relation_memory")
 DECOMPOSITION_MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decomposition_memory")
 MEMORY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")
@@ -94,6 +98,9 @@ def build_run_meta_from_args(
         "constraint_frontier_bias": getattr(args, "constraint_frontier_bias", 1),
         "decomposition_repair": getattr(args, "decomposition_repair", "off"),
         "run_dir": getattr(args, "run_dir", ""),
+        "result_root": getattr(args, "result_root", ""),
+        "working_memory_root": getattr(args, "working_memory_root", ""),
+        "questions_file": getattr(args, "questions_file", ""),
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "results_file": "results.jsonl",
         "trace_file": "pog_trace.jsonl",
@@ -127,13 +134,59 @@ def get_current_run() -> dict[str, Any] | None:
     return _RUN_OUTPUT
 
 
-def _resolve_run_dir(run_dir: str) -> str:
+def _resolve_root_path(raw_candidates: list[str], default_abs: str) -> str:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    for raw in raw_candidates:
+        raw = str(raw or "").strip()
+        if not raw:
+            continue
+        path = raw if os.path.isabs(raw) else os.path.join(base_dir, raw)
+        return os.path.abspath(path)
+    return default_abs
+
+
+def resolve_result_root(args=None) -> str:
+    """Return the directory that should hold timestamped run folders.
+
+    Preference: --result_root, then POG_RESULT_ROOT, then PoG/result.
+    """
+    candidates = []
+    if args is not None:
+        candidates.append(str(getattr(args, "result_root", "") or "").strip())
+    candidates.append(os.environ.get("POG_RESULT_ROOT", "").strip())
+    return _resolve_root_path(candidates, DEFAULT_RESULT_ROOT)
+
+
+def resolve_working_memory_root(args=None) -> str:
+    """Return the directory that should hold per-question working memory.
+
+    Preference: --working_memory_root, then POG_WORKING_MEMORY_ROOT,
+    then ../exp_mem_PoG (sibling of mem_PoG).
+    """
+    candidates = []
+    if args is not None:
+        candidates.append(str(getattr(args, "working_memory_root", "") or "").strip())
+    candidates.append(os.environ.get("POG_WORKING_MEMORY_ROOT", "").strip())
+    return _resolve_root_path(candidates, DEFAULT_WORKING_MEMORY_ROOT)
+
+
+def question_working_memory_dir(args, run_folder_name: str, question: str) -> str:
+    """Per-question working-memory folder: <root>/<run_folder>/<question[:255]>."""
+    return os.path.join(
+        resolve_working_memory_root(args),
+        run_folder_name,
+        str(question)[:255],
+    )
+
+
+def _resolve_run_dir(run_dir: str, result_root: str | None = None) -> str:
     run_dir = run_dir.strip()
     if os.path.isabs(run_dir):
         return run_dir
     if os.path.isdir(run_dir):
         return os.path.abspath(run_dir)
-    under_result = os.path.join(RESULT_ROOT, run_dir)
+    root = result_root or DEFAULT_RESULT_ROOT
+    under_result = os.path.join(root, run_dir)
     if os.path.isdir(under_result):
         return os.path.abspath(under_result)
     return os.path.abspath(under_result)
@@ -224,22 +277,23 @@ def init_run_output(
     planned_question_count: int,
     resume_dir: str | None = None,
 ) -> dict[str, Any]:
-    """Create or resume a run directory under result/."""
+    """Create or resume a run directory under result/ or --result_root."""
     global _RUN_OUTPUT
     if _RUN_OUTPUT is not None:
         return _RUN_OUTPUT
 
     config_tag = get_output_file_tag(args)
-    os.makedirs(RESULT_ROOT, exist_ok=True)
+    result_root = resolve_result_root(args)
+    os.makedirs(result_root, exist_ok=True)
 
     if resume_dir:
-        run_dir = _resolve_run_dir(resume_dir)
+        run_dir = _resolve_run_dir(resume_dir, result_root)
         if not os.path.isdir(run_dir):
             raise FileNotFoundError(f"Run directory not found: {run_dir}")
         run_folder_name = os.path.basename(run_dir.rstrip("/"))
     else:
         run_folder_name = build_run_folder_name(config_tag, planned_question_count)
-        run_dir = os.path.join(RESULT_ROOT, run_folder_name)
+        run_dir = os.path.join(result_root, run_folder_name)
         os.makedirs(run_dir, exist_ok=True)
 
     run_output = {

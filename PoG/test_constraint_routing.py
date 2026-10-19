@@ -16,7 +16,7 @@ from constraint_compiler import (
     select_prompt_constraints,
     select_search_constraints,
 )
-from decomposition_memory import build_gold_planning_prompt, should_use_decomposition_memory
+from constraint_runtime import should_inject_constraint_prompt
 
 
 def sample_compiled():
@@ -332,6 +332,33 @@ class DecompositionHopContractTest(unittest.TestCase):
         self.assertIn("government.governmental_body.members -> government.government_position_held.office_holder", prompt)
         self.assertIn('"step"', prompt)
         self.assertIn("Do not write standalone Filter or Select steps", prompt)
+
+
+class ConstraintPromptStageTest(unittest.TestCase):
+    def _args(self, stages, pushdown="on"):
+        return SimpleNamespace(constraint_pushdown=pushdown, constraint_prompt_stages=stages)
+
+    def test_none_disables_all_prompt_stages(self):
+        for stages in ("none", "off", ""):
+            args = self._args(stages)
+            for stage in ("relation", "memory", "reasoning", "answer"):
+                self.assertFalse(should_inject_constraint_prompt(args, stage), stages)
+
+    def test_default_list_still_injects(self):
+        args = self._args("relation,memory,reasoning,answer")
+        for stage in ("relation", "memory", "reasoning", "answer"):
+            self.assertTrue(should_inject_constraint_prompt(args, stage))
+
+    def test_drop_relation_keeps_other_stages(self):
+        args = self._args("memory,reasoning,answer")
+        self.assertFalse(should_inject_constraint_prompt(args, "relation"))
+        self.assertTrue(should_inject_constraint_prompt(args, "memory"))
+        self.assertTrue(should_inject_constraint_prompt(args, "reasoning"))
+        self.assertTrue(should_inject_constraint_prompt(args, "answer"))
+
+    def test_none_does_not_override_pushdown_off(self):
+        args = self._args("relation,memory,reasoning,answer", pushdown="off")
+        self.assertFalse(should_inject_constraint_prompt(args, "relation"))
 
 
 if __name__ == "__main__":
