@@ -38,3 +38,4 @@ PoG*.jsonl
 /self-play/src/sp_memory/__pycache__/
 /self-play/tests/__pycache__/
 /self-play/runs/
+/MemRL_PoG/__pycache__/
